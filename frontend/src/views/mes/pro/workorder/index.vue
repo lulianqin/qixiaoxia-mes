@@ -541,8 +541,10 @@ export default {
     formatRemaining(min) { if (min == null || min <= 0) return '—'; return min >= 60 ? (Math.round(min/60*10)/10) + 'h' : min + 'm'; },
     firstUndone(steps) { const i = (steps || []).findIndex(s => !s.done); return i < 0 ? -1 : i; },
     stepPct(s) {
+      // 工序已完工（无活跃任务）直接按 100%，避免外协工序产出单位与计划单位不一致时显示 0%
+      if (s.done) return 100;
       const q = Number(s.quantity) || 0, p = Number(s.quantityProduced) || 0;
-      if (q <= 0) return s.done ? 100 : 0;
+      if (q <= 0) return 0;
       return Math.max(0, Math.min(100, Math.round(p / q * 100)));
     },
     dotStyle(row, s, i) {
@@ -552,7 +554,9 @@ export default {
     stepTip(row, s, i) {
       const pct = this.stepPct(s);
       const q = s.quantity == null ? '—' : Number(s.quantity);
-      const p = s.quantityProduced == null ? 0 : Number(s.quantityProduced);
+      // 已完工工序产量按计划量展示，避免外协工序（单位不同）显示 0/10000 却 100%
+      const p = s.done && s.quantity != null ? Number(s.quantity)
+        : (s.quantityProduced == null ? 0 : Number(s.quantityProduced));
       let state;
       if (pct >= 100) state = '已完成';
       else if (row.status === 'PRODUCING' && i === this.firstUndone(row.steps)) state = '进行中';

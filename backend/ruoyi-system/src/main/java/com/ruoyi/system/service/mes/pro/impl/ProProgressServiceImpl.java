@@ -118,7 +118,9 @@ public class ProProgressServiceImpl implements IProProgressService
             row.setActualStartTime(ProDates.toDate(actual.get("actualStart")));
             row.setActualEndTime(ProDates.toDate(actual.get("actualEnd")));
         }
-        row.setCompletionRate(percent(t.getQuantityProduced(), t.getQuantity()));
+        // 已完成任务一律 100%（外协工序产出单位与计划单位不同，产量比不可靠）
+        row.setCompletionRate(ProConstants.TASK_STATUS_COMPLETED.equals(t.getStatus())
+                ? 100 : percent(t.getQuantityProduced(), t.getQuantity()));
         row.setDelayLevel(DelayLevelEvaluator.evaluateTask(
                 t.getStartTime(), t.getEndTime(),
                 row.getActualStartTime(), row.getActualEndTime(),

@@ -74,7 +74,9 @@
       </el-table-column>
       <el-table-column label="工序" align="center" prop="processName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
-      <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
+      <el-table-column label="已生产" align="center" prop="quantityProduced" width="80">
+        <template #default="scope">{{ producedDisplay(scope.row) }}</template>
+      </el-table-column>
       <el-table-column label="颜色" align="center" prop="colorCode" width="80">
         <template #default="scope">
           <el-color-picker v-model="scope.row.colorCode" disabled size="small" v-if="scope.row.colorCode" />
@@ -270,6 +272,15 @@ const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null 
 const qcReleaseRef = ref<InstanceType<typeof QcReleaseDialog>>()
 function isQcBlocked(row: any) {
   return !!qcBlockMap.value[String(row.taskId)]?.blocked
+}
+// 外协任务完工后已生产量按计划量展示：外协产出单位（吨/卷）与任务计划单位（个）不同，
+// 收货自动推进时产量可能与计划量不同，历史数据也可能为 0
+function producedDisplay(row: any) {
+  const produced = Number(row.quantityProduced) || 0
+  if (row.status === 'COMPLETED' && row.workstationCode === 'VENDOR' && produced === 0) {
+    return Number(row.quantity) || 0
+  }
+  return produced
 }
 function loadQcBlockStates(rows: any[]) {
   const ids = rows.filter((r: any) => r.status === 'PRODUCING').map((r: any) => r.taskId)

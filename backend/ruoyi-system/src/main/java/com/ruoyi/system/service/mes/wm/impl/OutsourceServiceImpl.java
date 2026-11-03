@@ -212,6 +212,12 @@ public class OutsourceServiceImpl implements IOutsourceService
         order.setOutsourceFactoryId(vendor != null ? vendor.getOutsourceFactoryId() : null);
         order.setWorkorderId(req.getWorkorderId());
         order.setWorkorderCode(req.getWorkorderCode());
+        // 外协单未随请求传入工单号时从工单主数据补齐（工单名称在报工记录里按 workorderId 回查）
+        if (req.getWorkorderId() != null && order.getWorkorderCode() == null)
+        {
+            ProWorkorder wo = workorderMapper.selectProWorkorderByWorkorderId(req.getWorkorderId());
+            if (wo != null) order.setWorkorderCode(wo.getWorkorderCode());
+        }
         order.setCardId(req.getCardId());
         order.setRouteId(req.getRouteId());
         order.setProcessId(req.getProcessId());
@@ -1492,6 +1498,8 @@ public class OutsourceServiceImpl implements IOutsourceService
         fb.setFeedbackCode(autoCodeGenerator.genSerialCode("FEEDBACK_CODE", null));
         fb.setWorkorderId(order.getWorkorderId() != null ? order.getWorkorderId() : PLACEHOLDER_WORKORDER_ID);
         fb.setWorkorderCode(order.getWorkorderCode());
+        // 报工记录补齐工单名称与任务关联（外协单头历史上未冗余名称，报工列表需要展示）
+        fillFeedbackWorkorderContext(fb, order);
         fb.setProcessId(order.getProcessId() != null ? order.getProcessId() : PLACEHOLDER_WORKORDER_ID);
         fb.setProcessCode(order.getProcessCode());
         fb.setProcessName(order.getProcessName());
@@ -1537,6 +1545,33 @@ public class OutsourceServiceImpl implements IOutsourceService
         return fb.getRecordId();
     }
 
+    /** 报工记录补齐工单名称与工序任务（外协单头未冗余名称时回查工单主数据） */
+    private void fillFeedbackWorkorderContext(ProFeedback fb, WmOutsourceOrder order)
+    {
+        if (order.getWorkorderId() == null) return;
+        ProWorkorder wo = workorderMapper.selectProWorkorderByWorkorderId(order.getWorkorderId());
+        if (wo != null)
+        {
+            fb.setWorkorderName(wo.getWorkorderName());
+            if (fb.getWorkorderCode() == null) fb.setWorkorderCode(wo.getWorkorderCode());
+        }
+        if (order.getProcessId() == null) return;
+        ProTask query = new ProTask();
+        query.setWorkorderId(order.getWorkorderId());
+        query.setProcessId(order.getProcessId());
+        List<ProTask> tasks = proTaskMapper.selectProTaskList(query);
+        if (tasks == null || tasks.isEmpty()) return;
+        // 优先关联生产中任务；同一工序若有多个批次任务，已完成的历史任务也可关联（排除已取消）
+        ProTask task = tasks.stream()
+                .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
+                .findFirst()
+                .orElseGet(() -> tasks.stream()
+                        .filter(t -> !ProConstants.TASK_STATUS_CANCEL.equals(t.getStatus()))
+                        .findFirst().orElse(tasks.get(0)));
+        fb.setTaskId(task.getTaskId());
+        fb.setTaskCode(task.getTaskCode());
+    }
+
     /** 加载完整订单（头 + 发料行 + 收货行），写操作后返回给前端避免数据缺失 */
     private WmOutsourceOrder loadFullOrder(Long orderId)
     {
@@ -1561,31 +1596,24 @@ public class OutsourceServiceImpl implements IOutsourceService
         query.setProcessId(order.getProcessId());
         List<ProTask> tasks = proTaskMapper.selectProTaskList(query);
         if (tasks == null || tasks.isEmpty()) return;
-        // 只给生产中(PRODUCING)任务加产量；CANCEL/COMPLETED 跳过（取第一个活跃任务）
+        // 外协任务可能仍为 NORMAL/PREPARE（未下发就外发），只跳过终态(CANCEL/COMPLETED)
         ProTask target = tasks.stream()
-                .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
+                .filter(t -> !ProConstants.TASK_STATUS_CANCEL.equals(t.getStatus())
+                        && !ProConstants.TASK_STATUS_COMPLETED.equals(t.getStatus()))
                 .findFirst().orElse(null);
         if (target == null)
         {
-            log.warn("外协收货未找到生产中任务: workorderId={}, processId={}", order.getWorkorderId(), order.getProcessId());
+            log.warn("外协收货未找到可推进任务: workorderId={}, processId={}", order.getWorkorderId(), order.getProcessId());
             return;
         }
         BigDecimal totalQty = recptLines.stream()
                 .map(l -> nvl(l.getQuantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
         proTaskMapper.addQuantityProduced(target.getTaskId(), totalQty, totalQty, BigDecimal.ZERO);
-        ProTask updated = proTaskMapper.selectProTaskByTaskId(target.getTaskId());
-        if (updated != null && ProConstants.TASK_STATUS_PRODUCING.equals(updated.getStatus()))
-        {
-            BigDecimal produced = nvl(updated.getQuantityProduced());
-            BigDecimal planned = nvl(updated.getQuantity());
-            if (planned.compareTo(BigDecimal.ZERO) > 0 && produced.compareTo(planned) >= 0)
-            {
-                // 条件完成：仅 PRODUCING → COMPLETED，防收货与工单取消并发回退
-                int rows = proTaskMapper.completeTaskIfProducing(updated.getTaskId(), operator);
-                if (rows > 0)
-                    log.info("外协收货推进任务完成: taskId={}, produced={}/{}", updated.getTaskId(), produced, planned);
-            }
-        }
+        // 外协收货即整道工序交付完成：直接置 COMPLETED，并按计划量补齐已生产量。
+        // 外协产出单位（吨/卷）与任务计划单位（个）可能不同，不能按数量比较判断完成。
+        int rows = proTaskMapper.completeTaskFromOutsource(target.getTaskId(), operator);
+        if (rows > 0)
+            log.info("外协收货推进任务完成: taskId={}, 收货量={}", target.getTaskId(), totalQty);
     }
 
     /** 收货时补填 cardId（发料时卡可能未建，收货时应已存在） */

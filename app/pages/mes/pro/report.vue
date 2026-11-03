@@ -304,6 +304,13 @@ function reasonText(reason) {
   return map[reason] || '当前不可报工'
 }
 
+// 外协工序报工 → 自动跳转外协管理（新建/查看外协单，工单号带入）
+function gotoOutsource() {
+  const code = (workorder.value && workorder.value.workorderCode) || workorderCode.value.trim()
+  if (!code) return
+  uni.navigateTo({ url: '/pages/mes/wm/outsource-create?workorderCode=' + encodeURIComponent(code) })
+}
+
 // 扫流转卡码 → 后端反查报工上下文 → 单任务自动选中直进填数量步（4 步压成 2 步）
 function scanByCard(cardCode) {
   proxy.$modal.loading('查询流转卡...')
@@ -339,15 +346,14 @@ function scanByCard(cardCode) {
     outsourceTaskList.value = data.outsourceTasks || []
     reportedQualifiedSum.value = data.reportedQualifiedSum || 0
     if (!data.canReport) {
-      // 先填充上下文再提示：外协工序时页面仍能看到工单信息与「外协任务」区块
-      let msg = reasonText(data.reason)
+      // 外协工序：直接跳转外协管理，不再弹「无法报工」阻断
       if (data.reason === 'PROCESS_OUTSOURCED') {
         const doing = outsourceTaskList.value.find(t => t.status === 'PRODUCING')
-        if (doing && doing.processName) {
-          msg = '下一道工序「' + doing.processName + '」为外协工序（进行中），请在厂商端录结果或到「外协任务」处理'
-        }
+        proxy.$modal.msg('下一道工序' + (doing && doing.processName ? '「' + doing.processName + '」' : '') + '为外协工序，前往外协管理处理')
+        gotoOutsource()
+        return
       }
-      proxy.$modal.alert(msg, '无法报工')
+      proxy.$modal.alert(reasonText(data.reason), '无法报工')
       return
     }
     // 单任务自动选中 → 直接进填数量步；放行后重拉携带 taskId 时选中指定任务
@@ -420,7 +426,8 @@ function searchWorkorder() {
     taskList.value = data.tasks || []
     outsourceTaskList.value = data.outsourceTasks || []
     if (taskList.value.length === 0 && outsourceTaskList.value.length > 0) {
-      proxy.$modal.msg('外协工序请在厂商端录结果，无需厂内报工')
+      proxy.$modal.msg('该工单仅剩外协工序，前往外协管理处理')
+      gotoOutsource()
     } else if (taskList.value.length === 0) {
       proxy.$modal.msgError('该工单暂无可报工的工序任务')
     }

@@ -390,6 +390,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where task_id = #{taskId} and status = 'PRODUCING'
     </update>
 
+    <!-- 外协收货完成任务：非终态即可完成；已生产量不足计划量时补齐为计划量（外协单位与任务单位可能不一致） -->
+    <update id="completeTaskFromOutsource">
+        update qxx_pro_task
+        set status = 'COMPLETED',
+            quantity_produced = CASE WHEN quantity_produced &lt; quantity THEN quantity ELSE quantity_produced END,
+            update_by = #{operator},
+            update_time = NOW()
+        where task_id = #{taskId} and status not in ('COMPLETED','CANCEL')
+    </update>
+
     <!-- 异常顺延改期：只精准更新计划完成时间，避免全实体 update 覆盖并发状态（异常模块 E3） -->
     <update id="updateTaskEndTime">
         update qxx_pro_task

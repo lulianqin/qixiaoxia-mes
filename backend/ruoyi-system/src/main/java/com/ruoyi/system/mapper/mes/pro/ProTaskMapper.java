@@ -67,6 +67,13 @@ public interface ProTaskMapper {
     int completeTaskIfProducing(@Param("taskId") Long taskId, @Param("operator") String operator);
 
     /**
+     * 外协收货完成任务：非终态任务置 COMPLETED，并把已生产量补齐到计划量
+     * （外协产出单位与任务计划单位可能不同，不能用产量比计划量判断完成）。
+     * @return 影响行数；0 表示任务已终态（被取消/已完成）
+     */
+    int completeTaskFromOutsource(@Param("taskId") Long taskId, @Param("operator") String operator);
+
+    /**
      * 异常顺延改期：精准更新任务计划完成时间（异常模块 E3 RESCHEDULE 出口），
      * 不走全实体 update，避免覆盖并发状态变更。factory_id 由拦截器注入。
      */

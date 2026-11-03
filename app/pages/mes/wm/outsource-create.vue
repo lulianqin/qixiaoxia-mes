@@ -123,6 +123,7 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { getWorkorderOutsourceInfo } from '@/api/mes/pro/workorder'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { createOutsource } from '@/api/mes/wm/outsource'
@@ -301,6 +302,14 @@ async function submit(p) {
     setTimeout(() => { highlightId.value = null }, 2000)
   } catch (e) {} finally { f.submitting = false }
 }
+
+// 从报工页外协提示跳转时带入工单号，进入即自动查询外协工序
+onLoad((options) => {
+  if (options && options.workorderCode) {
+    workorderCode.value = decodeURIComponent(options.workorderCode)
+    searchWorkorder()
+  }
+})
 </script>
 
 <style lang="scss" scoped>
