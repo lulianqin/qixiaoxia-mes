@@ -34,3 +34,7 @@ export function getFeedbackChanges(params: { feedbackId?: number | string; taskI
 export function getInputDefault(taskId: number | string) {
   return request({ url: '/mes/pro/feedback/inputDefault/' + taskId, method: 'get' })
 }
+// 查询单个任务的合格数系统默认值（上一道工序审定合格数，首道工序为 null）
+export function getQualifiedDefault(taskId: number | string) {
+  return request({ url: '/mes/pro/feedback/qualifiedDefault/' + taskId, method: 'get' })
+}

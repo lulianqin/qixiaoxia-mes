@@ -1,8 +1,13 @@
 package com.ruoyi.web.controller.mes.pro;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,6 +43,8 @@ import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
 import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
+import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
+import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -68,6 +75,9 @@ public class ProWorkorderController extends BaseController
 
     @Autowired
     private TaskReportDefaultsApplier defaultsApplier;
+
+    @Autowired
+    private ProRouteProcessMapper proRouteProcessMapper;
 
     /**
      * 查询生产工单列表
@@ -345,18 +355,19 @@ public class ProWorkorderController extends BaseController
         if (!"PREPARE".equals(wo.getStatus()) && !"PRODUCING".equals(wo.getStatus())) {
             return error("该工单状态为「" + wo.getStatus() + "」，仅待生产/生产中可报工");
         }
-        // 查该工单的任务：外协任务(workstation_code=VENDOR)单独分流，厂内任务才进可报工列表
+        // 查该工单的任务：外协任务(workstation_code=VENDOR 或 路线工序标记外协)打标，前端分流引导
         ProTask taskQuery = new ProTask();
         taskQuery.setWorkorderId(wo.getWorkorderId());
         List<ProTask> allTasks = proTaskService.selectProTaskList(taskQuery);
-        // 可报工任务：厂内工序(workstation_code != VENDOR) + PRODUCING 状态
-        List<ProTask> reportableTasks = allTasks.stream()
+        // 全部任务按工艺路线顺序（order_num）排序并标记外协
+        List<ProTask> sortedTasks = sortAndMarkTasks(allTasks, allTasks);
+        // 可报工任务：PRODUCING 状态全部展示（含外协工序，前端打"外协"标签并引导转外协发货）
+        List<ProTask> reportableTasks = sortedTasks.stream()
                 .filter(t -> "PRODUCING".equals(t.getStatus()))
-                .filter(t -> !ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
                 .collect(Collectors.toList());
-        // 外协任务：展示在"外协"区域（workstation_code=VENDOR，不限状态）
-        List<ProTask> outsourceTasks = allTasks.stream()
-                .filter(t -> ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode()))
+        // 外协任务：展示在"外协"区域（派工工作站=VENDOR 或 路线工序标记外协）
+        List<ProTask> outsourceTasks = sortedTasks.stream()
+                .filter(t -> "1".equals(t.getIsOutsource()))
                 .collect(Collectors.toList());
         fillPendingFeedbackCount(allTasks);
         // 工单维度报工入口：富化上机数量默认值与质检锁态
@@ -367,6 +378,102 @@ public class ProWorkorderController extends BaseController
         result.put("tasks", reportableTasks);
         result.put("outsourceTasks", outsourceTasks);
         return success(result);
+    }
+
+    /**
+     * 移动端首页「我的工单」：当前用户派工/负责的生产中任务所关联的工单，
+     * 每个工单携带全部工序任务（按工艺顺序，含未开工/已完成）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @GetMapping("/myWorkorders")
+    public AjaxResult myWorkorders()
+    {
+        List<ProTask> myTasks = proTaskService.selectUserActiveTaskList(getUserId());
+        Map<Long, ProWorkorder> woMap = new LinkedHashMap<>();
+        for (ProTask t : myTasks)
+        {
+            if (woMap.containsKey(t.getWorkorderId())) {
+                continue;
+            }
+            ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(t.getWorkorderId());
+            if (wo != null) {
+                woMap.put(t.getWorkorderId(), wo);
+            }
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ProWorkorder wo : woMap.values())
+        {
+            result.add(buildWorkorderEntry(wo));
+        }
+        return success(result);
+    }
+
+    /**
+     * 工单全部工序任务（按工艺顺序，含状态/负责人/报工人/时间节点），
+     * 供移动端工单详情/工序详情页。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @GetMapping("/workorderTasks/{workorderCode}")
+    public AjaxResult workorderTasks(@PathVariable String workorderCode)
+    {
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderCode(workorderCode);
+        if (wo == null) {
+            return error("未找到工单：" + workorderCode);
+        }
+        return success(buildWorkorderEntry(wo));
+    }
+
+    /** 工单详情数据装配：工单 + 全部工序任务（按工艺顺序、标记外协、富化待确认报工数与质检锁态） */
+    private Map<String, Object> buildWorkorderEntry(ProWorkorder wo)
+    {
+        ProTask taskQuery = new ProTask();
+        taskQuery.setWorkorderId(wo.getWorkorderId());
+        List<ProTask> allTasks = proTaskService.selectProTaskList(taskQuery);
+        List<ProTask> sortedTasks = sortAndMarkTasks(allTasks, allTasks);
+        fillPendingFeedbackCount(sortedTasks);
+        defaultsApplier.apply(sortedTasks);
+        Map<String, Object> result = new HashMap<>();
+        result.put("workorder", wo);
+        result.put("tasks", sortedTasks);
+        return result;
+    }
+
+    /**
+     * 按工艺路线顺序（order_num）排序并标记外协（isOutsource：派工工作站=VENDOR 或 路线工序标记外协）。
+     * base 用于取路线ID（任务上冗余值），tasks 为待排序标记的子集/全集。
+     */
+    private List<ProTask> sortAndMarkTasks(List<ProTask> base, List<ProTask> tasks)
+    {
+        Long routeId = base.stream().map(ProTask::getRouteId)
+                .filter(Objects::nonNull).findFirst().orElse(null);
+        List<ProRouteProcess> routeProcesses = routeId == null
+                ? Collections.emptyList() : proRouteProcessMapper.selectProRouteProcessByRouteId(routeId);
+        Map<Long, ProRouteProcess> rpByProcess = routeProcesses.stream()
+                .filter(rp -> rp.getProcessId() != null)
+                .collect(Collectors.toMap(ProRouteProcess::getProcessId, rp -> rp, (a, b) -> a));
+        List<ProTask> sorted = tasks.stream()
+                .sorted(Comparator.comparingInt(t -> routeOrderNum(rpByProcess, t)))
+                .collect(Collectors.toList());
+        for (ProTask t : sorted)
+        {
+            boolean outsource = ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())
+                    || isOutsourceProcess(rpByProcess.get(t.getProcessId()));
+            t.setIsOutsource(outsource ? "1" : "0");
+        }
+        return sorted;
+    }
+
+    /** 路线工序标记为外协（is_outsource='1'）即外协工序 */
+    private boolean isOutsourceProcess(ProRouteProcess rp)
+    {
+        return rp != null && "1".equals(rp.getIsOutsource());
+    }
+
+    /** 工艺顺序号，未配置路线工序时排最后 */
+    private int routeOrderNum(Map<Long, ProRouteProcess> rpByProcess, ProTask t)
+    {
+        ProRouteProcess rp = rpByProcess.get(t.getProcessId());
+        return (rp == null || rp.getOrderNum() == null) ? Integer.MAX_VALUE : rp.getOrderNum();
     }
 
     /**

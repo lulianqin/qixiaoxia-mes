@@ -5,7 +5,7 @@
       <view class="header-row">
         <view class="header-text">
           <text class="hello">你好，{{ userName || '同事' }}</text>
-          <text class="hello-sub">我的工单任务</text>
+          <text class="hello-sub">我的工单</text>
         </view>
         <view class="work-entry" @click="goWorkbench">工作台 ›</view>
       </view>
@@ -38,28 +38,49 @@
 
       <view v-else-if="list.length === 0" class="state-box">
         <text class="empty-text">{{ emptyText }}</text>
-        <text v-if="activeTab === 'pending'" class="empty-link" @click="goReportList">查看全部待报工 ›</text>
       </view>
 
       <view v-else class="list-box">
-        <!-- 待报工 / 我负责：任务卡片 -->
-        <block v-if="isTaskTab">
-          <view v-for="item in list" :key="'t' + item.taskId" class="card" @click="goReport(item)">
+        <!-- 我的工单：工单卡片，横向展示全部工序 chips -->
+        <block v-if="activeTab === 'workorder'">
+          <view
+            v-for="entry in list"
+            :key="'w' + entry.workorder.workorderId"
+            class="card"
+            @click="goWorkorderDetail(entry)"
+          >
             <view class="card-head">
-              <text class="process">{{ item.processName || item.processCode || '未知工序' }}</text>
-              <uni-tag v-if="item.qcBlocked" type="error" text="不可开工" size="small" />
-              <uni-tag v-else-if="activeTab === 'leader'" type="primary" text="负责人" size="small" />
-              <uni-tag v-else type="warning" text="待报工" size="small" />
+              <view class="wo-title">
+                <text class="process">{{ entry.workorder.workorderCode }}</text>
+                <uni-tag :type="woStatusTagType(entry.workorder.status)" :text="woStatusText(entry.workorder.status)" size="small" />
+              </view>
+              <text class="wo-name">{{ entry.workorder.workorderName || entry.workorder.productName || '' }}</text>
             </view>
-            <text class="workorder">{{ item.workorderCode }}<text v-if="item.workorderName"> · {{ item.workorderName }}</text></text>
+
+            <scroll-view :scroll-x="true" class="chip-scroll">
+              <view class="chip-row">
+                <view
+                  v-for="task in entry.tasks"
+                  :key="task.taskId"
+                  class="chip"
+                  @click.stop="goTaskDetail(entry, task)"
+                >
+                  <view class="chip-dot" :class="'dot-' + chipLevel(task)"></view>
+                  <text class="chip-name" :class="'name-' + chipLevel(task)">{{ task.processName || task.processCode || '未知工序' }}</text>
+                  <text v-if="task.isOutsource === '1'" class="chip-OS">外协</text>
+                  <text v-if="task.pendingFeedbackCount > 0" class="chip-badge">{{ task.pendingFeedbackCount }}</text>
+                </view>
+              </view>
+            </scroll-view>
+
             <view class="card-foot">
               <view class="qty">
                 <text class="qty-label">排产</text>
-                <text class="qty-value">{{ num(item.quantity) }}</text>
+                <text class="qty-value">{{ num(entry.workorder.quantity) }}</text>
                 <text class="qty-label">已产</text>
-                <text class="qty-value">{{ num(item.quantityProduced) }}</text>
+                <text class="qty-value">{{ num(entry.workorder.quantityProduced) }}</text>
               </view>
-              <text class="go-text">去报工 ›</text>
+              <text class="go-text">详情 ›</text>
             </view>
           </view>
         </block>
@@ -100,7 +121,7 @@
   import { onShow } from '@dcloudio/uni-app'
   import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
   import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
-  import { listFeedback, listReportableTask } from '@/api/mes/pro/feedback'
+  import { listFeedback, getMyWorkorders } from '@/api/mes/pro/feedback'
   import { hasPermission } from '@/utils/mobileMenu'
   import { useUserStore } from '@/store'
 
@@ -110,22 +131,22 @@
   const PAGE_SIZE = 10
 
   const ALL_TABS = [
-    { key: 'pending', label: '待报工' },
-    { key: 'leader', label: '我负责' },
+    { key: 'workorder', label: '我的工单' },
     { key: 'prepare', label: '待确认', status: 'PREPARE' },
     { key: 'confirmed', label: '已确认', status: 'CONFIRMED' },
     { key: 'all', label: '全部', status: '' }
   ]
   const STATUS_MAP = { PREPARE: '待确认', CONFIRMED: '已确认', AUDITED: '已审核' }
   const STATUS_TAG_MAP = { PREPARE: 'warning', CONFIRMED: 'primary', AUDITED: 'success' }
+  // 工单状态标签
+  const WO_STATUS_MAP = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
+  const WO_STATUS_TAG_MAP = { PREPARE: 'default', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'error', CLOSED: 'info' }
 
-  // 只展示当前账号有权限的 tab（任务类 tab 看任务权限，报工记录 tab 看记录权限）
-  const TASK_TAB_KEYS = ['pending', 'leader']
-  const tabs = computed(() => ALL_TABS.filter(tab => TASK_TAB_KEYS.indexOf(tab.key) !== -1
+  // 工单 tab 看任务权限，报工记录 tab 看记录权限
+  const WORKORDER_TAB = 'workorder'
+  const tabs = computed(() => ALL_TABS.filter(tab => tab.key === WORKORDER_TAB
     ? hasPermission(userStore.permissions, 'mes:pro:task:list')
     : hasPermission(userStore.permissions, 'mes:pro:feedback:list')))
-  // 任务卡片（报工人 / 负责人视角）与报工记录卡片分开渲染
-  const isTaskTab = computed(() => TASK_TAB_KEYS.indexOf(activeTab.value) !== -1)
 
   const userName = computed(() => userStore.name)
   const activeTab = ref('')
@@ -139,8 +160,7 @@
 
   const emptyText = computed(() => {
     const map = {
-      pending: '暂无派给你的待报工任务',
-      leader: '暂无你负责的生产中任务',
+      workorder: '暂无进行中的工单',
       prepare: '暂无待确认的报工',
       confirmed: '暂无已确认的报工',
       all: '暂无报工记录'
@@ -159,6 +179,23 @@
 
   function statusTagType(status) {
     return STATUS_TAG_MAP[status] || 'default'
+  }
+
+  function woStatusText(status) {
+    return WO_STATUS_MAP[status] || status || ''
+  }
+
+  function woStatusTagType(status) {
+    return WO_STATUS_TAG_MAP[status] || 'default'
+  }
+
+  /** 工序 chip 状态分级：blocked(红)/done(绿)/doing(蓝)/todo(灰)/cancel(灰) */
+  function chipLevel(task) {
+    if (task.qcBlocked) return 'blocked'
+    if (task.status === 'COMPLETED') return 'done'
+    if (task.status === 'PRODUCING') return 'doing'
+    if (task.status === 'CANCEL') return 'cancel'
+    return 'todo'
   }
 
   /** 全部 tab 来源判定：报工人是本人 → 「报工」，否则是负责任务上的记录 → 「负责」 */
@@ -184,14 +221,17 @@
     const params = { pageNum: pageNum.value, pageSize: PAGE_SIZE }
     let request
 
-    if (activeTab.value === 'pending') {
-      // 个人任务：后端按派工人过滤（task.worker_id = 当前用户）
-      if (userStore.id) params.workerId = userStore.id
-      request = listReportableTask(params)
-    } else if (activeTab.value === 'leader') {
-      // 我负责的：后端按负责人过滤（task.leader_id = 当前用户），仅用于查看与代报兜底
-      if (userStore.id) params.leaderId = userStore.id
-      request = listReportableTask(params)
+    if (activeTab.value === WORKORDER_TAB) {
+      // 我的工单：我派工/负责的生产中工单 + 全部工序（不分页，一次返回）
+      request = getMyWorkorders().then(res => {
+        const rows = res.data || []
+        list.value = reset ? rows : list.value.concat(rows)
+        finished.value = true
+      }).catch(() => {})
+      return request.finally(() => {
+        loading.value = false
+        refreshing.value = false
+      })
     } else {
       // 个人报工记录：按报工人过滤（feedback.user_id = 当前用户）
       if (userStore.id) params.userId = userStore.id
@@ -234,12 +274,14 @@
     loadData(false)
   }
 
-  function goReport(item) {
-    proxy.$tab.navigateTo('/pages/mes/pro/report?workorderCode=' + encodeURIComponent(item.workorderCode) + '&taskId=' + item.taskId)
+  /** 工单卡片 → 工单详情页 */
+  function goWorkorderDetail(entry) {
+    proxy.$tab.navigateTo('/pages/mes/pro/workorder-detail?workorderCode=' + encodeURIComponent(entry.workorder.workorderCode))
   }
 
-  function goReportList() {
-    proxy.$tab.navigateTo('/pages/mes/pro/report-list')
+  /** 工序 chip → 工序详情页 */
+  function goTaskDetail(entry, task) {
+    proxy.$tab.navigateTo('/pages/mes/pro/task-detail?workorderCode=' + encodeURIComponent(entry.workorder.workorderCode) + '&taskId=' + task.taskId)
   }
 
   function goWorkbench() {
@@ -382,6 +424,94 @@
       align-items: center;
       gap: 10rpx;
     }
+  }
+
+  .wo-title {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    min-width: 0;
+  }
+
+  .wo-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 24rpx;
+    color: #8a94a6;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chip-scroll {
+    white-space: nowrap;
+    margin: 4rpx -8rpx 8rpx;
+  }
+
+  .chip-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 12rpx;
+    padding: 8rpx;
+  }
+
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8rpx;
+    padding: 10rpx 18rpx;
+    border-radius: 26rpx;
+    background: #f5f6f7;
+    border: 1rpx solid #e8ebf0;
+  }
+
+  .chip-dot {
+    width: 12rpx;
+    height: 12rpx;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    &.dot-doing { background: #3c96f3; }
+    &.dot-done { background: #67c23a; }
+    &.dot-todo { background: #c0c4cc; }
+    &.dot-cancel { background: #d3d7de; }
+    &.dot-blocked { background: #f56c6c; }
+  }
+
+  .chip-name {
+    font-size: 24rpx;
+    color: #1f2d3d;
+    max-width: 220rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.name-doing { color: #1d7bd6; font-weight: 600; }
+    &.name-done { color: #4e9a2e; }
+    &.name-blocked { color: #f56c6c; }
+    &.name-todo, &.name-cancel { color: #8a94a6; }
+  }
+
+  .chip-OS {
+    font-size: 20rpx;
+    color: #b06f1f;
+    background: #fdf3e3;
+    border-radius: 8rpx;
+    padding: 2rpx 8rpx;
+  }
+
+  .chip-badge {
+    min-width: 30rpx;
+    height: 30rpx;
+    line-height: 30rpx;
+    padding: 0 8rpx;
+    border-radius: 16rpx;
+    background: #f56c6c;
+    color: #fff;
+    font-size: 20rpx;
+    text-align: center;
   }
 
   .process {

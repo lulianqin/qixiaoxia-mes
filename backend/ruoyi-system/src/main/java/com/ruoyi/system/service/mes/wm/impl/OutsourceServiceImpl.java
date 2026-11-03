@@ -253,6 +253,8 @@ public class OutsourceServiceImpl implements IOutsourceService
             {
                 // PC 端直接发货可能未指定批次，FIFO 自动解析最早可用批次
                 resolveFifoBatchIfMissing(line);
+                // 在制品/产品未入库即外发：先虚拟入库补齐，再正常出库
+                ensureStockForPick(line, order);
                 WmTransaction pickTx = transactionService.processTransaction(buildPickTx(line, order));
                 writeIssueTrace(line, order, pickTx.getMaterialStockId());
             }
@@ -296,6 +298,66 @@ public class OutsourceServiceImpl implements IOutsourceService
         List<WmMaterialStock> stocks = materialStockMapper.selectAvailableBatches(
                 itemId, warehouseId, WmIssueConstants.QUALITY_NORMAL);
         return (stocks == null || stocks.isEmpty()) ? null : stocks.get(0);
+    }
+
+    /**
+     * 发料前保证库存可扣。产品/半成品在生产中尚未入库（无库存桶）即需外协发货时，
+     * 直接出库会报"库存记录不存在"。此处先补一笔杂项入库（虚拟入库）再正常出库，
+     * 库存最终归零、不为负，且事务留痕可追溯：
+     * <ul>
+     *   <li>无任何可用库存桶 → 虚拟入库整行数量；</li>
+     *   <li>有库存但不足 → 仅虚拟入库差额。</li>
+     * </ul>
+     */
+    private void ensureStockForPick(WmOutsourceIssueLine line, WmOutsourceOrder order)
+    {
+        BigDecimal qty = nvl(line.getQuantity());
+        if (qty.compareTo(BigDecimal.ZERO) <= 0) return;
+        WmMaterialStock stock = resolvePickStock(line);
+        if (stock == null)
+        {
+            transactionService.processTransaction(buildVirtualInboundTx(line, order, qty, null));
+            return;
+        }
+        BigDecimal onhand = stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO;
+        if (onhand.compareTo(qty) < 0)
+        {
+            transactionService.processTransaction(buildVirtualInboundTx(line, order, qty.subtract(onhand), stock));
+        }
+    }
+
+    /** 构建虚拟入库事务（MISC_RECPT 正数）：在制品/产品未入库即外协发料时自动补记，6 元组与随后的出库事务一致 */
+    private WmTransaction buildVirtualInboundTx(WmOutsourceIssueLine line, WmOutsourceOrder order,
+                                                BigDecimal qty, WmMaterialStock stock)
+    {
+        WmTransaction tx = new WmTransaction();
+        tx.setTransactionType(TransactionTypeEnum.MISC_RECPT.getCode());
+        tx.setSourceDocType(SOURCE_DOC_OUTSOURCE);
+        tx.setSourceDocId(order.getOrderId());
+        tx.setSourceDocCode(order.getOrderCode());
+        tx.setSourceLineId(line.getLineId() != null ? line.getLineId() : 0L);
+        tx.setItemId(line.getItemId());
+        tx.setItemCode(line.getItemCode());
+        tx.setItemName(line.getItemName());
+        tx.setSpecification(line.getSpecification());
+        tx.setUnitOfMeasure(line.getUnitOfMeasure() != null ? line.getUnitOfMeasure() : "TON");
+        tx.setUnitName(line.getUnitName() != null ? line.getUnitName() : "吨");
+        tx.setQuantity(qty);
+        tx.setBatchId(line.getBatchId());
+        tx.setBatchCode(line.getBatchCode());
+        tx.setWarehouseId(line.getWarehouseId());
+        tx.setWarehouseCode(line.getWarehouseCode());
+        tx.setWarehouseName(line.getWarehouseName());
+        if (stock != null)
+        {
+            // 沿用命中库存桶的供应商/库位，保证虚拟入库与出库落在同一 6 元组桶上
+            tx.setVendorId(stock.getVendorId());
+            tx.setLocationId(stock.getLocationId());
+            tx.setAreaId(stock.getAreaId());
+        }
+        tx.setRemark("直发虚拟入库：产品/半成品未入库即外协发料，自动补记");
+        tx.setTransactionTime(new Date());
+        return tx;
     }
 
     /**
@@ -380,6 +442,8 @@ public class OutsourceServiceImpl implements IOutsourceService
         {
             // 草稿行可能未指定批次（PC 直接保存草稿），执行时按 FIFO 补最早可用批次
             resolveFifoBatchIfMissing(line);
+            // 在制品/产品未入库即外发：先虚拟入库补齐，再正常出库
+            ensureStockForPick(line, order);
             WmTransaction pickTx = buildPickTx(line, order);
             transactionService.processTransaction(pickTx);
             writeIssueTrace(line, order, pickTx.getMaterialStockId());

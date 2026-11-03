@@ -59,6 +59,7 @@
         <view class="task-top">
           <text class="task-name">{{ task.processName || '工序' }}</text>
           <view class="task-tags">
+            <uni-tag v-if="task.isOutsource === '1'" type="warning" text="外协" size="small" />
             <uni-tag v-if="task.qcBlocked" type="error" text="不可开工" size="small" />
             <uni-tag v-if="(task.pendingFeedbackCount || 0) > 0" type="warning" :text="'待审核' + task.pendingFeedbackCount" size="small" />
             <uni-tag v-if="selectedTaskId === task.taskId" type="primary" text="已选" size="small" />
@@ -108,28 +109,28 @@
         <view class="qty-row">
           <text class="qty-label"><text class="required">*</text>合格数</text>
           <view class="qty-input">
-            <uni-number-box v-model="form.quantityQualified" :min="0" :step="1" />
+            <uni-number-box v-model="form.quantityQualified" :min="0" :max="99999999" :step="1" :width="110" />
             <text class="unit">{{ workorder.unitName || 'PCS' }}</text>
           </view>
         </view>
         <view class="qty-row">
           <text class="qty-label">不合格数</text>
           <view class="qty-input">
-            <uni-number-box v-model="form.quantityUnqualified" :min="0" :step="1" />
+            <uni-number-box v-model="form.quantityUnqualified" :min="0" :max="99999999" :step="1" :width="110" />
             <text class="unit">{{ workorder.unitName || 'PCS' }}</text>
           </view>
         </view>
         <view class="qty-row">
           <text class="qty-label">工废</text>
           <view class="qty-input">
-            <uni-number-box v-model="form.quantityLaborScrap" :min="0" :step="1" />
+            <uni-number-box v-model="form.quantityLaborScrap" :min="0" :max="99999999" :step="1" :width="110" />
             <text class="unit">{{ workorder.unitName || 'PCS' }}</text>
           </view>
         </view>
         <view class="qty-row">
           <text class="qty-label">料废</text>
           <view class="qty-input">
-            <uni-number-box v-model="form.quantityMaterialScrap" :min="0" :step="1" />
+            <uni-number-box v-model="form.quantityMaterialScrap" :min="0" :max="99999999" :step="1" :width="110" />
             <text class="unit">{{ workorder.unitName || 'PCS' }}</text>
           </view>
         </view>
@@ -449,12 +450,20 @@ function searchWorkorder() {
 
 // 选择工序任务
 function selectTask(task) {
+  // 外协工序任务不可内部报工：提示并引导转外协发货（分切、外协加工等所有外协工序一致）
+  if (task.isOutsource === '1') {
+    proxy.$modal.confirm('【' + (task.processName || '该工序') + '】为外协工序，不可内部报工。是否前往外协发货？', '转向外协发货')
+      .then(() => { gotoOutsource() }).catch(() => {})
+    return
+  }
   // 重复点击当前已选任务卡：保留用户手改值（上机数量/参数模板等），不重新选中与重载
   if (selectedTaskId.value != null && selectedTaskId.value === task.taskId) return
   selectedTaskId.value = task.taskId
   selectedTask.value = task
   // 上机数量重置为该任务的系统默认值（数字或 null，子组件挂载后会自动带出）
   form.quantityInput = task.defaultQuantityInput != null ? Number(task.defaultQuantityInput) : null
+  // 合格数默认带上一道工序审定合格数（后端富化；首道工序无默认值时保持 0）
+  form.quantityQualified = task.defaultQuantityQualified != null ? Number(task.defaultQuantityQualified) : 0
   // 加载该工序报工可见的参数模板
   paramList.value = []
   if (task.processId) {
@@ -546,6 +555,22 @@ async function submitReport() {
       }
     }
   }
+  // 防超报软提醒：任务流程按任务计划数量校验（超报不硬拦，由审核环节把关）
+  const st = selectedTask.value
+  if (!card.value && st && st.quantity != null) {
+    const willTotal = (Number(form.quantityQualified) || 0) + Number(st.quantityProduced || 0)
+    if (willTotal > Number(st.quantity)) {
+      try {
+        await proxy.$modal.confirm(
+          '该工序计划数量 ' + st.quantity + '，已报进度 ' + (st.quantityProduced || 0) +
+          '，本次合格后累计将超过计划数量，是否继续？',
+          '超报提醒'
+        )
+      } catch (e) {
+        return
+      }
+    }
+  }
   doSubmit()
 }
 
@@ -609,6 +634,18 @@ function doSubmit() {
   }).catch(e => {
     if (e === false || e === undefined || e === 'cancel' || e?.cancel) return // 用户取消，不提示
     const errMsg = typeof e === 'string' ? e : (e?.msg || e?.message || '未知错误')
+    // 外协工序误报工：引导直接转外协发货页
+    if (errMsg.indexOf('外发工序') !== -1 || errMsg.indexOf('外协收货回写') !== -1) {
+      proxy.$modal.confirm('该工序为外协工序，需走外协发货流程。是否前往外协发货？', '转向外协发货')
+        .then(() => { gotoOutsource() }).catch(() => {})
+      return
+    }
+    // 未领料拦截：引导跳转领料页
+    if (errMsg.indexOf('尚未领料') !== -1) {
+      proxy.$modal.confirm(errMsg + '。是否前往领料？', '去领料')
+        .then(() => { uni.navigateTo({ url: '/pages/mes/wm/issue/list' }) }).catch(() => {})
+      return
+    }
     proxy.$modal.alert(errMsg, '报工失败')
   }).finally(() => {
     submitting.value = false

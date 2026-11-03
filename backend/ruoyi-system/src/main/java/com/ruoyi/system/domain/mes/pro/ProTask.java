@@ -96,6 +96,10 @@ public class ProTask extends BaseEntity
 
     /** 报工默认上机数量（非持久化，查询入口富化） */
     private BigDecimal defaultQuantityInput;
+    /** 报工默认合格数：上一道工序审定合格数（非持久化，首道工序为 null） */
+    private BigDecimal defaultQuantityQualified;
+    /** 是否外协工序任务（非持久化，报工入口富化：'1'=外协，前端展示标签并引导转外协发货） */
+    private String isOutsource;
     /** 质检不合格阻塞态（非持久化，实时派生） */
     private Boolean qcBlocked;
     /** 阻塞原因文案 */
@@ -224,6 +228,10 @@ public class ProTask extends BaseEntity
 
     public BigDecimal getDefaultQuantityInput() { return defaultQuantityInput; }
     public void setDefaultQuantityInput(BigDecimal v) { this.defaultQuantityInput = v; }
+    public BigDecimal getDefaultQuantityQualified() { return defaultQuantityQualified; }
+    public void setDefaultQuantityQualified(BigDecimal v) { this.defaultQuantityQualified = v; }
+    public String getIsOutsource() { return isOutsource; }
+    public void setIsOutsource(String v) { this.isOutsource = v; }
     public Boolean getQcBlocked() { return qcBlocked; }
     public void setQcBlocked(Boolean v) { this.qcBlocked = v; }
     public String getQcBlockReason() { return qcBlockReason; }

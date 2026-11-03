@@ -1,9 +1,11 @@
 package com.ruoyi.system.service.mes.pro;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.qc.QcBlockInfo;
+import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
 
 /**
  * 报工入口任务默认值富化：为可报工任务回填「本次上机数量」系统默认值与质检阻塞态。
@@ -34,6 +37,9 @@ public class TaskReportDefaultsApplier {
     @Autowired
     private IProQcBlockService qcBlockService;
 
+    @Autowired
+    private ProFeedbackMapper feedbackMapper;
+
     /** 批量富化；tasks 为 null 时安全跳过。同一路线的工序节点只查一次库（消除 N+1） */
     public void apply(Collection<ProTask> tasks) {
         if (tasks == null) {
@@ -53,6 +59,8 @@ public class TaskReportDefaultsApplier {
         task.setDefaultQuantityInput(inputResolver.resolveDefaultInput(
                 task.getWorkorderId(), task.getRouteId(), task.getProcessId(),
                 task.getQuantity()));
+        task.setDefaultQuantityQualified(resolvePrevQualified(task.getWorkorderId(),
+                flow.prevNode(task.getRouteId(), task.getProcessId())));
         applyQcBlock(task);
     }
 
@@ -66,10 +74,23 @@ public class TaskReportDefaultsApplier {
         task.setDefaultQuantityInput(inputResolver.resolveDefaultInput(
                 task.getWorkorderId(), task.getRouteId(), task.getProcessId(),
                 task.getQuantity(), nodesLoader));
+        task.setDefaultQuantityQualified(resolvePrevQualified(task.getWorkorderId(),
+                flow.prevNode(nodes, task.getProcessId())));
         QcBlockInfo block = qcBlockService.findBlock(task.getWorkorderId(), task.getProcessId(),
                 task.getTaskId(), nodes);
         task.setQcBlocked(block != null);
         task.setQcBlockReason(block == null ? null : block.getReason());
+    }
+
+    /**
+     * 报工合格数默认值：上一道工序审定(AUDITED)合格数合计。
+     * 首道工序（无前驱）返回 null（前端保持 0，不伪造默认）。
+     */
+    private BigDecimal resolvePrevQualified(Long workorderId, Optional<ProRouteProcess> prev) {
+        if (prev.isEmpty()) {
+            return null;
+        }
+        return feedbackMapper.sumAuditedQuantityQualified(workorderId, prev.get().getProcessId());
     }
 
     /** 单条富化的质检阻塞态（无预载节点，findBlock 内部按 routeId 查路线） */

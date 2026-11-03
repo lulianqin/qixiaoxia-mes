@@ -20,6 +20,11 @@ public interface IProTaskService
      * 查可报工任务（厂内 PRODUCING + 工单 PREPARE/PRODUCING），供移动端待报工列表。
      */
     public List<ProTask> selectReportableTaskList(ProTask proTask);
+
+    /**
+     * 查当前用户派工/负责的生产中任务（含外协 VENDOR/外协路线工序），供移动端「我的工单」定位关联工单。
+     */
+    public List<ProTask> selectUserActiveTaskList(Long userId);
     public List<ProTask> selectAll();
     public int insertProTask(ProTask proTask);
     public int updateProTask(ProTask proTask);

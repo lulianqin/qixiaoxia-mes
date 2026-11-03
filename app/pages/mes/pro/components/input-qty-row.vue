@@ -4,7 +4,7 @@
     <view class="qty-right">
       <text v-if="changed" class="changed-tip">已改·默认 {{ defaultVal }}，保存后留痕</text>
       <view class="qty-input">
-        <uni-number-box :model-value="boxValue" :min="0" :step="1" @update:modelValue="onBoxChange" />
+        <uni-number-box :model-value="boxValue" :min="0" :max="99999999" :step="1" :width="110" @update:modelValue="onBoxChange" />
         <text class="unit">{{ unit || 'PCS' }}</text>
       </view>
     </view>

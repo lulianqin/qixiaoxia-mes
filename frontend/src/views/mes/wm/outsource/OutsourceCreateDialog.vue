@@ -1,11 +1,36 @@
 <template>
-  <el-dialog v-model="visible" title="外协发货" width="850px" :close-on-click-modal="false" append-to-body @close="cancel">
+  <el-dialog v-model="visible" title="外协发货" width="1100px" :close-on-click-modal="false" append-to-body @close="cancel">
     <el-form label-width="100px">
       <el-row>
+        <el-col :span="12">
+          <el-form-item label="生产工单">
+            <el-input v-model="form.workorderCode" placeholder="可选，点击右侧选择" readonly>
+              <template #append>
+                <el-button icon="Search" @click="woSelectRef?.open()" />
+              </template>
+            </el-input>
+          </el-form-item>
+        </el-col>
         <el-col :span="12">
           <el-form-item label="外协厂商" required>
             <el-select v-model="form.vendorId" placeholder="请选择外协厂商" filterable style="width: 100%" @change="onVendorChange">
               <el-option v-for="v in vendorOptions" :key="v.vendorId" :label="v.vendorName" :value="v.vendorId" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row>
+        <el-col :span="12" v-if="form.workorderId">
+          <el-form-item label="外协工序">
+            <el-select v-model="form.processId" placeholder="请选择外协工序" filterable clearable style="width: 100%" @change="onProcessChange">
+              <el-option v-for="p in processOptions" :key="p.processId" :label="p.processName" :value="p.processId" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12" v-if="form.workorderId">
+          <el-form-item label="流转卡">
+            <el-select v-model="form.cardId" placeholder="可选" filterable clearable style="width: 100%" @change="onCardChange">
+              <el-option v-for="c in cardOptions" :key="c.cardId" :label="c.cardCode" :value="c.cardId" />
             </el-select>
           </el-form-item>
         </el-col>
@@ -17,38 +42,11 @@
           </el-form-item>
         </el-col>
       </el-row>
-      <el-row>
-        <el-col :span="12">
-          <el-form-item label="生产工单">
-            <el-input v-model="form.workorderCode" placeholder="可选，点击右侧选择" readonly>
-              <template #append>
-                <el-button icon="Search" @click="woSelectRef?.open()" />
-              </template>
-            </el-input>
-          </el-form-item>
-        </el-col>
-        <el-col :span="12" v-if="form.workorderId">
-          <el-form-item label="流转卡">
-            <el-select v-model="form.cardId" placeholder="可选" filterable clearable style="width: 100%" @change="onCardChange">
-              <el-option v-for="c in cardOptions" :key="c.cardId" :label="c.cardCode" :value="c.cardId" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row v-if="form.workorderId">
-        <el-col :span="12">
-          <el-form-item label="外协工序">
-            <el-select v-model="form.processId" placeholder="可选" filterable clearable style="width: 100%" @change="onProcessChange">
-              <el-option v-for="p in processOptions" :key="p.processId" :label="p.processName" :value="p.processId" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
 
       <!-- 发料物料行 -->
       <el-divider content-position="left">发料明细</el-divider>
-      <el-table :data="form.issueLines" border size="small" max-height="280">
-        <el-table-column label="物料" align="center" min-width="160">
+      <el-table :data="form.issueLines" border size="small" max-height="320">
+        <el-table-column label="物料" align="center" min-width="180">
           <template #default="{ row }">
             <el-input v-model="row.itemName" placeholder="点击右侧选择" readonly size="small">
               <template #append>
@@ -57,14 +55,14 @@
             </el-input>
           </template>
         </el-table-column>
-        <el-table-column label="数量" align="center" width="110">
+        <el-table-column label="数量" align="center" width="150">
           <template #default="{ row }">
-            <el-input-number v-model="row.quantity" :min="0" :precision="4" size="small" style="width: 100%" />
+            <el-input-number v-model="row.quantity" :min="0" :precision="4" :controls="false" size="small" style="width: 100%" placeholder="支持10万级数量" />
           </template>
         </el-table-column>
         <el-table-column label="单位" align="center" width="80">
           <template #default="{ row }">
-            <el-input v-model="row.unitName" size="small" placeholder="吨" />
+            <span>{{ row.unitName || row.unitOfMeasure || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="仓库" align="center" min-width="140">
@@ -82,7 +80,10 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-button type="primary" plain icon="Plus" size="small" class="mt8" @click="addLine">添加物料</el-button>
+      <div class="mt8 line-actions">
+        <el-button type="primary" plain icon="Plus" size="small" @click="addLine">添加物料</el-button>
+        <el-button v-if="outsourceInfo?.productId" plain icon="Box" size="small" @click="addProductLine">发产品本身（{{ outsourceInfo.productName }}）</el-button>
+      </div>
     </el-form>
 
     <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
@@ -99,9 +100,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import { createOutsource } from '@/api/mes/wm/outsource'
+import { getOutsourceInfo } from '@/api/mes/pro/workorder'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { listProcard } from '@/api/mes/pro/procard'
-import { listAllProcess } from '@/api/mes/pro/process'
 import ItemSelect from '@/components/itemSelect/single.vue'
 import WorkorderSelect from '@/components/workorderSelect/single.vue'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
@@ -119,6 +120,8 @@ const currentItemIdx = ref(0)
 const vendorOptions = ref<any[]>([])
 const cardOptions = ref<any[]>([])
 const processOptions = ref<any[]>([])
+// 工单外协信息（外协工序/默认厂商/BOM发料行/产品本身）
+const outsourceInfo = ref<any>(null)
 
 const form = reactive<any>({
   vendorId: null, vendorCode: '', vendorName: '',
@@ -141,10 +144,6 @@ async function open() {
     const res = await listAllVendor()
     vendorOptions.value = (res.data || []).filter((v: any) => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
   }
-  if (processOptions.value.length === 0) {
-    const res = await listAllProcess()
-    processOptions.value = res.data || []
-  }
 }
 
 function resetForm() {
@@ -157,6 +156,8 @@ function resetForm() {
     issueLines: []
   })
   cardOptions.value = []
+  processOptions.value = []
+  outsourceInfo.value = null
 }
 
 function onVendorChange(vendorId: number) {
@@ -164,17 +165,29 @@ function onVendorChange(vendorId: number) {
   if (v) { form.vendorCode = v.vendorCode; form.vendorName = v.vendorName }
 }
 
-function onWorkorderSelected(row: any) {
+async function onWorkorderSelected(row: any) {
   if (!row) return
   form.workorderId = row.workorderId
   form.workorderCode = row.workorderCode
-  // 切换工单时清空工艺路线/工序/流转卡，避免上一张工单残留
   form.routeId = row.routeId || null
   form.processId = null
   form.processCode = ''
   form.processName = ''
   form.cardId = null
+  form.issueLines = []
+  processOptions.value = []
   loadCards(row.workorderId)
+  // 工单联动：只展示该工单的外协工序，默认选中第一道并带出厂商与发料明细
+  try {
+    const res = await getOutsourceInfo(row.workorderCode)
+    outsourceInfo.value = res.data || null
+    processOptions.value = outsourceInfo.value?.outsourceProcesses || []
+    if (processOptions.value.length > 0) {
+      onProcessChange(processOptions.value[0].processId)
+    }
+  } catch (e) {
+    outsourceInfo.value = null
+  }
 }
 
 async function loadCards(workorderId: number) {
@@ -194,15 +207,46 @@ function onCardChange(cardId: number) {
 function onProcessChange(processId: number) {
   const p = processOptions.value.find((x: any) => x.processId === processId)
   if (p) {
+    form.processId = p.processId
     form.processCode = p.processCode
     form.processName = p.processName
-    // 选工序时自动派生来源类型：分切工序→SLITTING，其余→GENERIC（后端 resolveSourceType 为权威，此处仅前端展示联动）
+    // 默认选中工单工序对应的供应商（路线工序配置的默认厂商）
+    if (p.vendorId != null) {
+      form.vendorId = p.vendorId
+      form.vendorCode = p.vendorCode || ''
+      form.vendorName = p.vendorName || ''
+    }
+    // 选工序时自动派生来源类型：分切工序→SLITTING，其余→GENERIC（后端 resolveSourceType 为权威）
     form.sourceType = p.processCode === 'SLITTING' ? 'SLITTING' : 'GENERIC'
+    // 发料明细默认填充：该工序 BOM 发料行；无 BOM 时不强制，可手动添加或发产品本身
+    form.issueLines = (p.bomLines || []).map((b: any) => ({
+      itemId: b.itemId, itemCode: b.itemCode, itemName: b.itemName,
+      specification: b.specification,
+      quantity: Number(b.quantity || 0),
+      unitOfMeasure: b.unitOfMeasure || null, unitName: b.unitName || null,
+      batchId: null, batchCode: null,
+      warehouseId: null, warehouseCode: '', warehouseName: ''
+    }))
   } else {
+    form.processId = null
     form.processCode = ''
     form.processName = ''
     form.sourceType = 'GENERIC'
   }
+}
+
+/** 发产品本身：工单产品（含在制半成品，如印刷后半成品）作为发料行，尚未入库也可发（后端自动虚拟入库） */
+function addProductLine() {
+  const info = outsourceInfo.value
+  if (!info?.productId) return
+  form.issueLines.push({
+    itemId: info.productId, itemCode: info.productCode, itemName: info.productName,
+    specification: info.productSpecification,
+    quantity: Number(info.productQuantity || 0),
+    unitOfMeasure: info.productUnitOfMeasure || null, unitName: info.productUnitName || null,
+    batchId: null, batchCode: null,
+    warehouseId: null, warehouseCode: '', warehouseName: ''
+  })
 }
 
 function onItemSelected(row: any) {
@@ -212,7 +256,9 @@ function onItemSelected(row: any) {
     line.itemId = row.itemId
     line.itemCode = row.itemCode
     line.itemName = row.itemName
-    if (!line.unitOfMeasure) { line.unitOfMeasure = 'TON'; line.unitName = '吨' }
+    // 单位跟随物料主数据，与物料匹配
+    line.unitOfMeasure = row.unitOfMeasure || line.unitOfMeasure || null
+    line.unitName = row.unitName || (row.unitOfMeasure ? null : line.unitName)
   }
 }
 
@@ -227,7 +273,7 @@ function onWarehouseSelected(row: any) {
 }
 
 function addLine() {
-  form.issueLines.push({ itemId: null, itemCode: '', itemName: '', quantity: 0, unitOfMeasure: 'TON', unitName: '吨', batchId: null, warehouseId: null, warehouseCode: '', warehouseName: '' })
+  form.issueLines.push({ itemId: null, itemCode: '', itemName: '', quantity: 0, unitOfMeasure: null, unitName: null, batchId: null, warehouseId: null, warehouseCode: '', warehouseName: '' })
 }
 
 function removeLine(idx: number) {
@@ -253,4 +299,5 @@ defineExpose({ open })
 
 <style scoped>
 .mt8 { margin-top: 8px; }
+.line-actions { display: flex; gap: 8px; }
 </style>

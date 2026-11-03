@@ -162,6 +162,16 @@
       "enablePullDownRefresh": true
     }
   }, {
+    "path": "pages/mes/pro/workorder-detail",
+    "style": {
+      "navigationBarTitleText": "工单详情"
+    }
+  }, {
+    "path": "pages/mes/pro/task-detail",
+    "style": {
+      "navigationBarTitleText": "工序详情"
+    }
+  }, {
     "path": "pages/mes/pro/scan",
     "style": {
       "navigationBarTitleText": "扫一扫"

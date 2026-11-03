@@ -416,6 +416,13 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         vo.setWorkorderCode(wo.getWorkorderCode());
         vo.setWorkorderName(wo.getWorkorderName());
         vo.setProductName(wo.getProductName());
+        // 产品（含在制半成品）自身信息：外协发料可将产品本身作为发料行（如印刷后半成品直发加工厂）
+        vo.setProductId(wo.getProductId());
+        vo.setProductCode(wo.getProductCode());
+        vo.setProductSpecification(wo.getProductSpc());
+        vo.setProductUnitOfMeasure(wo.getUnitOfMeasure());
+        vo.setProductUnitName(wo.getUnitName());
+        vo.setProductQuantity(wo.getQuantity());
 
         // routeId：routeProductId → ProRouteProduct.routeId
         Long routeId = resolveRouteId(wo);

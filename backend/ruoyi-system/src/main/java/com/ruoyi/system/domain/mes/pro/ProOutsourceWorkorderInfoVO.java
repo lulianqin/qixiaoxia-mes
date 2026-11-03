@@ -17,6 +17,14 @@ public class ProOutsourceWorkorderInfoVO
     private String workorderName;
     private String productName;
     private Long routeId;
+    /** 工单产品（含在制半成品）自身信息：外协发料可将产品本身作为发料行（如印刷后半成品直发加工厂） */
+    private Long productId;
+    private String productCode;
+    private String productSpecification;
+    private String productUnitOfMeasure;
+    private String productUnitName;
+    /** 产品本身作为发料行的默认数量（工单排产数量） */
+    private BigDecimal productQuantity;
     /** 活跃流转卡ID（无卡时为 null，建单后用于标记 OUTSOURCING） */
     private Long activeCardId;
 
@@ -99,6 +107,18 @@ public class ProOutsourceWorkorderInfoVO
     public void setWorkorderName(String v) { this.workorderName = v; }
     public String getProductName() { return productName; }
     public void setProductName(String v) { this.productName = v; }
+    public Long getProductId() { return productId; }
+    public void setProductId(Long v) { this.productId = v; }
+    public String getProductCode() { return productCode; }
+    public void setProductCode(String v) { this.productCode = v; }
+    public String getProductSpecification() { return productSpecification; }
+    public void setProductSpecification(String v) { this.productSpecification = v; }
+    public String getProductUnitOfMeasure() { return productUnitOfMeasure; }
+    public void setProductUnitOfMeasure(String v) { this.productUnitOfMeasure = v; }
+    public String getProductUnitName() { return productUnitName; }
+    public void setProductUnitName(String v) { this.productUnitName = v; }
+    public BigDecimal getProductQuantity() { return productQuantity; }
+    public void setProductQuantity(BigDecimal v) { this.productQuantity = v; }
     public Long getRouteId() { return routeId; }
     public void setRouteId(Long v) { this.routeId = v; }
     public Long getActiveCardId() { return activeCardId; }

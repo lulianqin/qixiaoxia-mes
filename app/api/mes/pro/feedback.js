@@ -39,3 +39,13 @@ export function listReportableTask(query) {
 export function getFeedbackEntry(workorderCode) {
   return request({ url: '/mes/pro/workorder/feedbackEntry/' + encodeURIComponent(workorderCode), method: 'get' })
 }
+
+// 移动端首页「我的工单」：我派工/负责的生产中工单 + 全部工序任务（按工艺顺序）
+export function getMyWorkorders() {
+  return request({ url: '/mes/pro/workorder/myWorkorders', method: 'get' })
+}
+
+// 工单全部工序任务（工单详情/工序详情页用）
+export function getWorkorderTasks(workorderCode) {
+  return request({ url: '/mes/pro/workorder/workorderTasks/' + encodeURIComponent(workorderCode), method: 'get' })
+}

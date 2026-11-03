@@ -241,7 +241,7 @@
             <el-row>
               <el-col :span="8">
                 <el-form-item label="报工数量" prop="quantityFeedback">
-                  <el-input-number v-model="form.quantityFeedback" :min="0" style="width: 100%" />
+                  <el-input-number v-model="form.quantityFeedback" :min="0" disabled style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :span="8">
@@ -428,10 +428,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from 'vue'
+import { ref, reactive, watch, getCurrentInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import { Warning } from '@element-plus/icons-vue'
-import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults, getFeedbackChanges, getInputDefault } from '@/api/mes/pro/feedback'
+import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults, getFeedbackChanges, getInputDefault, getQualifiedDefault } from '@/api/mes/pro/feedback'
 import { getTask } from '@/api/mes/pro/task'
 import { listParamTemplateByProcessId } from '@/api/mes/pro/paramtemplate'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
@@ -593,6 +593,16 @@ const rules = {
   ],
 }
 
+// 报工数量自动累计：合格 + 不合格 + 工废 + 料废 + 待检测（输入框禁用，仅展示）
+watch(() => [form.quantityQualified, form.quantityUnqualified, form.quantityLaborScrap,
+  form.quantityMaterialScrap, form.quantityUncheck], () => {
+  form.quantityFeedback = Number(form.quantityQualified || 0)
+    + Number(form.quantityUnqualified || 0)
+    + Number(form.quantityLaborScrap || 0)
+    + Number(form.quantityMaterialScrap || 0)
+    + Number(form.quantityUncheck || 0)
+}, { immediate: true })
+
 // ==================== 列表查询 ====================
 function getList() {
   loading.value = true
@@ -680,6 +690,11 @@ function onTaskSelected(row: any) {
     }).catch(() => {
       // 全局响应拦截器已提示错误；默认值仅为便利，失败时用户可手工填写，不再二次 toast
     })
+    // 合格数默认带上一道工序审定合格数（首道工序无默认值，保持 0）
+    form.quantityQualified = 0
+    getQualifiedDefault(row.taskId).then((res: any) => {
+      if (form.taskId === row.taskId && res.data != null) form.quantityQualified = Number(res.data)
+    }).catch(() => {})
     fetchConsumeDefaults(row.workorderId)
     if (row.processId) loadParamTemplates(row.processId)
   }

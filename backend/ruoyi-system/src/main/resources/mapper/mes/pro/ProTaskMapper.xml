@@ -111,6 +111,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                t.remark, t.create_by, t.create_time, t.update_by, t.update_time
         from qxx_pro_task t
         inner join qxx_pro_workorder wo on wo.workorder_id = t.workorder_id
+        left join qxx_pro_route_process rp on rp.route_id = t.route_id and rp.process_id = t.process_id
         <where>
             t.status = 'PRODUCING'
             and t.workstation_code != 'VENDOR'
@@ -130,7 +131,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 and t.leader_id = #{leaderId}
             </if>
         </where>
-        order by t.task_id desc
+        order by rp.order_num asc, t.task_id asc
+    </select>
+
+    <!-- 移动端「我的工单」：当前用户派工/负责的生产中任务（含外协 VENDOR 与外协路线工序）。
+         factory_id 由拦截器注入 t.factory_id。排序在 Controller 按工艺顺序重排，这里按工单聚合即可。 -->
+    <select id="selectUserActiveTaskList" resultMap="ProTaskResult">
+        select t.task_id, t.factory_id, t.task_code, t.task_name, t.workorder_id, t.workorder_code, t.workorder_name,
+               t.workstation_id, t.workstation_code, t.workstation_name, t.route_id, t.route_code,
+               t.process_id, t.process_code, t.process_name, t.item_id, t.item_code, t.item_name,
+               t.specification, t.unit_of_measure, t.unit_name, t.quantity, t.quantity_produced,
+               t.quantity_qualified, t.quantity_unqualified, t.quantity_changed,
+               t.worker_id, t.worker_name, t.worker_nick, t.leader_id, t.leader_name, t.leader_nick,
+               t.client_id, t.client_code,
+               t.client_name, t.client_nick, t.machine_code, t.setup_duration, t.unit_duration, t.offline_qty,
+               t.start_time, t.duration, t.end_time, t.color_code, t.request_date, t.finish_date, t.cancel_date,
+               t.vendor_id, t.vendor_code, t.outsource_factory_id, t.status, t.predecessor_id, t.snapshot_id,
+               t.gantt_sort, t.is_exception, t.exception_id, t.exception_code, t.origin_task_id,
+               t.remark, t.create_by, t.create_time, t.update_by, t.update_time
+        from qxx_pro_task t
+        inner join qxx_pro_workorder wo on wo.workorder_id = t.workorder_id
+        <where>
+            t.status = 'PRODUCING'
+            and wo.status in ('PREPARE', 'PRODUCING')
+            and (t.worker_id = #{userId} or t.leader_id = #{userId})
+        </where>
+        order by t.workorder_id, t.task_id
     </select>
 
     <select id="selectProTaskByTaskId" parameterType="Long" resultMap="ProTaskResult">

@@ -28,6 +28,14 @@ public interface ProFeedbackMapper {
                                           @Param("processId") Long processId);
 
     /**
+     * 统计工单某工序已审核(AUDITED)报工的合格品数量合计（报工合格数默认值：上道工序审定合格）。
+     * 一期按工单+工序粒度聚合，不区分流转卡。
+     * factory_id 由 FactoryIdInterceptor 自动注入 SQL 文本，参数无需传 factoryId。
+     */
+    BigDecimal sumAuditedQuantityQualified(@Param("workorderId") Long workorderId,
+                                           @Param("processId") Long processId);
+
+    /**
      * 统计工单某工序全部报工（含 PREPARE 待审核）的报工数量合计（上机数量默认值：本工序已产出/已消耗）。
      * 待审核报工代表已发生的实物产出，且被删除时为物理删除，故不按状态过滤。
      * 一期按工单+工序粒度聚合，不区分流转卡。

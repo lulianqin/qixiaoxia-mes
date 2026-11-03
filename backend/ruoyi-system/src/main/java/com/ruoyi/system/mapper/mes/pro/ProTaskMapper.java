@@ -22,6 +22,12 @@ public interface ProTaskMapper {
      * factory_id 由拦截器自动注入（主表别名 t）。
      */
     List<ProTask> selectReportableTaskList(ProTask task);
+
+    /**
+     * 移动端「我的工单」：当前用户派工（worker_id）或负责（leader_id）的生产中任务，
+     * 含外协 VENDOR 任务与外协路线工序任务，用于定位其关联工单。factory_id 由拦截器注入（主表别名 t）。
+     */
+    List<ProTask> selectUserActiveTaskList(@Param("userId") Long userId);
     int insertProTask(ProTask task);
     int updateProTask(ProTask task);
 

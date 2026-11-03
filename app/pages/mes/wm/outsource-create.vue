@@ -59,7 +59,9 @@
             <input class="remark-input" v-model="formOf(p).remark" placeholder="选填" />
           </view>
 
-          <view v-if="formOf(p).issueLines.length === 0" class="empty-hint"><text class="text-grey">该工序无 BOM 发料行</text></view>
+          <view v-if="formOf(p).issueLines.length === 0" class="empty-hint">
+            <text class="text-grey">该工序无 BOM 发料行，可发产品本身或手动添加物料</text>
+          </view>
           <view v-for="(line, idx) in formOf(p).issueLines" :key="idx" class="line-item">
             <view class="line-head">
               <text class="line-name">{{ line.itemName }}</text>
@@ -82,7 +84,15 @@
                 <input class="qty-input" type="digit" v-model="line.quantity" />
                 <text class="unit">{{ line.unitName || '吨' }}</text>
               </view>
+              <view class="line-row line-del">
+                <text class="del-btn" @click="removeLine(p, idx)">删除此行</text>
+              </view>
             </view>
+          </view>
+
+          <view class="line-actions">
+            <button class="cu-btn sm" @click="openItemPicker(p)">添加物料</button>
+            <button v-if="info.productId" class="cu-btn bg-blue sm" @click="addProductLine(p)">发产品本身（{{ info.productName }}）</button>
           </view>
 
           <button class="cu-btn bg-blue lg footer-submit" :disabled="!canSubmit(p) || formOf(p).submitting" @click="submit(p)">
@@ -108,11 +118,29 @@
     <!-- 仓库选择弹窗 -->
     <uni-popup ref="warehousePopup" type="bottom" :is-mask-click="true">
       <view class="popup-content">
-        <view class="popup-header"><text class="popup-title">选择仓库（可用批次）</text><text class="popup-close" @click="warehousePopup.close()">关闭</text></view>
+        <view class="popup-header"><text class="popup-title">选择仓库</text><text class="popup-close" @click="warehousePopup.close()">关闭</text></view>
         <scroll-view scroll-y class="popup-scroll">
-          <view v-if="batchOptions.length === 0" class="empty-hint"><text class="text-grey">暂无可用库存</text></view>
+          <view v-if="batchOptions.length === 0" class="empty-hint"><text class="text-grey">暂无可选仓库/库存</text></view>
           <view v-for="b in batchOptions" :key="(b.warehouseId || '') + '-' + (b.batchId || '')" class="popup-item" @click="pickWarehouse(b)">
-            <view><text class="line-name">{{ b.warehouseName }}</text><text class="line-spec">可用 {{ b.quantityAvailable }} · 批次 {{ b.batchCode || '-' }}</text></view>
+            <view><text class="line-name">{{ b.warehouseName }}</text><text class="line-spec">{{ b.quantityAvailable != null ? ('可用 ' + b.quantityAvailable + ' · 批次 ' + (b.batchCode || '-')) : '无批次（未入库直发，后端自动补记）' }}</text></view>
+            <uni-icons type="right" size="16" color="#ccc"></uni-icons>
+          </view>
+        </scroll-view>
+      </view>
+    </uni-popup>
+
+    <!-- 物料选择弹窗 -->
+    <uni-popup ref="itemPopup" type="bottom" :is-mask-click="true">
+      <view class="popup-content">
+        <view class="popup-header"><text class="popup-title">选择物料</text><text class="popup-close" @click="itemPopup.close()">关闭</text></view>
+        <view class="popup-search">
+          <input class="card-input" v-model="itemKeyword" placeholder="输入物料名称/编码搜索" confirm-type="search" @confirm="searchItems" />
+          <button class="cu-btn sm" @click="searchItems">搜索</button>
+        </view>
+        <scroll-view scroll-y class="popup-scroll">
+          <view v-if="itemOptions.length === 0" class="empty-hint"><text class="text-grey">暂无物料，请搜索</text></view>
+          <view v-for="it in itemOptions" :key="it.itemId" class="popup-item" @click="pickItem(it)">
+            <view><text class="line-name">{{ it.itemName }}</text><text class="line-spec">{{ it.itemCode }}{{ it.specification ? ' · ' + it.specification : '' }}</text></view>
             <uni-icons type="right" size="16" color="#ccc"></uni-icons>
           </view>
         </scroll-view>
@@ -126,12 +154,15 @@ import { ref, reactive, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getWorkorderOutsourceInfo } from '@/api/mes/pro/workorder'
 import { listAllVendor } from '@/api/mes/md/vendor'
+import { listItem } from '@/api/mes/md/item'
 import { createOutsource } from '@/api/mes/wm/outsource'
 import { availableBatches } from '@/api/mes/wm/issue'
+import { listAllWarehouse } from '@/api/mes/wm/warehouse'
 
 const { proxy } = getCurrentInstance()
 const vendorPopup = ref()
 const warehousePopup = ref()
+const itemPopup = ref()
 
 const workorderCode = ref('')
 const loading = ref(false)
@@ -142,6 +173,10 @@ const vendorOptions = ref([])
 const batchOptions = ref([])
 const activeProcessId = ref(null)
 const activeLineIdx = ref(null)
+// 物料选择弹窗状态
+const itemKeyword = ref('')
+const itemOptions = ref([])
+const itemPickerProcess = ref(null)
 // 刚发料的工序ID，用于高亮反馈
 const highlightId = ref(null)
 // 每个外协工序独立的发料表单，key=processId
@@ -245,6 +280,13 @@ async function openWarehousePicker(processId, idx) {
   activeProcessId.value = processId; activeLineIdx.value = idx
   try { const res = await availableBatches(forms[processId].issueLines[idx].itemId); batchOptions.value = res.data || [] }
   catch (e) { batchOptions.value = [] }
+  // 无可用批次（如产品本身/在制品未入库直发）时退化为纯仓库选择，批次留空由后端 FIFO/虚拟入库处理
+  if (batchOptions.value.length === 0) {
+    try {
+      const res = await listAllWarehouse()
+      batchOptions.value = (res.data || []).map(w => ({ warehouseId: w.warehouseId, warehouseCode: w.warehouseCode, warehouseName: w.warehouseName, batchId: 0, batchCode: '', quantityAvailable: null }))
+    } catch (e2) { batchOptions.value = [] }
+  }
   warehousePopup.value.open()
 }
 function pickWarehouse(b) {
@@ -257,6 +299,49 @@ function pickWarehouse(b) {
 
 function goExecute(orderId) {
   proxy.$tab.navigateTo('/pages/mes/wm/outsource-execute?orderId=' + orderId)
+}
+
+/** 发产品本身：工单产品（含在制半成品，如印刷后半成品）作为发料行，未入库直发由后端自动补虚拟入库 */
+function addProductLine(p) {
+  const f = formOf(p)
+  if (!info.value.productId) return
+  f.issueLines.push({
+    itemId: info.value.productId, itemCode: info.value.productCode || '', itemName: info.value.productName || '产品本身',
+    specification: info.value.productSpecification || '',
+    quantity: info.value.productQuantity != null ? Number(info.value.productQuantity) : 0,
+    unitOfMeasure: info.value.productUnitOfMeasure || 'TON', unitName: info.value.productUnitName || '吨',
+    batchId: 0, warehouseId: null, warehouseCode: '', warehouseName: '', batchCode: '',
+    quantityAvailable: null
+  })
+}
+
+/** 手动添加任意物料行（外协加工不一定按 BOM 发料） */
+function openItemPicker(p) { itemPickerProcess.value = p; searchItems(); itemPopup.value.open() }
+
+async function searchItems() {
+  try {
+    const res = await listItem({ pageNum: 1, pageSize: 20, itemName: itemKeyword.value || undefined, enableFlag: '1' })
+    itemOptions.value = res.rows || []
+  } catch (e) { itemOptions.value = [] }
+}
+
+function pickItem(it) {
+  const p = itemPickerProcess.value
+  if (p) {
+    formOf(p).issueLines.push({
+      itemId: it.itemId, itemCode: it.itemCode, itemName: it.itemName,
+      specification: it.specification || '',
+      quantity: 0,
+      unitOfMeasure: it.unitOfMeasure || 'TON', unitName: it.unitName || '吨',
+      batchId: 0, warehouseId: null, warehouseCode: '', warehouseName: '', batchCode: '',
+      quantityAvailable: null
+    })
+  }
+  itemPopup.value.close()
+}
+
+function removeLine(p, idx) {
+  formOf(p).issueLines.splice(idx, 1)
 }
 
 async function submit(p) {
@@ -355,6 +440,11 @@ page { background-color: #f5f6f7; min-height: 100%; }
 .popup-title { font-size: 30rpx; font-weight: 600; }
 .popup-close { color: #999; font-size: 28rpx; }
 .popup-scroll { max-height: 60vh; }
+.popup-search { display: flex; align-items: center; gap: 16rpx; padding: 16rpx 24rpx; border-bottom: 1px solid #f0f0f0; }
+.line-actions { display: flex; gap: 16rpx; padding: 16rpx 0 0; }
+.line-actions .cu-btn { flex: 1; }
+.del-btn { color: #f56c6c; font-size: 26rpx; padding: 8rpx 0; }
+.line-del { justify-content: flex-end; }
 .popup-item { display: flex; justify-content: space-between; align-items: center; padding: 24rpx; border-bottom: 1px solid #f5f5f5; }
 .popup-item.selected { background: #f0f7ff; }
 .footer-submit, .cu-btn.lg { width: 100%; font-size: 30rpx; height: 88rpx; line-height: 88rpx; }

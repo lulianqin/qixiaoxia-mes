@@ -127,6 +127,22 @@ public class ProFeedbackController extends BaseController
     }
 
     /**
+     * 查询单个任务的合格数系统默认值：上一道工序审定(AUDITED)合格数合计（首道工序为 null）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:feedback:query')")
+    @GetMapping("/qualifiedDefault/{taskId}")
+    public AjaxResult qualifiedDefault(@PathVariable Long taskId)
+    {
+        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
+        if (task == null)
+        {
+            return error("任务不存在");
+        }
+        defaultsApplier.apply(task);
+        return success(task.getDefaultQuantityQualified());
+    }
+
+    /**
      * 获取报工记录详细信息
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:feedback:query')")

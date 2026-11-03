@@ -96,6 +96,12 @@ public class ProTaskServiceImpl implements IProTaskService
     }
 
     @Override
+    public List<ProTask> selectUserActiveTaskList(Long userId)
+    {
+        return proTaskMapper.selectUserActiveTaskList(userId);
+    }
+
+    @Override
     public List<ProTask> selectAll()
     {
         return proTaskMapper.selectProTaskList(new ProTask());
@@ -257,13 +263,17 @@ public class ProTaskServiceImpl implements IProTaskService
         // 自动填充工单、产品、工序等关联字段
         autoFillRelatedFields(proTask);
 
-        // 自动生成任务名称：[产品名]【数量】单位
+        // 自动生成任务名称：[产品名]【数量】单位；产品信息缺失时兜底 [工单名]-[工序名]，避免任务名称为空
         if (proTask.getTaskName() == null || proTask.getTaskName().isEmpty() || proTask.getTaskName().equals(proTask.getTaskCode()))
         {
             StringBuilder sb = new StringBuilder();
             if (proTask.getItemName() != null) sb.append(proTask.getItemName());
             if (proTask.getQuantity() != null) sb.append("【").append(proTask.getQuantity().stripTrailingZeros().toPlainString()).append("】");
             if (proTask.getUnitName() != null) sb.append(proTask.getUnitName());
+            if (sb.length() == 0) {
+                if (proTask.getWorkorderName() != null) sb.append(proTask.getWorkorderName());
+                if (proTask.getProcessName() != null) sb.append(sb.length() > 0 ? "-" : "").append(proTask.getProcessName());
+            }
             if (sb.length() > 0) proTask.setTaskName(sb.toString());
         }
 
