@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.pur;
 
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
@@ -126,6 +127,45 @@ class PurOrderServiceUnitTest {
         assertThatThrownBy(() -> service.approvePurOrder(999L))
             .isInstanceOf(RuntimeException.class)
             .hasMessageContaining("不存在");
+    }
+
+    @Test
+    @DisplayName("6.1 审批：明细单价为 0 时拒绝审批")
+    void testApproveRejectsZeroUnitPrice() {
+        PurOrderVO order = draftOrder();
+        when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
+        PurOrderLine zeroPrice = new PurOrderLine();
+        zeroPrice.setLineId(11L);
+        zeroPrice.setItemCode("MAT-001");
+        zeroPrice.setUnitPrice(BigDecimal.ZERO);
+        when(purOrderLineService.selectPurOrderLineList(any())).thenReturn(Collections.singletonList(zeroPrice));
+
+        assertThatThrownBy(() -> service.approvePurOrder(1L))
+            .isInstanceOf(ServiceException.class)
+            .hasMessageContaining("未填单价");
+        verify(purOrderMapper, never()).updatePurOrder(any());
+    }
+
+    @Test
+    @DisplayName("6.2 人工编辑校验：ORDERED 状态拒绝修改")
+    void testAssertUserEditableRejectsOrdered() {
+        PurOrderVO order = draftOrder();
+        order.setStatus("ORDERED");
+        when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
+
+        assertThatThrownBy(() -> service.assertUserEditable(1L))
+            .isInstanceOf(ServiceException.class)
+            .hasMessageContaining("已下单");
+    }
+
+    @Test
+    @DisplayName("6.3 人工编辑校验：APPROVED 状态放行（需补录供应商/单价）")
+    void testAssertUserEditableAllowsApproved() {
+        PurOrderVO order = draftOrder();
+        order.setStatus("APPROVED");
+        when(purOrderMapper.selectPurOrderByOrderId(1L)).thenReturn(order);
+
+        assertThatCode(() -> service.assertUserEditable(1L)).doesNotThrowAnyException();
     }
 
     @Test

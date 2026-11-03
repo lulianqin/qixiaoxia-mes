@@ -15,6 +15,9 @@ public interface MdItemMapper
 
     public MdItem selectMdItemById(Long itemId);
 
+    /** 按物料ID集合批量查询（单位换算批量化，避免逐行 N+1） */
+    public List<MdItem> selectMdItemByIds(Long[] itemIds);
+
     public MdItem checkItemCodeUnique(MdItem mdItem);
 
     public int insertMdItem(MdItem mdItem);

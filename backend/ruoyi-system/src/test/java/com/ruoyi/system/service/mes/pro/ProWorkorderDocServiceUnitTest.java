@@ -75,6 +75,9 @@ class ProWorkorderDocServiceUnitTest {
     @Mock private IPurOrderLineService purOrderLineService;
     @Mock private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
     @Mock private com.ruoyi.system.mapper.mes.md.MdItemVendorMapper mdItemVendorMapper;
+    @Mock private com.ruoyi.system.mapper.mes.md.MdVendorMapper mdVendorMapper;
+    @Mock private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
+    @Mock private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
 
     // ====== Infrastructure ======
     @Mock private RedisLockTemplate lockTemplate;
@@ -120,6 +123,20 @@ class ProWorkorderDocServiceUnitTest {
 
         // ---- TransactionTemplate mock: support new TransactionTemplate(txManager).execute(callback) ----
         when(txManager.getTransaction(any())).thenReturn(mock(org.springframework.transaction.TransactionStatus.class));
+
+        // ---- 单位换算/产品BOM：默认无物料主数据、无产品BOM（按原数量直通）----
+        lenient().when(mesQuantityService.loadItems(any())).thenReturn(Collections.emptyMap());
+        lenient().when(mdProductBomService.selectMdProductBomList(any()))
+                .thenReturn(Collections.emptyList());
+        lenient().when(mesQuantityService.toBaseQty(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(mesQuantityService.hasAuxUnit(any())).thenReturn(false);
+        lenient().when(mesQuantityService.requiredTotalQty(any(), any())).thenAnswer(inv -> {
+            ProWorkorderBom bom = inv.getArgument(0);
+            if (bom.getTotalQuantity() != null) return bom.getTotalQuantity();
+            BigDecimal qty = bom.getQuantity() == null ? BigDecimal.ZERO : bom.getQuantity();
+            BigDecimal woQty = inv.getArgument(1);
+            return qty.multiply(woQty == null ? BigDecimal.ONE : woQty);
+        });
     }
 
     @AfterEach
@@ -163,6 +180,48 @@ class ProWorkorderDocServiceUnitTest {
         assertThat(vo.isHasPurchaseRecommend()).isFalse();
         assertThat(vo.isHasIssueDocs()).isFalse();
         assertThat(vo.isReceiptReady()).isFalse();
+    }
+
+    @Test
+    @DisplayName("loadKitDashboard：已作废领料单不进看板")
+    void should_filterCanceledIssue_when_dashboardLoads() {
+        when(proWorkorderMapper.selectProWorkorderByWorkorderId(1L)).thenReturn(testWorkorder);
+        ProWorkorderBom bom = bomRow(1L, 10L, "MAT-001", "白牛皮", "KG", new BigDecimal("50"));
+        when(proWorkorderBomService.selectProWorkorderBomByWorkorderId(1L))
+                .thenReturn(Collections.singletonList(bom));
+
+        List<Map<String, Object>> materialRows = new ArrayList<>();
+        Map<String, Object> row = new HashMap<>();
+        row.put("itemId", 10L); row.put("itemCode", "MAT-001"); row.put("itemName", "白牛皮");
+        row.put("unitName", "KG"); row.put("requiredQty", new BigDecimal("50"));
+        row.put("availableQty", new BigDecimal("800")); row.put("sufficient", true);
+        row.put("shortageQty", BigDecimal.ZERO);
+        materialRows.add(row);
+        when(proWorkorderService.checkMaterialReadiness(1L)).thenReturn(materialRows);
+
+        WmIssueHeader draft = new WmIssueHeader();
+        draft.setIssueId(1L);
+        draft.setIssueCode("LL-DRAFT");
+        draft.setIssueName("草稿领料单");
+        draft.setStatus("DRAFT");
+        WmIssueHeader canceled = new WmIssueHeader();
+        canceled.setIssueId(2L);
+        canceled.setIssueCode("LL-CANCELED");
+        canceled.setIssueName("作废领料单");
+        canceled.setStatus("CANCELED");
+        when(wmIssueHeaderService.selectWmIssueHeaderList(any()))
+                .thenReturn(java.util.Arrays.asList(draft, canceled));
+
+        when(wmRtIssueService.selectWmRtIssueList(any())).thenReturn(Collections.emptyList());
+        when(proFeedbackMapper.selectProFeedbackList(any())).thenReturn(Collections.emptyList());
+        when(wmProductRecptService.selectWmProductRecptList(any())).thenReturn(Collections.emptyList());
+
+        ProWorkorderKitDashboardVO vo = docService.loadKitDashboard(1L);
+
+        assertThat(vo.getIssueStatuses()).hasSize(1);
+        assertThat(vo.getIssueStatuses().get(0).getIssueCode()).isEqualTo("LL-DRAFT");
+        assertThat(vo.getIssueDraftCount()).isEqualTo(1);
+        assertThat(vo.isHasIssueDocs()).isTrue();
     }
 
     @Test
@@ -662,12 +721,21 @@ class ProWorkorderDocServiceUnitTest {
         materialRows.add(row2);
         when(proWorkorderService.checkMaterialReadiness(1L)).thenReturn(materialRows);
 
-        // item 20 有首选供应商，item 10 无
+        // item 20 有首选供应商（含报价），item 10 无供应商（走物料默认价兜底）
         com.ruoyi.system.domain.mes.md.MdItemVendor iv = new com.ruoyi.system.domain.mes.md.MdItemVendor();
         iv.setItemId(20L); iv.setVendorId(200L); iv.setVendorCode("V-001"); iv.setVendorName("圣享纸业");
         iv.setIsPreferred("Y"); iv.setMinOrderQty(new BigDecimal("50")); iv.setLeadTimeDays(7);
-        when(mdItemVendorMapper.selectList(argThat((com.ruoyi.system.domain.mes.md.MdItemVendor q) -> q != null && Long.valueOf(20L).equals(q.getItemId())))).thenReturn(Collections.singletonList(iv));
-        when(mdItemVendorMapper.selectList(argThat((com.ruoyi.system.domain.mes.md.MdItemVendor q) -> q != null && !Long.valueOf(20L).equals(q.getItemId())))).thenReturn(Collections.emptyList());
+        iv.setPurchasePrice(new BigDecimal("12.5")); iv.setTaxRate(new BigDecimal("13"));
+        when(mdItemVendorMapper.selectEnabledByItemIds(any())).thenReturn(Collections.singletonList(iv));
+
+        com.ruoyi.system.domain.mes.md.MdItem item10 = new com.ruoyi.system.domain.mes.md.MdItem();
+        item10.setItemId(10L); item10.setUnitOfMeasure("KG");
+        item10.setDefaultPurchasePrice(new BigDecimal("8.0")); item10.setDefaultTaxRate(new BigDecimal("9"));
+        com.ruoyi.system.domain.mes.md.MdItem item20 = new com.ruoyi.system.domain.mes.md.MdItem();
+        item20.setItemId(20L); item20.setUnitOfMeasure("KG");
+        Map<Long, com.ruoyi.system.domain.mes.md.MdItem> items = new HashMap<>();
+        items.put(10L, item10); items.put(20L, item20);
+        when(mesQuantityService.loadItems(any())).thenReturn(items);
 
         Map<String, Object> result = docService.buildPurOrderWizard(1L);
 
@@ -676,13 +744,24 @@ class ProWorkorderDocServiceUnitTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> lines = (List<Map<String, Object>>) result.get("lines");
         assertThat(lines).hasSize(2);
-        // item 20: hasVendor=true, checked=true
+        // item 20: hasVendor=true, checked=true，价格取供应商报价
         assertThat(lines.get(1).get("hasVendor")).isEqualTo(true);
         assertThat(lines.get(1).get("checked")).isEqualTo(true);
         assertThat(lines.get(1).get("vendorName")).isEqualTo("圣享纸业");
-        // item 10: hasVendor=false, checked=false (无供应商默认不勾选)
+        assertThat(lines.get(1).get("priceSource")).isEqualTo("VENDOR");
+        assertThat((BigDecimal) lines.get(1).get("unitPrice")).isEqualByComparingTo("12.5");
+        assertThat((BigDecimal) lines.get(1).get("amount")).isEqualByComparingTo("1250.00");
+        // item 10: hasVendor=false, checked=false（无供应商默认不勾选），价格回落物料默认价
         assertThat(lines.get(0).get("hasVendor")).isEqualTo(false);
         assertThat(lines.get(0).get("checked")).isEqualTo(false);
+        assertThat(lines.get(0).get("priceSource")).isEqualTo("ITEM");
+        assertThat((BigDecimal) lines.get(0).get("unitPrice")).isEqualByComparingTo("8.0");
+        assertThat((BigDecimal) lines.get(0).get("amount")).isEqualByComparingTo("1200.00");
+        // 无供应商的 item 10 候选为空
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> options = (List<Map<String, Object>>) lines.get(1).get("vendorOptions");
+        assertThat(options).hasSize(1);
+        assertThat(options.get(0).get("vendorName")).isEqualTo("圣享纸业");
     }
 
     @Test

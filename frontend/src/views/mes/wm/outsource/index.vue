@@ -74,11 +74,18 @@
           <qc-status-tag :status="row.qcStatus" @click="goIqc(row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="270" fixed="right">
+      <el-table-column label="代操作人" align="center" prop="agentOperator" width="90">
+        <template #default="{ row }">{{ row.agentOperator || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="操作" align="center" width="340" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
           <el-button v-if="row.status === 'DRAFT'" link type="warning" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleExecute(row)" v-hasPermi="['mes:wm:outsource:execute']">执行发料</el-button>
           <el-button v-if="row.status === 'DRAFT'" link type="danger" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleDelete(row)" v-hasPermi="['mes:wm:outsource:remove']">删除</el-button>
+          <el-button v-if="row.status === 'ISSUED'" link type="primary" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleVendorReceive(row)" v-hasPermi="['mes:wm:outsource:agentOps']">签收</el-button>
+          <el-button v-if="row.status === 'VENDOR_RCVD' || row.status === 'PROCESSING'" link type="primary" size="small" :disabled="actionLoadingId != null" @click="handleAgentResult(row)" v-hasPermi="['mes:wm:outsource:agentOps']">{{ row.status === 'VENDOR_RCVD' ? '录结果' : '补录' }}</el-button>
+          <el-button v-if="row.status === 'PROCESSING'" link type="warning" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleComplete(row)" v-hasPermi="['mes:wm:outsource:agentOps']">完成</el-button>
+          <el-button v-if="row.status === 'FINISHED'" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleShip(row)" v-hasPermi="['mes:wm:outsource:agentOps']">发货回厂</el-button>
           <el-button v-if="canReceive(row.status)" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleReceive(row)" v-hasPermi="['mes:wm:outsource:receive']">收货</el-button>
         </template>
       </el-table-column>
@@ -88,6 +95,8 @@
 
     <!-- 外协发货弹窗 -->
     <OutsourceCreateDialog ref="createDialogRef" @success="getList" />
+    <!-- 代厂商录入加工结果弹窗 -->
+    <OutsourceAgentResultDialog ref="agentResultRef" @success="getList" />
 
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" title="外协单详情" width="800px" append-to-body>
@@ -128,10 +137,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue'
 import { useRouter } from 'vue-router'
-import { listOutsource, getOutsource, executeOutsource, batchExecuteOutsource, receiveOutsource, batchReceiveOutsource, delOutsource } from '@/api/mes/wm/outsource'
+import { listOutsource, getOutsource, executeOutsource, batchExecuteOutsource, receiveOutsource, batchReceiveOutsource, delOutsource, vendorReceiveOutsource, completeOutsource, shipOutsource } from '@/api/mes/wm/outsource'
 import OutsourceCreateDialog from './OutsourceCreateDialog.vue'
+import OutsourceAgentResultDialog from './OutsourceAgentResultDialog.vue'
 import QcStatusTag from '../../qc/components/QcStatusTag.vue'
 import { showBatchResult } from './batchResult'
+import type { OutsourceIssueLineVO } from './types'
 
 interface OutsourceOrderRow {
   orderId: number
@@ -149,7 +160,8 @@ interface OutsourceOrderRow {
   iqcId?: number | null
   iqcCode?: string | null
   qcStatus?: string | null
-  issueLines?: unknown[]
+  agentOperator?: string | null
+  issueLines?: OutsourceIssueLineVO[]
   recptLines?: unknown[]
 }
 
@@ -173,6 +185,7 @@ const showSearch = ref(true)
 const list = ref<OutsourceOrderRow[]>([])
 const total = ref(0)
 const createDialogRef = ref()
+const agentResultRef = ref()
 const detailVisible = ref(false)
 const detail = ref<OutsourceOrderRow | null>(null)
 const selectedRows = ref<OutsourceOrderRow[]>([])
@@ -215,6 +228,41 @@ async function handleReceive(row: OutsourceOrderRow) {
   try {
     await receiveOutsource(row.orderId)
     proxy.$modal.msgSuccess('收货成功')
+    getList()
+  } finally { actionLoadingId.value = null }
+}
+
+// ── 代厂商操作（签收 / 录结果 / 完成 / 发货回厂）────────────────
+async function handleVendorReceive(row: OutsourceOrderRow) {
+  if (!await confirmAction('确认代厂商签收？签收后由我厂承担加工责任，可继续录结果。')) return
+  actionLoadingId.value = row.orderId
+  try {
+    await vendorReceiveOutsource(row.orderId)
+    proxy.$modal.msgSuccess('签收成功')
+    getList()
+  } finally { actionLoadingId.value = null }
+}
+
+function handleAgentResult(row: OutsourceOrderRow) {
+  agentResultRef.value?.open(row)
+}
+
+async function handleComplete(row: OutsourceOrderRow) {
+  if (!await confirmAction('确认代厂商完成加工？完成后可发货回厂。')) return
+  actionLoadingId.value = row.orderId
+  try {
+    await completeOutsource(row.orderId)
+    proxy.$modal.msgSuccess('已完成，可发货回厂')
+    getList()
+  } finally { actionLoadingId.value = null }
+}
+
+async function handleShip(row: OutsourceOrderRow) {
+  if (!await confirmAction('确认代厂商发货回厂？发货后将生成来料检验单，等待我厂收货。')) return
+  actionLoadingId.value = row.orderId
+  try {
+    await shipOutsource(row.orderId)
+    proxy.$modal.msgSuccess('已发货回厂')
     getList()
   } finally { actionLoadingId.value = null }
 }

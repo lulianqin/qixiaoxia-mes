@@ -176,6 +176,10 @@
               <el-col :span="8"><el-form-item label="最高库存"><el-input-number v-model="form.maxStock" :precision="4" style="width:100%" /></el-form-item></el-col>
               <el-col :span="8"><el-form-item label="预警库存"><el-input-number v-model="form.alertStock" :precision="4" style="width:100%" /></el-form-item></el-col>
             </el-row>
+            <el-row>
+              <el-col :span="12"><el-form-item label="默认采购价"><el-input-number v-model="form.defaultPurchasePrice" :min="0" :precision="4" style="width:100%" placeholder="元/主单位，采购向导兜底价" /></el-form-item></el-col>
+              <el-col :span="12"><el-form-item label="默认税率(%)"><el-input-number v-model="form.defaultTaxRate" :min="0" :max="100" :precision="2" style="width:100%" /></el-form-item></el-col>
+            </el-row>
             <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item>
           </el-form>
         </el-tab-pane>

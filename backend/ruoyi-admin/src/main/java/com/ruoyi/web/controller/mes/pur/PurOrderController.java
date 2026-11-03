@@ -181,6 +181,8 @@ public class PurOrderController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody PurOrder purOrder)
     {
+        // 已下单/收货中/已收货等状态只读，避免下达后仍被篡改
+        purOrderService.assertUserEditable(purOrder.getOrderId());
         return toAjax(purOrderService.updatePurOrder(purOrder));
     }
 

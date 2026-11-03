@@ -31,6 +31,12 @@ public class ProWorkorderBom extends BaseEntity
     @Excel(name = "单位用量") private BigDecimal quantity;
     @Excel(name = "预计总用量") private BigDecimal totalQuantity;
     @Excel(name = "预计总用量(辅助单位)") private BigDecimal totalQuantity2;
+    /** 用量方式：PER_UNIT-按件用量；TOTAL-整单总量 */
+    private String quantityMode;
+    /** BOM来源：PRODUCT-产品BOM；PROCESS-工艺路线BOM */
+    private String bomSource;
+    /** 损耗率（0~1），需求 = 总量 × (1 + 损耗率) */
+    private java.math.BigDecimal scrapRate;
 
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
@@ -68,6 +74,12 @@ public class ProWorkorderBom extends BaseEntity
     public void setTotalQuantity(BigDecimal v) { this.totalQuantity = v; }
     public BigDecimal getTotalQuantity2() { return totalQuantity2; }
     public void setTotalQuantity2(BigDecimal v) { this.totalQuantity2 = v; }
+    public String getQuantityMode() { return quantityMode; }
+    public void setQuantityMode(String v) { this.quantityMode = v; }
+    public String getBomSource() { return bomSource; }
+    public void setBomSource(String v) { this.bomSource = v; }
+    public java.math.BigDecimal getScrapRate() { return scrapRate; }
+    public void setScrapRate(java.math.BigDecimal v) { this.scrapRate = v; }
 
     @Override
     public String toString() {

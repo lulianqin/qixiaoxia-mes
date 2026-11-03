@@ -14,6 +14,9 @@
         <result property="isPreferred" column="is_preferred"/>
         <result property="minOrderQty" column="min_order_qty"/>
         <result property="leadTimeDays" column="lead_time_days"/>
+        <result property="purchasePrice" column="purchase_price"/>
+        <result property="taxRate" column="tax_rate"/>
+        <result property="currency" column="currency"/>
         <result property="enableFlag" column="enable_flag"/>
         <result property="remark" column="remark"/>
         <result property="createBy" column="create_by"/>
@@ -24,7 +27,8 @@
 
     <sql id="selectVo">
         select record_id, factory_id, item_id, item_code, item_name, vendor_id, vendor_code, vendor_name,
-               is_preferred, min_order_qty, lead_time_days, enable_flag, remark, create_by, create_time, update_by, update_time
+               is_preferred, min_order_qty, lead_time_days, purchase_price, tax_rate, currency,
+               enable_flag, remark, create_by, create_time, update_by, update_time
         from qxx_md_item_vendor
     </sql>
 
@@ -51,6 +55,15 @@
         <include refid="selectVo"/> where item_id = #{itemId} order by is_preferred desc
     </select>
 
+    <select id="selectEnabledByItemIds" resultMap="MdItemVendorResult">
+        <include refid="selectVo"/>
+        where enable_flag = '1' and item_id in
+        <foreach item="itemId" collection="array" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+        order by is_preferred desc, record_id desc
+    </select>
+
     <insert id="insert" parameterType="MdItemVendor" useGeneratedKeys="true" keyProperty="recordId">
         insert into qxx_md_item_vendor
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -63,6 +76,9 @@
             <if test="isPreferred != null">is_preferred,</if>
             <if test="minOrderQty != null">min_order_qty,</if>
             <if test="leadTimeDays != null">lead_time_days,</if>
+            <if test="purchasePrice != null">purchase_price,</if>
+            <if test="taxRate != null">tax_rate,</if>
+            <if test="currency != null">currency,</if>
             <if test="enableFlag != null">enable_flag,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -78,6 +94,9 @@
             <if test="isPreferred != null">#{isPreferred},</if>
             <if test="minOrderQty != null">#{minOrderQty},</if>
             <if test="leadTimeDays != null">#{leadTimeDays},</if>
+            <if test="purchasePrice != null">#{purchasePrice},</if>
+            <if test="taxRate != null">#{taxRate},</if>
+            <if test="currency != null">#{currency},</if>
             <if test="enableFlag != null">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -97,6 +116,9 @@
             <if test="isPreferred != null">is_preferred = #{isPreferred},</if>
             <if test="minOrderQty != null">min_order_qty = #{minOrderQty},</if>
             <if test="leadTimeDays != null">lead_time_days = #{leadTimeDays},</if>
+            <if test="purchasePrice != null">purchase_price = #{purchasePrice},</if>
+            <if test="taxRate != null">tax_rate = #{taxRate},</if>
+            <if test="currency != null">currency = #{currency},</if>
             <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

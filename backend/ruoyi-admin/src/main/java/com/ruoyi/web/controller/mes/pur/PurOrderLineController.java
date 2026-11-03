@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
+import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -33,6 +34,9 @@ public class PurOrderLineController extends BaseController
 {
     @Autowired
     private IPurOrderLineService purOrderLineService;
+
+    @Autowired
+    private IPurOrderService purOrderService;
 
     /**
      * 查询采购订单行列表
@@ -77,6 +81,8 @@ public class PurOrderLineController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody PurOrderLine purOrderLine)
     {
+        // 已下单及之后状态不允许增删改明细
+        purOrderService.assertUserEditable(purOrderLine.getOrderId());
         purOrderLineService.insertPurOrderLine(purOrderLine);
         return success(purOrderLine);
     }
@@ -89,6 +95,10 @@ public class PurOrderLineController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody PurOrderLine purOrderLine)
     {
+        PurOrderLine existing = purOrderLineService.selectPurOrderLineByLineId(purOrderLine.getLineId());
+        if (existing != null) {
+            purOrderService.assertUserEditable(existing.getOrderId());
+        }
         return toAjax(purOrderLineService.updatePurOrderLine(purOrderLine));
     }
 
@@ -100,6 +110,12 @@ public class PurOrderLineController extends BaseController
 	@DeleteMapping("/{lineIds}")
     public AjaxResult remove(@PathVariable Long[] lineIds)
     {
+        for (Long lineId : lineIds) {
+            PurOrderLine existing = purOrderLineService.selectPurOrderLineByLineId(lineId);
+            if (existing != null) {
+                purOrderService.assertUserEditable(existing.getOrderId());
+            }
+        }
         return toAjax(purOrderLineService.deletePurOrderLineByLineIds(lineIds));
     }
 }

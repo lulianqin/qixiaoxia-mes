@@ -52,6 +52,7 @@ class ProWorkorderServiceSkuUnitTest {
     @Mock private IProRouteProcessService routeProcessService;
     @Mock private IProWorkorderChangeService changeService;
     @Mock private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
+    @Mock private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
 
     private ProWorkorder testWorkorder;
@@ -89,6 +90,18 @@ class ProWorkorderServiceSkuUnitTest {
             w.setWorkorderId(9001L);
             return 1;
         }).when(workorderMapper).insertProWorkorder(any(ProWorkorder.class));
+
+        // 单位换算/需求计算：默认无物料主数据，数量直通
+        lenient().when(mesQuantityService.loadItems(any())).thenReturn(java.util.Collections.emptyMap());
+        lenient().when(mesQuantityService.toBaseQty(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(mesQuantityService.hasAuxUnit(any())).thenReturn(false);
+        lenient().when(mesQuantityService.calcTotalQty(any(), any())).thenAnswer(inv -> {
+            ProWorkorderBom bom = inv.getArgument(0);
+            BigDecimal woQty = inv.getArgument(1);
+            BigDecimal qty = bom.getQuantity() == null ? BigDecimal.ZERO : bom.getQuantity();
+            return "TOTAL".equalsIgnoreCase(bom.getQuantityMode()) ? qty
+                    : qty.multiply(woQty == null ? BigDecimal.ONE : woQty);
+        });
     }
 
     // ══════════════════════════════════════════════

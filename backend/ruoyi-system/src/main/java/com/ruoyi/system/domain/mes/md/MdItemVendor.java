@@ -34,6 +34,15 @@ public class MdItemVendor extends BaseEntity
     private BigDecimal minOrderQty;
     @Excel(name = "采购提前期")
     private Integer leadTimeDays;
+    /** 供应商报价(元/主单位)，采购向导默认价优先取此值 */
+    @Excel(name = "采购价")
+    private BigDecimal purchasePrice;
+    /** 税率(%) */
+    @Excel(name = "税率")
+    private BigDecimal taxRate;
+    /** 币种 */
+    @Excel(name = "币种")
+    private String currency;
     @Excel(name = "是否启用")
     private String enableFlag;
 
@@ -59,6 +68,12 @@ public class MdItemVendor extends BaseEntity
     public void setMinOrderQty(BigDecimal v) { this.minOrderQty = v; }
     public Integer getLeadTimeDays() { return leadTimeDays; }
     public void setLeadTimeDays(Integer v) { this.leadTimeDays = v; }
+    public BigDecimal getPurchasePrice() { return purchasePrice; }
+    public void setPurchasePrice(BigDecimal v) { this.purchasePrice = v; }
+    public BigDecimal getTaxRate() { return taxRate; }
+    public void setTaxRate(BigDecimal v) { this.taxRate = v; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String v) { this.currency = v; }
     public String getEnableFlag() { return enableFlag; }
     public void setEnableFlag(String v) { this.enableFlag = v; }
 }

@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,6 +88,8 @@ public class SlittingResultStrategy implements OutsourceResultStrategy
             child.setWarehouseName(line.getWarehouseName());
             child.setStatus("OUTSOURCED");
             child.setSlitBatchNo(order.getOrderCode());
+            // 分切子卷实际规格：厂商录结果时以 extAttrs 提交 {"width":门幅, "gsm":克重}
+            fillActualSpec(child, line.getExtAttrs(), order.getOrderCode());
             // 关联母卷：分切外协建单时 sourceRefId 指向母卷 rollId，
             // 不设会导致子卷 parentRollId 为空，追溯断链（无法从子卷反查母卷）
             if (order.getSourceRefId() != null) child.setParentRollId(order.getSourceRefId());
@@ -134,6 +138,28 @@ public class SlittingResultStrategy implements OutsourceResultStrategy
             }
         }
         log.info("分切策略-收货: orderId={}, 子卷入库 {} 卷", order.getOrderId(), updated);
+    }
+
+    /**
+     * 把收货行 extAttrs 中的分切规格写入子卷实际门幅/克重。
+     * extAttrs 非法或字段缺失时跳过（不阻断录结果），保留原值。
+     */
+    private void fillActualSpec(WmRollDetail child, String extAttrs, String orderCode)
+    {
+        if (extAttrs == null || extAttrs.isEmpty()) return;
+        try
+        {
+            JSONObject ext = JSON.parseObject(extAttrs);
+            if (ext == null) return;
+            Object width = ext.get("width");
+            Object gsm = ext.get("gsm");
+            if (width != null) child.setActualWidth(String.valueOf(width));
+            if (gsm != null) child.setActualWeightGsm(String.valueOf(gsm));
+        }
+        catch (Exception e)
+        {
+            log.warn("分切子卷规格解析失败, 已跳过: orderCode={}, extAttrs={}", orderCode, extAttrs);
+        }
     }
 
     /**

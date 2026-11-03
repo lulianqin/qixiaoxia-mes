@@ -67,6 +67,9 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
     private WmMaterialStockMapper wmMaterialStockMapper;
 
     @Autowired
+    private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
+
+    @Autowired
     private WmTransactionMapper wmTransactionMapper;
 
     @Autowired
@@ -442,6 +445,14 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
         // RQC 拦截门：绑定 RQC 模板的物料必须已有 COMPLETED+PASS/CONCESSION 的退料检验单方可执行退料
         qcGateService.assertRtIssueExecutable(header, lines);
 
+        // 退料数量按行单位 → 物料主单位统一折算，并用于辅助单位数量维护
+        Map<Long, com.ruoyi.system.domain.mes.md.MdItem> items = new HashMap<>();
+        List<Long> itemIds = new ArrayList<>();
+        for (WmRtIssueLine line : lines) {
+            if (line.getItemId() != null) itemIds.add(line.getItemId());
+        }
+        if (!itemIds.isEmpty()) items = mesQuantityService.loadItems(itemIds);
+
         for (WmRtIssueLine line : lines) {
             // 2. 查库存 (itemId + batchId + warehouseId + vendorId + workorderId + qualityStatus)
             WmMaterialStock stockQuery = new WmMaterialStock();
@@ -453,23 +464,43 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             stockQuery.setQualityStatus("NORMAL");
 
             WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
-            BigDecimal delta = line.getQuantityRt();
+            com.ruoyi.system.domain.mes.md.MdItem item = items.get(line.getItemId());
+            BigDecimal delta = mesQuantityService.toBaseQty(line.getQuantityRt(), line.getUnitOfMeasure(), item);
+            BigDecimal auxDelta = (item != null && mesQuantityService.hasAuxUnit(item))
+                    ? mesQuantityService.toAuxQty(delta, item.getUnitOfMeasure(), item) : null;
 
             if (existing != null) {
-                // 库存存在 → 增加现有量
-                existing.setQuantityOnhand(existing.getQuantityOnhand().add(delta));
+                // 历史库存行可能按辅助单位记录，先归一到主单位再累加
+                mesQuantityService.normalizeStockRow(existing);
+                // 库存存在 → 现有量与可用量同步增加（退料回库可再次使用）
+                BigDecimal newOnhand = nvlQty(existing.getQuantityOnhand()).add(delta);
+                BigDecimal newAvailable = nvlQty(existing.getQuantityAvailable()).add(delta);
+                existing.setQuantityOnhand(newOnhand);
+                existing.setQuantityAvailable(newAvailable.min(newOnhand));
+                if (auxDelta != null) {
+                    existing.setQuantityOnhand2(nvlQty(existing.getQuantityOnhand2()).add(auxDelta));
+                    existing.setQuantityAvailable2(nvlQty(existing.getQuantityAvailable2()).add(auxDelta));
+                }
                 existing.setUpdateTime(new Date());
                 wmMaterialStockMapper.updateWmMaterialStock(existing);
             } else {
                 // 库存不存在 → 新建库存记录
                 stockQuery.setQuantityOnhand(delta);
+                stockQuery.setQuantityAvailable(delta);
+                stockQuery.setQuantityOnhand2(auxDelta != null ? auxDelta : BigDecimal.ZERO);
+                stockQuery.setQuantityAvailable2(auxDelta != null ? auxDelta : BigDecimal.ZERO);
                 stockQuery.setCreateTime(new Date());
                 stockQuery.setUpdateTime(new Date());
                 stockQuery.setItemCode(line.getItemCode());
                 stockQuery.setItemName(line.getItemName());
                 stockQuery.setSpecification(line.getItemSpc());
-                stockQuery.setUnitOfMeasure(line.getUnitOfMeasure());
-                stockQuery.setUnitName(line.getUnitName());
+                stockQuery.setUnitOfMeasure(item != null ? item.getUnitOfMeasure() : line.getUnitOfMeasure());
+                stockQuery.setUnitName(item != null ? item.getUnitName() : line.getUnitName());
+                if (item != null) {
+                    stockQuery.setUnit2(item.getUnit2());
+                    stockQuery.setUnit2Name(item.getUnit2Name());
+                    stockQuery.setConversionRate(item.getConversionRate());
+                }
                 stockQuery.setQualityStatus("NORMAL");
                 stockQuery.setWorkorderId(header.getWorkorderId());
                 stockQuery.setWorkorderCode(header.getWorkorderCode());
@@ -489,8 +520,9 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             tx.setItemCode(line.getItemCode());
             tx.setItemName(line.getItemName());
             tx.setSpecification(line.getItemSpc());
-            tx.setUnitOfMeasure(line.getUnitOfMeasure());
-            tx.setUnitName(line.getUnitName());
+            // delta 已折算为物料主单位，流水单位同步写主单位
+            tx.setUnitOfMeasure(item != null ? item.getUnitOfMeasure() : line.getUnitOfMeasure());
+            tx.setUnitName(item != null ? item.getUnitName() : line.getUnitName());
             tx.setQuantity(delta);
             tx.setBatchId(line.getBatchId());
             tx.setBatchCode(line.getBatchCode());
@@ -509,8 +541,8 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             trace.setParentId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
             trace.setChildType("MATERIAL_STOCK");
             trace.setChildId(existing.getMaterialStockId());
-            trace.setQuantity(line.getQuantityRt());
-            trace.setUnitOfMeasure(line.getUnitOfMeasure());
+            trace.setQuantity(delta);
+            trace.setUnitOfMeasure(item != null ? item.getUnitOfMeasure() : line.getUnitOfMeasure());
             trace.setWorkorderId(header.getWorkorderId());
             trace.setTransactionId(tx.getTransactionId());
             trace.setProcessId(null);
@@ -527,5 +559,9 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
         wmRtIssueMapper.updateWmRtIssue(header);
 
         return rtId;
+    }
+
+    private BigDecimal nvlQty(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
     }
 }

@@ -59,6 +59,7 @@ class WmIssueHeaderServiceUnitTest {
     @Mock private com.ruoyi.system.mapper.mes.wm.WmIssueDetailMapper issueDetailMapper;
     @Mock private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
     @Mock private RedisLockTemplate lockTemplate;
+    @Mock private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
     @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private WmIssueHeaderServiceImpl service;
 
@@ -82,6 +83,20 @@ class WmIssueHeaderServiceUnitTest {
         // 手动创建 txTemplate（@PostConstruct 在 Mockito 下不触发）
         TransactionTemplate tt = new TransactionTemplate(transactionManager);
         ReflectionTestUtils.setField(service, "txTemplate", tt);
+
+        // 单位换算：默认无物料主数据（数量直通）
+        lenient().when(mesQuantityService.loadItems(any())).thenReturn(java.util.Collections.emptyMap());
+        lenient().when(mesQuantityService.toBaseQty(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(mesQuantityService.toAuxQty(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(mesQuantityService.hasAuxUnit(any())).thenReturn(false);
+        lenient().when(mesQuantityService.isAuxUnit(any(), any())).thenReturn(false);
+        lenient().when(mesQuantityService.requiredTotalQty(any(), any())).thenAnswer(inv -> {
+            com.ruoyi.system.domain.mes.pro.ProWorkorderBom bom = inv.getArgument(0);
+            if (bom.getTotalQuantity() != null) return bom.getTotalQuantity();
+            java.math.BigDecimal qty = bom.getQuantity() == null ? java.math.BigDecimal.ZERO : bom.getQuantity();
+            java.math.BigDecimal woQty = inv.getArgument(1);
+            return qty.multiply(woQty == null ? java.math.BigDecimal.ONE : woQty);
+        });
 
         // 测试数据
         testHeader = new WmIssueHeader();
@@ -722,5 +737,50 @@ class WmIssueHeaderServiceUnitTest {
 
         // 终态单不阻断 → 执行了 insert
         verify(issueHeaderMapper).insertWmIssueHeader(newHeader);
+    }
+
+    // ══════════════════════════════════════════════
+    // 删除状态校验（P0：已作废可删除）
+    // ══════════════════════════════════════════════
+
+    @Test
+    @DisplayName("27. 删除：已作废且无出库流水 → 允许删除并级联删除行")
+    void testDeleteCanceledWithoutIssueOut() {
+        testHeader.setStatus("CANCELED");
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        when(transactionMapper.selectWmTransactionList(any())).thenReturn(java.util.Collections.emptyList());
+        when(issueHeaderMapper.deleteWmIssueHeaderByIssueIds(any())).thenReturn(1);
+
+        int rows = service.deleteWmIssueHeaderByIssueIds(new Long[]{1L});
+
+        assertThat(rows).isEqualTo(1);
+        verify(issueLineMapper).deleteWmIssueLineByIssueId(1L);
+        verify(issueHeaderMapper).deleteWmIssueHeaderByIssueIds(any());
+    }
+
+    @Test
+    @DisplayName("28. 删除：已作废但存在出库流水 → 拒绝删除")
+    void testDeleteCanceledWithIssueOutRejected() {
+        testHeader.setStatus("CANCELED");
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+        WmTransaction out = new WmTransaction();
+        out.setTransactionType("ISSUE_OUT");
+        when(transactionMapper.selectWmTransactionList(any())).thenReturn(List.of(out));
+
+        assertThatThrownBy(() -> service.deleteWmIssueHeaderByIssueIds(new Long[]{1L}))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("出库流水");
+        verify(issueHeaderMapper, never()).deleteWmIssueHeaderByIssueIds(any());
+    }
+
+    @Test
+    @DisplayName("29. 删除：已发料状态仍不可删除")
+    void testDeleteIssuedRejected() {
+        testHeader.setStatus("ISSUED");
+        when(issueHeaderMapper.selectWmIssueHeaderByIssueId(1L)).thenReturn(testHeader);
+
+        assertThatThrownBy(() -> service.deleteWmIssueHeaderByIssueIds(new Long[]{1L}))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("仅草稿/待审核/已作废");
     }
 }

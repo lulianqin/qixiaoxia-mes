@@ -370,6 +370,9 @@
           <el-input-number v-model="_bomItemForm.quantity" :min="0.0001" :precision="4" style="width:100%" />
           <span style="margin-left:8px;color:#909399">{{ _bomItemForm.unitName || '' }}</span>
         </el-form-item>
+        <el-form-item label="计量单位">
+          <el-input v-model="_bomItemForm.unitOfMeasure" placeholder="如 TON / 卷，需与物料单位匹配" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button type="primary" @click="confirmAddBomItem">确 定</el-button>

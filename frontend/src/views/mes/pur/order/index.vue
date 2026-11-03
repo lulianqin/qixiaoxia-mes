@@ -190,7 +190,7 @@
       <el-table-column label="操作" align="center" width="320" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pur:order:query']"></el-button></el-tooltip>
-          <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
+          <el-tooltip content="修改" placement="top" v-if="['DRAFT','APPROVED'].includes(scope.row.status)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
           <el-button v-if="scope.row.status === 'DRAFT'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:pur:order:approve']">审批</el-button>
           <el-button v-if="scope.row.status === 'APPROVED'" link type="warning" size="small" @click="handleOrder(scope.row)" v-hasPermi="['mes:pur:order:order']">下单</el-button>

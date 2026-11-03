@@ -19,6 +19,12 @@ public class PurOrderWizardLineVO
     private String vendorCode;
     private String vendorName;
     private BigDecimal quantity;
+    /** 单价(元/主单位) */
+    private BigDecimal unitPrice;
+    /** 税率(%) */
+    private BigDecimal taxRate;
+    /** 行金额(不含税)，后端按 数量×单价 计算 */
+    private BigDecimal amount;
 
     public Long getItemId() { return itemId; }
     public void setItemId(Long v) { this.itemId = v; }
@@ -38,4 +44,10 @@ public class PurOrderWizardLineVO
     public void setVendorName(String v) { this.vendorName = v; }
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal v) { this.quantity = v; }
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal v) { this.unitPrice = v; }
+    public BigDecimal getTaxRate() { return taxRate; }
+    public void setTaxRate(BigDecimal v) { this.taxRate = v; }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal v) { this.amount = v; }
 }

@@ -109,6 +109,14 @@ public class MdItem extends BaseEntity
     /** 是否启用批次管理 */
     private String batchFlag;
 
+    /** 默认采购价(元/主单位)，供应商未维护报价时兜底 */
+    @Excel(name = "默认采购价")
+    private BigDecimal defaultPurchasePrice;
+
+    /** 默认税率(%) */
+    @Excel(name = "默认税率")
+    private BigDecimal defaultTaxRate;
+
     // ---- 扩展属性（分类驱动的动态属性，扁平 JSON {attrCode:value}） ----
     /** 扩展属性 JSON */
     private Map<String, Object> extAttrs;
@@ -189,6 +197,12 @@ public class MdItem extends BaseEntity
 
     public String getBatchFlag() { return batchFlag; }
     public void setBatchFlag(String batchFlag) { this.batchFlag = batchFlag; }
+
+    public BigDecimal getDefaultPurchasePrice() { return defaultPurchasePrice; }
+    public void setDefaultPurchasePrice(BigDecimal defaultPurchasePrice) { this.defaultPurchasePrice = defaultPurchasePrice; }
+
+    public BigDecimal getDefaultTaxRate() { return defaultTaxRate; }
+    public void setDefaultTaxRate(BigDecimal defaultTaxRate) { this.defaultTaxRate = defaultTaxRate; }
 
     public Map<String, Object> getExtAttrs() { return extAttrs; }
     public void setExtAttrs(Map<String, Object> extAttrs) { this.extAttrs = extAttrs; }

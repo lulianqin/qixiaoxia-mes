@@ -55,11 +55,25 @@
             </el-tag>
           </div>
         </template>
+        <el-alert v-if="dashboard?.hasDuplicateBom" type="warning" :closable="false" show-icon style="margin-bottom:8px"
+          title="产品BOM与工序BOM存在重复物料，已按工序BOM计算">
+          <div v-for="(w, i) in (dashboard?.duplicateBomWarnings || [])" :key="i" style="font-size:12px">{{ w }}</div>
+        </el-alert>
         <el-table :data="dashboard?.materialRows" size="small" border>
           <el-table-column label="序号" type="index" width="55" align="center" />
           <el-table-column label="物料编码" prop="itemCode" width="120" align="center" />
           <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" />
-          <el-table-column label="需求数量" width="110" align="center">
+          <el-table-column label="来源" width="90" align="center">
+            <template #default="scope">
+              <el-tag size="small" :type="scope.row.bomSource === 'PRODUCT' ? 'info' : ''">
+                {{ scope.row.bomSource === 'PRODUCT' ? '产品BOM' : '工序BOM' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="BOM用量" width="110" align="center">
+            <template #default="scope">{{ scope.row.bomRequiredQty }} {{ scope.row.bomUnitName }}</template>
+          </el-table-column>
+          <el-table-column label="需求(库存单位)" width="120" align="center">
             <template #default="scope">{{ scope.row.requiredQty }} {{ scope.row.unitName }}</template>
           </el-table-column>
           <el-table-column label="可用库存" width="110" align="center">
@@ -222,6 +236,10 @@ interface MaterialRow {
   itemCode: string
   itemName: string
   unitName: string
+  bomUnitName: string
+  bomRequiredQty: number
+  quantityMode: string
+  bomSource: string
   requiredQty: number
   availableQty: number
   reservedForOrder: number
@@ -271,6 +289,8 @@ interface KitDashboardData {
   sufficientCount: number
   shortageCount: number
   materialRows: MaterialRow[]
+  hasDuplicateBom: boolean
+  duplicateBomWarnings: string[]
   hasIssueDocs: boolean
   issueStatuses: IssueStatusRow[]
   issuePostedCount: number

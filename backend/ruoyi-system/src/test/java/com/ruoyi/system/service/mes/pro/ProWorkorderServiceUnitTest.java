@@ -17,6 +17,7 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.service.mes.pro.impl.ProWorkorderServiceImpl;
+import com.ruoyi.system.service.mes.wm.IWmIssueLineService;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
 import com.ruoyi.system.service.mes.wm.IWmMaterialStockService;
 import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
@@ -68,12 +69,15 @@ class ProWorkorderServiceUnitTest {
     @Mock private IProTaskService proTaskService;
     @Mock private IProWorkorderChangeService proWorkorderChangeService;
     @Mock private IWmIssueHeaderService wmIssueHeaderService;
+    @Mock private IWmIssueLineService wmIssueLineService;
     @Mock private IWmWarehouseService wmWarehouseService;
     @Mock private ProCardMapper proCardMapper;
     @Mock private OutsourceIssueHelper outsourceIssueHelper;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
+    @Mock private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
     @InjectMocks private ProWorkorderServiceImpl workorderService;
 
     private ProWorkorder testWorkorder;
@@ -95,6 +99,27 @@ class ProWorkorderServiceUnitTest {
         // Redis 锁默认透传执行 Supplier（cancelWorkorder/preStartCheck 等先锁后事务方法）
         lenient().when(lockTemplate.execute(anyString(), any(java.util.function.Supplier.class)))
                 .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(1)).get());
+        // 单位换算/产品BOM：默认无物料主数据、无产品BOM（数量直通）
+        lenient().when(mesQuantityService.loadItems(any())).thenReturn(java.util.Collections.emptyMap());
+        lenient().when(mdProductBomService.selectMdProductBomList(any()))
+                .thenReturn(java.util.Collections.emptyList());
+        // 计算器桩：按 PER_UNIT 乘以工单数量；单位换算直通（测试不造单位换算场景）
+        lenient().when(mesQuantityService.calcTotalQty(any(), any())).thenAnswer(inv -> {
+            ProWorkorderBom bom = inv.getArgument(0);
+            BigDecimal woQty = inv.getArgument(1);
+            BigDecimal qty = bom.getQuantity() == null ? BigDecimal.ZERO : bom.getQuantity();
+            BigDecimal total = "TOTAL".equalsIgnoreCase(bom.getQuantityMode()) ? qty : qty.multiply(woQty == null ? BigDecimal.ONE : woQty);
+            return total;
+        });
+        lenient().when(mesQuantityService.requiredTotalQty(any(), any())).thenAnswer(inv -> {
+            ProWorkorderBom bom = inv.getArgument(0);
+            if (bom.getTotalQuantity() != null) return bom.getTotalQuantity();
+            BigDecimal woQty = inv.getArgument(1);
+            BigDecimal qty = bom.getQuantity() == null ? BigDecimal.ZERO : bom.getQuantity();
+            return "TOTAL".equalsIgnoreCase(bom.getQuantityMode()) ? qty : qty.multiply(woQty == null ? BigDecimal.ONE : woQty);
+        });
+        lenient().when(mesQuantityService.toBaseQty(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(mesQuantityService.hasAuxUnit(any())).thenReturn(false);
 
         testWorkorder = new ProWorkorder();
         testWorkorder.setWorkorderId(1L);

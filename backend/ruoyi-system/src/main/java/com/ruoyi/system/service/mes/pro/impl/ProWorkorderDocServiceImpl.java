@@ -1,8 +1,14 @@
 package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdItemVendor;
+import com.ruoyi.system.domain.mes.md.MdVendor;
+import com.ruoyi.system.mapper.mes.md.MdVendorMapper;
 
 import com.ruoyi.common.enums.WmIssueConstants;
 import com.ruoyi.common.enums.WmWarehouseConstants;
@@ -47,6 +53,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private IProTaskService proTaskService;
     @Autowired private ProRouteProcessMapper proRouteProcessMapper;
     @Autowired private ProDocGenerationLogMapper docLogMapper;
+    @Autowired private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
+    @Autowired private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
 
     @Autowired private IWmIssueHeaderService wmIssueHeaderService;
     @Autowired private IWmIssueLineService wmIssueLineService;
@@ -61,6 +69,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Autowired private IPurOrderService purOrderService;
     @Autowired private IPurOrderLineService purOrderLineService;
     @Autowired private com.ruoyi.system.mapper.mes.md.MdItemVendorMapper mdItemVendorMapper;
+    @Autowired private MdVendorMapper mdVendorMapper;
     @Autowired private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
     @Autowired private com.ruoyi.system.service.mes.qc.IQcFactoryService qcFactoryService;
@@ -100,6 +109,11 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         vo.setSufficientCount(sufficient);
         vo.setShortageCount(shortage);
         vo.setAllSufficient(shortage == 0);
+
+        // 1.1 产品BOM与工序BOM重复物料提示（重复物料已按工序BOM计算）
+        List<String> duplicateWarnings = buildDuplicateBomWarnings(wo);
+        vo.setDuplicateBomWarnings(duplicateWarnings);
+        vo.setHasDuplicateBom(!duplicateWarnings.isEmpty());
 
         // 2. 采购单建议
         vo.setPurchaseRecommends(buildPurchaseRecommends(workorderId, materialRows));
@@ -142,6 +156,33 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     private List<Map<String, Object>> checkMaterialReadiness(Long workorderId)
     {
         return proWorkorderService.checkMaterialReadiness(workorderId);
+    }
+
+    // ---- 1.1 产品BOM / 工序BOM 重复物料 ----
+    private List<String> buildDuplicateBomWarnings(ProWorkorder wo)
+    {
+        List<String> warnings = new ArrayList<>();
+        if (wo == null || wo.getProductId() == null) return warnings;
+        com.ruoyi.system.domain.mes.md.MdProductBom q =
+                new com.ruoyi.system.domain.mes.md.MdProductBom();
+        q.setItemId(wo.getProductId());
+        q.setEnableFlag("1");
+        List<com.ruoyi.system.domain.mes.md.MdProductBom> productBoms =
+                mdProductBomService.selectMdProductBomList(q);
+        if (productBoms == null || productBoms.isEmpty()) return warnings;
+        List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(wo.getWorkorderId());
+        Set<Long> processItems = new HashSet<>();
+        if (bomList != null) {
+            for (ProWorkorderBom bom : bomList) {
+                if (bom.getProcessId() != null && bom.getItemId() != null) processItems.add(bom.getItemId());
+            }
+        }
+        for (com.ruoyi.system.domain.mes.md.MdProductBom pb : productBoms) {
+            if (pb.getBomItemId() != null && processItems.contains(pb.getBomItemId())) {
+                warnings.add("物料[" + pb.getBomItemCode() + "]同时存在于产品BOM与工序BOM，已按工序BOM计算，请核对用量");
+            }
+        }
+        return warnings;
     }
 
     // ---- 2. 采购建议 ----
@@ -209,6 +250,11 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         query.setWorkorderId(workorderId);
         List<WmIssueHeader> headers = wmIssueHeaderService.selectWmIssueHeaderList(query);
         for (WmIssueHeader h : headers) {
+            // 已作废单是终态，不再在齐套看板展示；全部作废时 hasIssueDocs=false，
+            // 允许「仅生成领料单」重新生成（与 loadIssuedKeys 跳过终态的口径一致）
+            if (WmIssueConstants.STATUS_CANCELED.equals(h.getStatus())) {
+                continue;
+            }
             ProKitIssueStatusVO vo = new ProKitIssueStatusVO();
             vo.setIssueId(h.getIssueId());
             vo.setIssueCode(h.getIssueCode());
@@ -226,6 +272,10 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         List<WmOutsourceOrder> orders = wmOutsourceOrderMapper.selectOutsourceOrderList(oq);
         if (orders != null) {
             for (WmOutsourceOrder o : orders) {
+                // 已作废的外协单同样不展示（兼容历史 CANCEL 值）
+                if (WmIssueConstants.STATUS_CANCELED.equals(o.getStatus()) || "CANCEL".equals(o.getStatus())) {
+                    continue;
+                }
                 ProKitIssueStatusVO vo = new ProKitIssueStatusVO();
                 vo.setIssueId(o.getOrderId());
                 vo.setIssueCode(o.getOrderCode());
@@ -367,6 +417,10 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
         if (bomList == null || bomList.isEmpty()) return new ArrayList<>();
 
+        Map<Long, com.ruoyi.system.domain.mes.md.MdItem> items = mesQuantityService.loadItems(
+                bomList.stream().map(ProWorkorderBom::getItemId)
+                        .filter(Objects::nonNull).collect(Collectors.toList()));
+
         // 按 processId 分组
         Map<Long, List<ProWorkorderBom>> grouped = new LinkedHashMap<>();
         for (ProWorkorderBom bom : bomList) {
@@ -391,18 +445,22 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             }
             if (h.getProcessId() != null) {
                 existingByProcess.computeIfAbsent(h.getProcessId(), k -> new ArrayList<>()).add(h);
+            } else {
+                // 无工序的产品级备料单，用 0 作为幂等哨兵
+                existingByProcess.computeIfAbsent(0L, k -> new ArrayList<>()).add(h);
             }
         }
 
         for (Map.Entry<Long, List<ProWorkorderBom>> entry : grouped.entrySet()) {
             Long processId = entry.getKey();
-            if (processId == 0L) continue;
-            if (outsourceMap.containsKey(processId)) continue; // 外协工序走外协发料，跳过厂内领料
+            // processId=0 表示产品级原料/辅料（未关联工序）→ 生成「产品级备料单」
+            boolean productLevel = (processId == 0L);
+            if (!productLevel && outsourceMap.containsKey(processId)) continue; // 外协工序走外协发料，跳过厂内领料
             List<ProWorkorderBom> processBoms = entry.getValue();
-            String processName = processBoms.get(0).getProcessName();
+            String processName = productLevel ? "产品级原料" : processBoms.get(0).getProcessName();
 
-            // 从预加载 Map 取排产任务
-            ProTask task = taskByProcess.get(processId);
+            // 从预加载 Map 取排产任务（产品级原料无工序/任务）
+            ProTask task = productLevel ? null : taskByProcess.get(processId);
 
             // 幂等检查：该工单+工序已有非终态领料单则补记日志后跳过；
             //   全是终态(CANCELED/CLOSED)时不放行跳过，允许重新生成，与开工检查 loadIssuedKeys 口径一致。
@@ -433,7 +491,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             header.setWorkorderId(wo.getWorkorderId());
             header.setWorkorderCode(wo.getWorkorderCode());
             header.setWorkorderName(wo.getWorkorderName());
-            header.setProcessId(processId);
+            header.setProcessId(productLevel ? null : processId);
             header.setProcessName(processName);
             if (task != null) {
                 header.setTaskId(task.getTaskId());
@@ -457,15 +515,18 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                 line.setItemId(bom.getItemId());
                 line.setItemCode(bom.getItemCode());
                 line.setItemName(bom.getItemName());
-                line.setUnitOfMeasure(bom.getUnitOfMeasure());
-                line.setUnitName(bom.getUnitName());
-                line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
-                line.setProcessId(processId);
+                com.ruoyi.system.domain.mes.md.MdItem lineItem = items.get(bom.getItemId());
+                BigDecimal qtyBase = mesQuantityService.toBaseQty(
+                        mesQuantityService.requiredTotalQty(bom, wo.getQuantity()), bom.getUnitOfMeasure(), lineItem);
+                line.setUnitOfMeasure(lineItem != null ? lineItem.getUnitOfMeasure() : bom.getUnitOfMeasure());
+                line.setUnitName(lineItem != null ? lineItem.getUnitName() : bom.getUnitName());
+                line.setQuantityIssue(qtyBase);
+                line.setProcessId(productLevel ? null : processId);
                 line.setProcessCode(processCode);
                 line.setProcessName(processName);
                 line.setWarehouseId(defaultWarehouseId);
                 wmIssueLineService.insertWmIssueLine(line);
-                totalQty = totalQty.add(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
+                totalQty = totalQty.add(qtyBase);
             }
             header.setQuantityTotal(totalQty);
             wmIssueHeaderService.updateWmIssueHeader(header);
@@ -803,48 +864,133 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     @Override
     public Map<String, Object> buildPurOrderWizard(Long workorderId) {
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
-        List<Map<String, Object>> materialRows = checkMaterialReadiness(workorderId);
+        if (wo == null) {
+            throw new ServiceException("工单不存在，无法进行采购向导");
+        }
+        List<Map<String, Object>> shortageRows = collectShortageRows(checkMaterialReadiness(workorderId));
+        List<Long> itemIds = shortageRows.stream()
+                .map(r -> (Long) r.get("itemId")).filter(Objects::nonNull).distinct()
+                .collect(Collectors.toList());
+        Map<Long, MdItem> items = mesQuantityService.loadItems(itemIds);
+        Map<Long, List<MdItemVendor>> vendorsByItem = loadEnabledVendors(itemIds);
 
-        // 收集缺料物料，为每个物料查找首选供应商
         List<Map<String, Object>> wizardLines = new ArrayList<>();
         Map<Long, List<Map<String, Object>>> vendorGroups = new LinkedHashMap<>();
+        for (Map<String, Object> row : shortageRows) {
+            Long itemId = (Long) row.get("itemId");
+            Map<String, Object> line = buildWizardLine(row, items.get(itemId), vendorsByItem.get(itemId));
+            wizardLines.add(line);
+            Long vid = (Long) line.get("vendorId");
+            vendorGroups.computeIfAbsent(vid != null ? vid : 0L, k -> new ArrayList<>()).add(line);
+        }
+        markExistingPO(workorderId, wizardLines);
 
+        Map<String, Object> result = new HashMap<>();
+        result.put("workorderId", workorderId);
+        result.put("workorderCode", wo.getWorkorderCode());
+        result.put("lines", wizardLines);
+        result.put("vendorGroups", new ArrayList<>(vendorGroups.values()));
+        result.put("vendorCount", vendorGroups.size());
+        return result;
+    }
+
+    /** 过滤出真正需要采购的缺料行 */
+    private List<Map<String, Object>> collectShortageRows(List<Map<String, Object>> materialRows) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (materialRows == null) return rows;
         for (Map<String, Object> row : materialRows) {
             if (Boolean.TRUE.equals(row.get("sufficient"))) continue;
             BigDecimal shortage = (BigDecimal) row.get("shortageQty");
             if (shortage == null || shortage.compareTo(BigDecimal.ZERO) <= 0) continue;
-
-            Long itemId = (Long) row.get("itemId");
-            // 查该物料的首选供应商
-            com.ruoyi.system.domain.mes.md.MdItemVendor ivQuery = new com.ruoyi.system.domain.mes.md.MdItemVendor();
-            ivQuery.setItemId(itemId);
-            ivQuery.setIsPreferred("Y");
-            List<com.ruoyi.system.domain.mes.md.MdItemVendor> ivList = mdItemVendorMapper.selectList(ivQuery);
-            com.ruoyi.system.domain.mes.md.MdItemVendor preferred = (ivList != null && !ivList.isEmpty()) ? ivList.get(0) : null;
-
-            Map<String, Object> line = new HashMap<>();
-            line.put("itemId", itemId);
-            line.put("itemCode", row.get("itemCode"));
-            line.put("itemName", row.get("itemName"));
-            line.put("unitName", row.get("unitName"));
-            line.put("unitOfMeasure", row.get("unitName")); // 物料齐套检查结果中 unitName 即单位编码
-            line.put("shortageQty", shortage);
-            line.put("recommendedQty", shortage);
-            line.put("minOrderQty", preferred != null ? preferred.getMinOrderQty() : null);
-            line.put("leadTimeDays", preferred != null ? preferred.getLeadTimeDays() : null);
-            line.put("vendorId", preferred != null ? preferred.getVendorId() : null);
-            line.put("vendorCode", preferred != null ? preferred.getVendorCode() : null);
-            line.put("vendorName", preferred != null ? preferred.getVendorName() : null);
-            line.put("hasVendor", preferred != null);
-            line.put("checked", preferred != null); // 有供应商的默认勾选
-
-            wizardLines.add(line);
-
-            Long vid = preferred != null ? preferred.getVendorId() : 0L;
-            vendorGroups.computeIfAbsent(vid, k -> new ArrayList<>()).add(line);
+            rows.add(row);
         }
+        return rows;
+    }
 
-        // 标记已生成 PO 的物料
+    /** 批量加载缺料物料已启用（enable_flag=1）的供应商，首选排前 */
+    private Map<Long, List<MdItemVendor>> loadEnabledVendors(List<Long> itemIds) {
+        Map<Long, List<MdItemVendor>> map = new HashMap<>();
+        if (itemIds == null || itemIds.isEmpty()) return map;
+        List<MdItemVendor> list = mdItemVendorMapper.selectEnabledByItemIds(itemIds.toArray(new Long[0]));
+        if (list != null) {
+            for (MdItemVendor iv : list) map.computeIfAbsent(iv.getItemId(), k -> new ArrayList<>()).add(iv);
+        }
+        return map;
+    }
+
+    /** 组装向导行：候选供应商 + 默认供应商 + 默认价格（供应商报价优先，物料默认价兜底） */
+    private Map<String, Object> buildWizardLine(Map<String, Object> row, MdItem item, List<MdItemVendor> candidates) {
+        BigDecimal shortage = (BigDecimal) row.get("shortageQty");
+        MdItemVendor chosen = candidates != null && !candidates.isEmpty() ? candidates.get(0) : null;
+
+        Map<String, Object> line = new HashMap<>();
+        line.put("itemId", row.get("itemId"));
+        line.put("itemCode", row.get("itemCode"));
+        line.put("itemName", row.get("itemName"));
+        line.put("unitName", row.get("unitName"));
+        line.put("unitOfMeasure", item != null ? item.getUnitOfMeasure() : row.get("unitName"));
+        line.put("shortageQty", shortage);
+        line.put("recommendedQty", shortage);
+        line.put("minOrderQty", chosen != null ? chosen.getMinOrderQty() : null);
+        line.put("leadTimeDays", chosen != null ? chosen.getLeadTimeDays() : null);
+        line.put("vendorId", chosen != null ? chosen.getVendorId() : null);
+        line.put("vendorCode", chosen != null ? chosen.getVendorCode() : null);
+        line.put("vendorName", chosen != null ? chosen.getVendorName() : null);
+        line.put("hasVendor", chosen != null);
+        line.put("checked", chosen != null);
+        line.put("vendorOptions", buildVendorOptions(candidates));
+        line.put("itemDefaultPrice", item != null ? item.getDefaultPurchasePrice() : null);
+        line.put("itemDefaultTaxRate", item != null ? item.getDefaultTaxRate() : null);
+        applyDefaultPrice(line, shortage, chosen, item);
+        return line;
+    }
+
+    /** 候选供应商（前端下拉切换，含每家报价/税率/提前期） */
+    private List<Map<String, Object>> buildVendorOptions(List<MdItemVendor> candidates) {
+        List<Map<String, Object>> options = new ArrayList<>();
+        if (candidates == null) return options;
+        for (MdItemVendor iv : candidates) {
+            Map<String, Object> o = new HashMap<>();
+            o.put("vendorId", iv.getVendorId());
+            o.put("vendorCode", iv.getVendorCode());
+            o.put("vendorName", iv.getVendorName());
+            o.put("isPreferred", iv.getIsPreferred());
+            o.put("purchasePrice", iv.getPurchasePrice());
+            o.put("taxRate", iv.getTaxRate());
+            o.put("minOrderQty", iv.getMinOrderQty());
+            o.put("leadTimeDays", iv.getLeadTimeDays());
+            options.add(o);
+        }
+        return options;
+    }
+
+    /** 默认价：所选供应商报价优先，其次物料默认采购价；均未维护时留空（草稿可 0 价） */
+    private void applyDefaultPrice(Map<String, Object> line, BigDecimal qty, MdItemVendor chosen, MdItem item) {
+        BigDecimal price = null;
+        BigDecimal tax = null;
+        String source = "NONE";
+        if (chosen != null && chosen.getPurchasePrice() != null) {
+            price = chosen.getPurchasePrice();
+            tax = chosen.getTaxRate();
+            source = "VENDOR";
+        } else if (item != null && item.getDefaultPurchasePrice() != null) {
+            price = item.getDefaultPurchasePrice();
+            tax = item.getDefaultTaxRate();
+            source = "ITEM";
+        }
+        line.put("unitPrice", price);
+        line.put("taxRate", tax != null ? tax : BigDecimal.ZERO);
+        line.put("amount", computeAmount(qty, price));
+        line.put("priceSource", source);
+    }
+
+    private BigDecimal computeAmount(BigDecimal qty, BigDecimal price) {
+        if (qty == null || price == null) return BigDecimal.ZERO;
+        return qty.multiply(price).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** 标记工单已生成过采购单的物料，默认不勾选 */
+    private void markExistingPO(Long workorderId, List<Map<String, Object>> wizardLines) {
         PurOrder poQuery = new PurOrder();
         poQuery.setWorkorderId(workorderId);
         List<PurOrderVO> existingPOs = purOrderService.selectPurOrderList(poQuery);
@@ -862,22 +1008,11 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             }
         }
         for (Map<String, Object> line : wizardLines) {
-            Long itemId = (Long) line.get("itemId");
-            String existingPO = itemPOStatus.get(itemId);
+            String existingPO = itemPOStatus.get((Long) line.get("itemId"));
             line.put("hasExistingPO", existingPO != null);
             line.put("existingPOCode", existingPO);
-            // 已有 PO 的物料默认不勾选
             if (existingPO != null) line.put("checked", false);
         }
-
-        // 构建返回结果
-        Map<String, Object> result = new HashMap<>();
-        result.put("workorderId", workorderId);
-        result.put("workorderCode", wo.getWorkorderCode());
-        result.put("lines", wizardLines);
-        result.put("vendorGroups", new ArrayList<>(vendorGroups.values()));
-        result.put("vendorCount", vendorGroups.size());
-        return result;
     }
 
     @Override
@@ -892,24 +1027,33 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
     private Map<String, Object> doSubmitPurOrderWizard(Long workorderId, java.util.List<PurOrderWizardLineVO> lines) {
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) {
+            throw new ServiceException("工单不存在，无法生成采购单");
+        }
         if (lines == null || lines.isEmpty()) {
             Map<String, Object> empty = new HashMap<>();
             empty.put("message", "无提交行"); return empty;
         }
         String batch = UUID.randomUUID().toString();
 
-        // 按 vendorId 分组
+        // 按 vendorId 分组；采购数量必须 > 0，避免生成 0 数量采购明细
         Map<Long, List<PurOrderWizardLineVO>> groups = new LinkedHashMap<>();
         for (PurOrderWizardLineVO line : lines) {
+            BigDecimal qty = line.getQuantity();
+            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) continue;
             Long vid = line.getVendorId() != null ? line.getVendorId() : 0L;
             groups.computeIfAbsent(vid, k -> new ArrayList<>()).add(line);
+        }
+        if (groups.isEmpty()) {
+            Map<String, Object> empty = new HashMap<>();
+            empty.put("message", "采购数量必须大于 0"); return empty;
         }
 
         List<Map<String, Object>> created = new ArrayList<>();
         for (Map.Entry<Long, List<PurOrderWizardLineVO>> entry : groups.entrySet()) {
             Long vendorId = entry.getKey();
             List<PurOrderWizardLineVO> groupLines = entry.getValue();
-            PurOrderWizardLineVO first = groupLines.get(0);
+            MdVendor vendor = requireEnabledVendor(vendorId);
 
             String orderCode = genCode("PO");
             PurOrder po = new PurOrder();
@@ -918,8 +1062,8 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
             po.setWorkorderId(workorderId);
             po.setWorkorderCode(wo.getWorkorderCode());
             po.setVendorId(vendorId > 0 ? vendorId : 0L);
-            po.setVendorCode(vendorId > 0 ? first.getVendorCode() : null);
-            po.setVendorName(vendorId > 0 ? first.getVendorName() : "待定");
+            po.setVendorCode(vendor != null ? vendor.getVendorCode() : null);
+            po.setVendorName(vendor != null ? vendor.getVendorName() : "待定");
             po.setOrderDate(new Date());
             po.setStatus("DRAFT");
             po.setCurrency("CNY");
@@ -936,6 +1080,10 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
                 line.setUnitName(l.getUnitName());
                 BigDecimal qty = l.getQuantity() != null ? l.getQuantity() : BigDecimal.ZERO;
                 line.setQuantityOrdered(qty);
+                // 单价按主单位记账；金额=数量×单价（不含税），后端计算不信任前端
+                line.setUnitPrice(l.getUnitPrice() != null ? l.getUnitPrice() : BigDecimal.ZERO);
+                line.setTaxRate(l.getTaxRate() != null ? l.getTaxRate() : BigDecimal.ZERO);
+                line.setAmount(computeAmount(qty, l.getUnitPrice()));
                 line.setStatus("ORDERED");
                 purOrderLineService.insertPurOrderLine(line);
                 totalQty = totalQty.add(qty);
@@ -946,7 +1094,7 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
 
             Map<String, Object> info = new HashMap<>();
             info.put("orderId", po.getOrderId()); info.put("orderCode", orderCode);
-            info.put("vendorId", vendorId); info.put("vendorName", vendorId > 0 ? first.getVendorName() : "待定");
+            info.put("vendorId", vendorId); info.put("vendorName", vendor != null ? vendor.getVendorName() : "待定");
             info.put("lineCount", groupLines.size()); info.put("totalQuantity", totalQty);
             created.add(info);
         }
@@ -955,6 +1103,16 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
         result.put("purOrders", created);
         result.put("message", "共生成 " + created.size() + " 张采购单");
         return result;
+    }
+
+    /** 校验提交的供应商存在且启用；vendorId <= 0 视为「待定」 */
+    private MdVendor requireEnabledVendor(Long vendorId) {
+        if (vendorId == null || vendorId <= 0) return null;
+        MdVendor vendor = mdVendorMapper.selectMdVendorByVendorId(vendorId);
+        if (vendor == null || !"1".equals(vendor.getEnableFlag())) {
+            throw new ServiceException("供应商[" + vendorId + "]不存在或已停用，请重新选择");
+        }
+        return vendor;
     }
 
     @Override

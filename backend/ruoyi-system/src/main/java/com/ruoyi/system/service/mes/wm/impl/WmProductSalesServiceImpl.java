@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.ruoyi.common.enums.SalOrderStatus;
 import com.ruoyi.common.enums.WmProductSalesConstants;
 import com.ruoyi.common.enums.WmWarehouseConstants;
 import com.ruoyi.common.exception.ServiceException;
@@ -61,6 +62,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private WmProductSalesLineMapper wmProductSalesLineMapper;
     @Autowired private WmProductSalesDetailMapper wmProductSalesDetailMapper;
     @Autowired private WmMaterialStockMapper wmMaterialStockMapper;
+
+    @Autowired private com.ruoyi.system.service.mes.common.MesQuantityService mesQuantityService;
     @Autowired private WmTransactionMapper wmTransactionMapper;
     @Autowired private ProMaterialTraceMapper proMaterialTraceMapper;
     @Autowired private ProWorkorderMapper proWorkorderMapper;
@@ -321,6 +324,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     /** 单批次扣减并写 detail/tx/trace（行锁已在 load 时由 for update 取得） */
     private void deductAndRecord(WmProductSales header, WmProductSalesDetail d,
                                  WmProductSalesLine line, WmMaterialStock stock, BigDecimal qty) {
+        mesQuantityService.normalizeStockRow(stock);
         BigDecimal newOnhand = (stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO)
                 .subtract(qty);
         if (newOnhand.compareTo(BigDecimal.ZERO) < 0) {
@@ -482,6 +486,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             if (d.getMaterialStockId() == null || d.getQuantity() == null) continue;
             WmMaterialStock stock = wmMaterialStockMapper.selectWmMaterialStockByMaterialStockId(d.getMaterialStockId());
             if (stock == null) continue;
+            mesQuantityService.normalizeStockRow(stock);
             BigDecimal newOnhand = (stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO)
                     .add(d.getQuantity());
             // 作废回滚：available 亦需回加（否则被扣的量长期冻结），再钳制 ≤ onhand
@@ -528,6 +533,10 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     public WmProductSales buildFromSaleOrder(Long orderId) {
         SalOrder order = salOrderService.getDetail(orderId);
         if (order == null) throw new ServiceException("销售订单不存在");
+        // V161：待接单订单不允许生成出库（前端选单只列已确认/生产中，此处做后端兜底）
+        if (SalOrderStatus.PENDING_ACCEPT.getCode().equals(order.getStatus())) {
+            throw new ServiceException("销售订单[" + order.getOrderCode() + "]待接单，不能生成出库单");
+        }
         WmProductSales draft = new WmProductSales();
         draft.setSalesOrderId(order.getOrderId());
         draft.setSalesOrderCode(order.getOrderCode());

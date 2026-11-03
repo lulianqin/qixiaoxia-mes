@@ -104,7 +104,7 @@ public class WmOutsourceController extends BaseController
     }
 
     /** Step1.5 厂商签收（ISSUED → VENDOR_RCVD，厂商操作） */
-    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:vendorReceive')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:wm:outsource:vendorReceive,mes:wm:outsource:agentOps')")
     @Log(title = "外协厂商签收", businessType = BusinessType.UPDATE)
     @PostMapping("/{orderId}/vendorReceive")
     public AjaxResult vendorReceive(@PathVariable Long orderId)
@@ -113,7 +113,7 @@ public class WmOutsourceController extends BaseController
     }
 
     /** Step2 厂商录加工结果（厂商操作，支持分批补录；录满自动完成） */
-    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:result')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:wm:outsource:result,mes:wm:outsource:agentOps')")
     @Log(title = "外协录结果", businessType = BusinessType.UPDATE)
     @PostMapping("/{orderId}/result")
     public AjaxResult recordResult(@PathVariable Long orderId,
@@ -123,7 +123,7 @@ public class WmOutsourceController extends BaseController
     }
 
     /** Step2.5 厂商手动完成（PROCESSING → FINISHED，允许短交，厂商操作） */
-    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:complete')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:wm:outsource:complete,mes:wm:outsource:agentOps')")
     @Log(title = "外协加工完成", businessType = BusinessType.UPDATE)
     @PostMapping("/{orderId}/complete")
     public AjaxResult complete(@PathVariable Long orderId)
@@ -132,7 +132,7 @@ public class WmOutsourceController extends BaseController
     }
 
     /** Step2.6 厂商发货（FINISHED → SHIPPED，厂商操作） */
-    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:ship')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:wm:outsource:ship,mes:wm:outsource:agentOps')")
     @Log(title = "外协厂商发货", businessType = BusinessType.UPDATE)
     @PostMapping("/{orderId}/ship")
     public AjaxResult ship(@PathVariable Long orderId)

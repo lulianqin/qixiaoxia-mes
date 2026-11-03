@@ -64,6 +64,8 @@ public class WmOutsourceOrder extends BaseEntity
     private Date shipTime;
     private String shipBy;
     private Date receiveTime;
+    /** 代操作人（内部员工代厂商操作时记录；NULL=厂商本人操作） */
+    private String agentOperator;
 
     /** 发料行（创建/详情时用） */
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -141,6 +143,8 @@ public class WmOutsourceOrder extends BaseEntity
     public void setShipBy(String v) { this.shipBy = v; }
     public Date getReceiveTime() { return receiveTime; }
     public void setReceiveTime(Date v) { this.receiveTime = v; }
+    public String getAgentOperator() { return agentOperator; }
+    public void setAgentOperator(String v) { this.agentOperator = v; }
     public List<WmOutsourceIssueLine> getIssueLines() { return issueLines; }
     public void setIssueLines(List<WmOutsourceIssueLine> v) { this.issueLines = v; }
     public List<WmOutsourceRecptLine> getRecptLines() { return recptLines; }

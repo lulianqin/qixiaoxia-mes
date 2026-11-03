@@ -33,6 +33,7 @@ import com.ruoyi.system.domain.mes.wm.WmIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmIssueDetail;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
+import com.ruoyi.system.service.mes.common.MesQuantityService;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
@@ -69,6 +70,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     @Autowired
     private WmTransactionMapper wmTransactionMapper;
+
+    @Autowired
+    private MesQuantityService mesQuantityService;
 
     @Autowired
     private ProMaterialTraceMapper proMaterialTraceMapper;
@@ -252,8 +256,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     }
 
     /**
-     * 批量删除领料单：仅 DRAFT/PENDING 状态可删，防止误删已预占/已发料单据导致库存账实不符。
-     * 同时级联删除领料行（明细表保留，作为历史发料记录）。
+     * 批量删除领料单：草稿/待审核/已作废可删，防止误删已预占/已发料单据导致库存账实不符。
+     * 已作废单额外校验：若存在 ISSUE_OUT 出库流水（历史脏数据或并发漏网）则拒绝物理删除，
+     * 避免删除审计凭证。同时级联删除领料行。
      */
     @Override
     @Transactional
@@ -262,14 +267,33 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         for (Long id : issueIds) {
             WmIssueHeader header = wmIssueHeaderMapper.selectWmIssueHeaderByIssueId(id);
             if (header == null) continue;
-            if (!WmIssueConstants.isEditable(header.getStatus())) {
+            boolean canceled = WmIssueConstants.STATUS_CANCELED.equals(header.getStatus());
+            if (!WmIssueConstants.isEditable(header.getStatus()) && !canceled) {
                 throw new ServiceException("领料单[" + header.getIssueCode() + "]状态为["
-                        + header.getStatus() + "]，仅草稿/待审核状态可删除");
+                        + header.getStatus() + "]，仅草稿/待审核/已作废状态可删除");
+            }
+            if (canceled) {
+                assertNoIssueOutTransaction(id);
             }
             // 级联删除领料行
             wmIssueLineMapper.deleteWmIssueLineByIssueId(id);
         }
         return wmIssueHeaderMapper.deleteWmIssueHeaderByIssueIds(issueIds);
+    }
+
+    /**
+     * 已作废单删除前的防御校验：存在实际出库流水则拒绝删除。
+     * 理论上 CANCELED 不可能有 ISSUE_OUT（作废已拦截已发料状态），此处防历史脏数据。
+     */
+    private void assertNoIssueOutTransaction(Long issueId) {
+        WmTransaction q = new WmTransaction();
+        q.setSourceDocType(WmIssueConstants.SOURCE_ISSUE);
+        q.setSourceDocId(issueId);
+        q.setTransactionType(WmIssueConstants.TX_ISSUE_OUT);
+        List<WmTransaction> txs = wmTransactionMapper.selectWmTransactionList(q);
+        if (txs != null && !txs.isEmpty()) {
+            throw new ServiceException("领料单已产生出库流水，不能删除，请保留作废记录");
+        }
     }
 
     @Override
@@ -293,6 +317,10 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         List<ProWorkorderBom> bomList = proWorkorderBomMapper.selectProWorkorderBomList(query);
         if (bomList == null || bomList.isEmpty()) throw new ServiceException("工单BOM为空，请先维护工单BOM");
 
+        Map<Long, com.ruoyi.system.domain.mes.md.MdItem> items = mesQuantityService.loadItems(
+                bomList.stream().map(ProWorkorderBom::getItemId)
+                        .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toList()));
+
         BigDecimal totalQty = BigDecimal.ZERO;
         int skipped = 0;
         for (ProWorkorderBom bom : bomList) {
@@ -305,15 +333,18 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             line.setItemId(bom.getItemId());
             line.setItemCode(bom.getItemCode());
             line.setItemName(bom.getItemName());
-            line.setUnitOfMeasure(bom.getUnitOfMeasure());
-            line.setUnitName(bom.getUnitName());
+            com.ruoyi.system.domain.mes.md.MdItem lineItem = items.get(bom.getItemId());
+            BigDecimal qtyBase = mesQuantityService.toBaseQty(
+                    mesQuantityService.requiredTotalQty(bom, wo.getQuantity()), bom.getUnitOfMeasure(), lineItem);
+            line.setUnitOfMeasure(lineItem != null ? lineItem.getUnitOfMeasure() : bom.getUnitOfMeasure());
+            line.setUnitName(lineItem != null ? lineItem.getUnitName() : bom.getUnitName());
             line.setProcessId(bom.getProcessId());
-            line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
+            line.setQuantityIssue(qtyBase);
             line.setWarehouseId(header.getWarehouseId());
             line.setCreateTime(DateUtils.getNowDate());
             line.setCreateBy(SecurityUtils.getUsername());
             wmIssueLineMapper.insertWmIssueLine(line);
-            totalQty = totalQty.add(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
+            totalQty = totalQty.add(qtyBase);
         }
         if (totalQty.compareTo(BigDecimal.ZERO) == 0) {
             throw new ServiceException("工单BOM全部为外协工序物料，请走外协发料模块");
@@ -350,6 +381,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         Map<Long, ProRouteProcess> outsourceMap = outsourceIssueHelper.resolveOutsourceProcessMap(wo);
 
         List<WmIssueLine> lines = new ArrayList<>();
+        Map<Long, com.ruoyi.system.domain.mes.md.MdItem> items = mesQuantityService.loadItems(
+                bomList.stream().map(ProWorkorderBom::getItemId)
+                        .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toList()));
         for (ProWorkorderBom bom : bomList) {
             if (bom.getProcessId() != null && outsourceMap.containsKey(bom.getProcessId())) {
                 continue; // 外协工序物料走外协发料单
@@ -358,10 +392,13 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             line.setItemId(bom.getItemId());
             line.setItemCode(bom.getItemCode());
             line.setItemName(bom.getItemName());
-            line.setUnitOfMeasure(bom.getUnitOfMeasure());
-            line.setUnitName(bom.getUnitName());
+            com.ruoyi.system.domain.mes.md.MdItem lineItem = items.get(bom.getItemId());
+            BigDecimal qtyBase = mesQuantityService.toBaseQty(
+                    mesQuantityService.requiredTotalQty(bom, wo.getQuantity()), bom.getUnitOfMeasure(), lineItem);
+            line.setUnitOfMeasure(lineItem != null ? lineItem.getUnitOfMeasure() : bom.getUnitOfMeasure());
+            line.setUnitName(lineItem != null ? lineItem.getUnitName() : bom.getUnitName());
             line.setProcessId(bom.getProcessId());
-            line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
+            line.setQuantityIssue(qtyBase);
             lines.add(line);
         }
         if (lines.isEmpty()) {
@@ -491,6 +528,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             for (Map.Entry<Long, BigDecimal> e : netAlloc.entrySet()) {
                 WmMaterialStock existing = wmMaterialStockMapper.selectWmMaterialStockByMaterialStockId(e.getKey());
                 if (existing == null) continue; // 库存记录已不存在，跳过
+                mesQuantityService.normalizeStockRow(existing);
 
                 BigDecimal releaseQty = e.getValue(); // 净预占量（正数）
                 existing.setQuantityAvailable((existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO).add(releaseQty));
@@ -982,6 +1020,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     /** 扣减可用库存（预占），现有库存不动；不足抛异常由调用方前置检查 */
     private void deductAvailable(WmMaterialStock stock, BigDecimal delta) {
+        mesQuantityService.normalizeStockRow(stock);
         BigDecimal avail = stock.getQuantityAvailable() != null ? stock.getQuantityAvailable() : BigDecimal.ZERO;
         BigDecimal newAvailable = avail.subtract(delta);
         stock.setQuantityAvailable(newAvailable.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newAvailable);
@@ -1115,12 +1154,18 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     /** 出库：扣 quantityOnhand + 钳制 available，写 ISSUE_OUT 事务 + 物料追溯 */
     private void deductOnhandAndWriteIssueOut(WmIssueLine line, WmIssueHeader header, BigDecimal qty, WmMaterialStock stock) {
+        mesQuantityService.normalizeStockRow(stock);
         BigDecimal result = stock.getQuantityOnhand() != null ? stock.getQuantityOnhand().subtract(qty) : qty.negate();
         if (result.compareTo(BigDecimal.ZERO) < 0) {
             throw new ServiceException("物料[" + line.getItemCode() + "]库存不足！当前库存：" + stock.getQuantityOnhand() + "，需出库：" + qty);
         }
         stock.setQuantityOnhand(result);
         stock.setQuantityAvailable(clampAvailableToOnhand(stock.getQuantityAvailable(), result));
+        // 库存清零时辅助单位数量同步归零（部分卷出库时保持辅单位不变）
+        if (result.compareTo(BigDecimal.ZERO) == 0) {
+            stock.setQuantityOnhand2(BigDecimal.ZERO);
+            stock.setQuantityAvailable2(BigDecimal.ZERO);
+        }
         stock.setUpdateTime(new Date());
         wmMaterialStockMapper.updateWmMaterialStock(stock);
 
@@ -1154,12 +1199,18 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     /** 发料单批次出库：扣单条库存 onhand + 写 detail + 写 ISSUE_OUT 事务 + trace */
     private void issueOutSingleBatch(WmIssueHeader header, WmIssueDetail d, BigDecimal qty, WmMaterialStock stock) {
+        mesQuantityService.normalizeStockRow(stock);
         BigDecimal newOnhand = (stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO).subtract(qty);
         if (newOnhand.compareTo(BigDecimal.ZERO) < 0) {
             throw new ServiceException("物料[" + d.getItemCode() + "]库存不足！当前：" + stock.getQuantityOnhand() + "，需发料：" + qty);
         }
         stock.setQuantityOnhand(newOnhand);
         stock.setQuantityAvailable(clampAvailableToOnhand(stock.getQuantityAvailable(), newOnhand));
+        // 库存清零时辅助单位数量同步归零（部分卷发料时保持辅单位不变）
+        if (newOnhand.compareTo(BigDecimal.ZERO) == 0) {
+            stock.setQuantityOnhand2(BigDecimal.ZERO);
+            stock.setQuantityAvailable2(BigDecimal.ZERO);
+        }
         stock.setUpdateTime(new Date());
         wmMaterialStockMapper.updateWmMaterialStock(stock);
 

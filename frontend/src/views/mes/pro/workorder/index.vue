@@ -277,10 +277,14 @@
     <!-- BOM物料编辑弹窗 -->
     <el-dialog :title="bomEditTitle" v-model="bomEditOpen" width="500px" append-to-body>
       <el-form ref="bomEditForm" :model="bomEditForm" label-width="100px">
-        <el-form-item label="所属工序"><el-select v-model="bomEditForm._processId" style="width:100%" placeholder="请选择"><el-option v-for="p in (routeProcesses.length ? routeProcesses : processOptions)" :key="p.processId" :label="p.processName" :value="p.processId" /></el-select></el-form-item>
+        <el-form-item label="所属工序"><el-select v-model="bomEditForm._processId" style="width:100%" placeholder="请选择"><el-option label="产品级原料（不指定工序）" :value="null" /><el-option v-for="p in (routeProcesses.length ? routeProcesses : processOptions)" :key="p.processId" :label="p.processName" :value="p.processId" /></el-select></el-form-item>
         <el-form-item label="物料"><el-row :gutter="8"><el-col :span="18"><el-input v-model="bomEditForm.itemName" placeholder="请选择物料" disabled /></el-col><el-col :span="6"><el-button type="primary" icon="Search" size="small" @click="$refs.bomItemSelectRef.open()">选择</el-button></el-col></el-row></el-form-item>
         <el-form-item label="物料类型"><el-select v-model="bomEditForm.itemOrProduct" style="width:100%"><el-option label="原料" value="RAW" /><el-option label="半成品" value="SEMI" /><el-option label="成品" value="FINISHED" /><el-option label="辅料" value="AUXILIARY" /><el-option label="包材" value="PACK" /></el-select></el-form-item>
-        <el-form-item label="单位用量"><el-input-number v-model="bomEditForm.quantity" :min="0" :precision="4" style="width:100%" /></el-form-item>
+        <el-form-item label="用量方式"><el-select v-model="bomEditForm.quantityMode" style="width:100%"><el-option label="按件用量（×工单数量）" value="PER_UNIT" /><el-option label="整单总量（直接填写）" value="TOTAL" /></el-select></el-form-item>
+        <el-form-item v-if="bomEditForm.quantityMode==='TOTAL'" label="整单总用量"><el-input-number v-model="bomEditForm.totalQuantity" :min="0" :precision="4" style="width:100%" /></el-form-item>
+        <el-form-item v-else label="单位用量"><el-input-number v-model="bomEditForm.quantity" :min="0" :precision="4" style="width:100%" /></el-form-item>
+        <el-form-item label="计量单位"><el-input v-model="bomEditForm.unitOfMeasure" placeholder="如 TON / 卷，需与物料单位匹配" /></el-form-item>
+        <el-form-item label="损耗率"><el-input-number v-model="bomEditForm.scrapRate" :min="0" :max="1" :precision="4" :step="0.01" style="width:100%" /><span style="margin-left:8px;color:#909399;font-size:12px">0.05=5%</span></el-form-item>
       </el-form>
       <template #footer><el-button type="primary" @click="confirmBomEdit">确 定</el-button><el-button @click="bomEditOpen=false">取 消</el-button></template>
     </el-dialog>
@@ -489,10 +493,12 @@ export default {
       this.routeProcesses.forEach(p => {
         ensure(p.processId, p.processName)
       })
-      // 附着 BOM（只挂路线内工序）
+      // 附着 BOM（工序行挂路线内工序；无工序行 = 产品级原料/辅料）
       this.bomList.forEach(b => {
         const pid = b.processId || b._processId
-        if (routePids.has(pid)) {
+        if (!pid) {
+          ensure(null, '产品级原料').bomItems.push(b)
+        } else if (routePids.has(pid)) {
           ensure(pid, b.processName || b._processName || this.getProcessName(pid)).bomItems.push(b)
         }
       })
@@ -639,7 +645,19 @@ export default {
         if (this.optType === 'add') {
           import('@/api/mes/pro/routeproductbom').then(m=>{
             m.listRouteProductBomByRouteId(rp.routeId).then(r=>{
-              this.bomList = (r.data||[]).filter(b=>b.productId===rp.itemId && routePids.has(b.processId)).map(b=>({...b, _processId:b.processId, _processName:this.getProcessName(b.processId)}))
+              this.bomList = (r.data||[]).filter(b=>b.productId===rp.itemId && routePids.has(b.processId)).map(b=>({...b, _processId:b.processId, _processName:this.getProcessName(b.processId), bomSource:'PROCESS', quantityMode:'PER_UNIT'}))
+              // 自动合并产品BOM（产品级原料/辅料，不绑定工序）
+              import('@/api/mes/md/bom').then(bm=>{
+                bm.listBom({ itemId: rp.itemId, pageSize: 999 }).then(pr=>{
+                  const existing = new Set(this.bomList.map(x=>x.itemId))
+                  const productRows = (pr.rows||[]).filter(pb=>!existing.has(pb.bomItemId)).map(pb=>({
+                    processId: null, processName: '产品级原料', bomSource: 'PRODUCT', quantityMode: 'PER_UNIT',
+                    itemId: pb.bomItemId, itemCode: pb.bomItemCode, itemName: pb.bomItemName,
+                    unitOfMeasure: pb.unitOfMeasure, quantity: pb.quantity, scrapRate: pb.scrapRate || 0
+                  }))
+                  this.bomList = [...this.bomList, ...productRows]
+                })
+              })
             })
           })
           import('@/api/mes/pro/routeprocessparam').then(m=>{
@@ -678,7 +696,7 @@ export default {
     },
     getProcessName(pid) { const p=this.processOptions.find(i=>i.processId===pid) || this.routeProcesses.find(i=>i.processId===pid); return p?p.processName:pid },
     // BOM CRUD
-    handleAddBom(processId) { this._bomEditIdx=-1; const proc=this.processGroupList.find(p=>p.processId===processId); this.bomEditForm={ _processId:processId||null, _processName:proc?proc.processName:'', itemId:null, itemCode:null, itemName:null, itemOrProduct:'RAW', quantity:0, unitOfMeasure:null, unitName:null }; this.bomEditTitle='新增物料行'; this.bomEditOpen=true },
+    handleAddBom(processId) { this._bomEditIdx=-1; const proc=this.processGroupList.find(p=>p.processId===processId); this.bomEditForm={ _processId:processId||null, _processName:proc?proc.processName:'', itemId:null, itemCode:null, itemName:null, itemOrProduct:'RAW', quantity:0, unitOfMeasure:null, unitName:null, quantityMode:'PER_UNIT', totalQuantity:null, scrapRate:0 }; this.bomEditTitle='新增物料行'; this.bomEditOpen=true },
     handleEditBom(row) { this._bomEditIdx=this.bomList.indexOf(row); this.bomEditForm={...row}; this.bomEditTitle='编辑物料行'; this.bomEditOpen=true },
     handleDelBom(row) { const idx=this.bomList.indexOf(row); if(idx>=0) this.bomList.splice(idx,1) },
     // ── 工序管理：增加/删除/排序 ──
@@ -703,9 +721,15 @@ export default {
       // 更新 orderNum
       arr.forEach((p, i) => { p.orderNum = i + 1 })
     },
-    onBomItemSelected(row) { this.bomEditForm.itemId=row.itemId; this.bomEditForm.itemCode=row.itemCode; this.bomEditForm.itemName=row.itemName; this.bomEditForm.unitOfMeasure=row.unitOfMeasure; this.bomEditForm.unitName=row.unitName },
+    onBomItemSelected(row) { this.bomEditForm.itemId=row.itemId; this.bomEditForm.itemCode=row.itemCode; this.bomEditForm.itemName=row.itemName; this.bomEditForm.unitOfMeasure=row.unitOfMeasure; this.bomEditForm.unitName=row.unitName; this.bomEditForm.unit2=row.unit2||null; this.bomEditForm.unit2Name=row.unit2Name||null; this.bomEditForm.conversionRate=row.conversionRate||null },
     confirmBomEdit() {
-      const f=this.bomEditForm; f._processName=this.getProcessName(f._processId)
+      const f=this.bomEditForm
+      // 产品级原料：工序为空
+      if (f._processId === -1) f._processId = null
+      f.processId = f._processId
+      f.processName = f._processId ? this.getProcessName(f._processId) : '产品级原料'
+      f.bomSource = f._processId ? 'PROCESS' : 'PRODUCT'
+      if (f.quantityMode !== 'TOTAL') { f.totalQuantity = null }
       if(this._bomEditIdx>=0) this.bomList.splice(this._bomEditIdx,1,f); else this.bomList.push({...f})
       this.bomEditOpen=false
     },
@@ -760,8 +784,15 @@ export default {
           processName: bom.processName || bom._processName || '',
           itemId: bom.itemId, itemCode: bom.itemCode || '', itemName: bom.itemName || '',
           itemSpc: bom.itemSpc || '', unitOfMeasure: bom.unitOfMeasure || '',
-          unitName: bom.unitName || '', itemOrProduct: bom.itemOrProduct || 'RAW',
-          quantity: bom.quantity || 0
+          unitName: bom.unitName || '', unit2: bom.unit2 || null, unit2Name: bom.unit2Name || null,
+          conversionRate: bom.conversionRate || null,
+          itemOrProduct: bom.itemOrProduct || 'RAW',
+          quantityMode: bom.quantityMode || 'PER_UNIT',
+          bomSource: bom.bomSource || (bom.processId || bom._processId ? 'PROCESS' : 'PRODUCT'),
+          scrapRate: bom.scrapRate || 0,
+          quantity: bom.quantity || 0,
+          // 整单总量仅在 TOTAL 模式下提交，避免切换模式后残留旧值
+          totalQuantity: (bom.quantityMode === 'TOTAL') ? bom.totalQuantity : null
         })),
         paramList: this.paramList.map(p => ({
           recordId: p.recordId || null,

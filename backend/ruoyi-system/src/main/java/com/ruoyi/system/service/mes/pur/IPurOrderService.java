@@ -62,6 +62,14 @@ public interface IPurOrderService
     public int updatePurOrder(PurOrder purOrder);
 
     /**
+     * 校验采购订单是否允许人工编辑（DRAFT/APPROVED 放行，ORDERED 及之后只读）。
+     * 仅供 Controller 层调用；内部流程（收货回写、异常调整、齐套生成）不调用。
+     *
+     * @param orderId 采购订单ID
+     */
+    public void assertUserEditable(Long orderId);
+
+    /**
      * 批量删除采购订单头
      * 
      * @param orderIds 需要删除的采购订单头主键集合

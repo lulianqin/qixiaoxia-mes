@@ -53,6 +53,9 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderParam;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.pro.ProRoute;
+import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdProductBom;
+import com.ruoyi.system.service.mes.common.MesQuantityService;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProParamTemplate;
 import com.ruoyi.system.domain.mes.pro.ProProcess;
@@ -146,6 +149,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
     @Autowired
     private com.ruoyi.system.service.mes.md.IMdProductBomService mdProductBomService;
+
+    @Autowired
+    private MesQuantityService mesQuantityService;
 
     @Autowired
     private RedisLockTemplate lockTemplate;
@@ -934,30 +940,27 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
         // 2. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
         //    quantity_available，齐套计算需加回，否则发料后永远显示缺料
-        Map<Long, BigDecimal> reservedByItem = sumReservedByItem(workorderId);
-
         // 3. 一次性批量加载所有 BOM 物料的库存，消除逐物料 N+1（factory_id 由拦截器注入）
         List<Long> bomItemIds = new ArrayList<>();
         for (ProWorkorderBom bom : bomList) {
             if (bom.getItemId() != null) bomItemIds.add(bom.getItemId());
         }
-        Map<Long, BigDecimal> availableByItem = sumAvailableByItemIds(bomItemIds);
+        Map<Long, MdItem> items = mesQuantityService.loadItems(bomItemIds);
+        Map<Long, BigDecimal> availableByItem = sumAvailableByItemIds(bomItemIds, items);
+        Map<Long, BigDecimal> reservedByItem = sumReservedByItem(workorderId, items);
 
         List<Map<String, Object>> result = new ArrayList<>();
         boolean allSufficient = true;
 
         for (ProWorkorderBom bom : bomList) {
-            // 汇总可用库存（确认领料时已预占扣减quantity_available）
-            // 存量数据已通过 migration_init_available.sql 初始化为 quantity_onhand
+            MdItem item = items.get(bom.getItemId());
+            // 需求：按用量方式 + 损耗率计算，再折算到库存基准单位（物料主单位）
+            BigDecimal requiredBiz = mesQuantityService.requiredTotalQty(bom, wo.getQuantity());
+            BigDecimal required = mesQuantityService.toBaseQty(requiredBiz, bom.getUnitOfMeasure(), item);
+
             BigDecimal availableTotal = availableByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
-
-            // 本工单已备料量（已预占或已发料，库存 available 已被扣除，需加回）
             BigDecimal reserved = reservedByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
-            // 有效可用量 = 纯库存可用 + 本工单已备料
             BigDecimal effectiveQty = availableTotal.add(reserved);
-
-            // 所需用量
-            BigDecimal required = bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO;
             boolean sufficient = effectiveQty.compareTo(required) >= 0;
 
             Map<String, Object> row = new HashMap<>();
@@ -965,7 +968,11 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             row.put("itemId", bom.getItemId());
             row.put("itemCode", bom.getItemCode());
             row.put("itemName", bom.getItemName());
-            row.put("unitName", bom.getUnitName());
+            row.put("unitName", item != null ? item.getUnitName() : bom.getUnitName());
+            row.put("bomUnitName", bom.getUnitName());
+            row.put("bomRequiredQty", requiredBiz);
+            row.put("quantityMode", bom.getQuantityMode());
+            row.put("bomSource", bom.getBomSource());
             row.put("requiredQty", required);
             row.put("availableQty", availableTotal);
             row.put("reservedForOrder", reserved);
@@ -1006,9 +1013,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
      * 齐套分析需将其加回，否则发料后会持续误报缺料。</p>
      *
      * @param workorderId 生产工单主键
-     * @return itemId → 已备料量
+     * @param items 物料主数据（用于单位折算）
+     * @return itemId → 已备料量（库存基准单位）
      */
-    private Map<Long, BigDecimal> sumReservedByItem(Long workorderId)
+    private Map<Long, BigDecimal> sumReservedByItem(Long workorderId, Map<Long, MdItem> items)
     {
         Map<Long, BigDecimal> reservedByItem = new HashMap<>();
         WmIssueHeader hQuery = new WmIssueHeader();
@@ -1034,7 +1042,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         for (WmIssueLine line : wmIssueLineMapper.selectByIssueIds(issueIds))
         {
             BigDecimal qty = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
-            reservedByItem.merge(line.getItemId(), qty, BigDecimal::add);
+            // 领料行可能按业务单位（吨/卷）记录，统一折算到库存基准单位后再汇总
+            BigDecimal baseQty = mesQuantityService.toBaseQty(qty, line.getUnitOfMeasure(), items.get(line.getItemId()));
+            reservedByItem.merge(line.getItemId(), baseQty, BigDecimal::add);
         }
         return reservedByItem;
     }
@@ -1043,9 +1053,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
      * 按 itemId 集合汇总可用库存 quantity_available（批量查询，消除齐套分析 N+1）。
      *
      * @param itemIds 物料ID集合
-     * @return itemId → 可用库存合计
+     * @param items 物料主数据（用于单位折算）
+     * @return itemId → 可用库存合计（库存基准单位）
      */
-    private Map<Long, BigDecimal> sumAvailableByItemIds(List<Long> itemIds)
+    private Map<Long, BigDecimal> sumAvailableByItemIds(List<Long> itemIds, Map<Long, MdItem> items)
     {
         Map<Long, BigDecimal> availableByItem = new HashMap<>();
         if (itemIds == null || itemIds.isEmpty()) return availableByItem;
@@ -1053,7 +1064,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (stocks == null) return availableByItem;
         for (WmMaterialStock stock : stocks) {
             if (stock.getItemId() == null || stock.getQuantityAvailable() == null) continue;
-            availableByItem.merge(stock.getItemId(), stock.getQuantityAvailable(), BigDecimal::add);
+            // 历史库存可能按辅助单位记录，先折算到物料主单位再汇总
+            BigDecimal baseQty = mesQuantityService.toBaseQty(
+                    stock.getQuantityAvailable(), stock.getUnitOfMeasure(), items.get(stock.getItemId()));
+            availableByItem.merge(stock.getItemId(), baseQty, BigDecimal::add);
         }
         return availableByItem;
     }
@@ -1089,7 +1103,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             for (WmIssueHeader h : headers) {
                 if (WmIssueConstants.isTerminal(h.getStatus())) continue;
                 if (h.getTaskId() != null) taskIds.add(h.getTaskId());
-                if (h.getProcessId() != null) processIds.add(h.getProcessId());
+                // 无工序的「产品级备料单」用 0 作为幂等哨兵
+                processIds.add(h.getProcessId() != null ? h.getProcessId() : 0L);
             }
         }
     }
@@ -1323,6 +1338,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             return step;
         }
 
+        Map<Long, MdItem> items = mesQuantityService.loadItems(
+                bomList.stream().map(ProWorkorderBom::getItemId).filter(Objects::nonNull).collect(Collectors.toList()));
+
         // 按 processId 分组
         Map<Long, List<ProWorkorderBom>> grouped = new LinkedHashMap<>();
         for (ProWorkorderBom bom : bomList)
@@ -1354,15 +1372,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             Long processId = entry.getKey();
             List<ProWorkorderBom> processBoms = entry.getValue();
 
-            // processId=0 表示 BOM 行未关联工序，跳过
-            if (processId == 0L)
-            {
-                skippedCount++;
-                continue;
-            }
-
-            String processName = processBoms.get(0).getProcessName();
-            ProRouteProcess outsourceRp = outsourceMap.get(processId);
+            // processId=0 表示 BOM 行未关联工序（产品级原料/辅料）→ 生成一张「产品级备料单」
+            boolean productLevel = (processId == 0L);
+            String processName = productLevel ? "产品级原料" : processBoms.get(0).getProcessName();
+            ProRouteProcess outsourceRp = productLevel ? null : outsourceMap.get(processId);
 
             if (outsourceRp != null)
             {
@@ -1381,9 +1394,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 continue;
             }
 
-            // 厂内工序：生成生产领料单
-            // 从预加载的任务 Map 中取该工序对应的排产任务
-            ProTask task = taskByProcess.get(processId);
+            // 厂内工序：生成生产领料单（产品级原料也走此分支，但无 task/工序）
+            ProTask task = productLevel ? null : taskByProcess.get(processId);
             String processCode = (task != null) ? task.getProcessCode() : null;
 
             // 幂等检查：该工单+工序已有非终态领料单则跳过
@@ -1409,7 +1421,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             header.setWorkorderId(wo.getWorkorderId());
             header.setWorkorderCode(wo.getWorkorderCode());
             header.setWorkorderName(wo.getWorkorderName());
-            header.setProcessId(processId);
+            header.setProcessId(productLevel ? null : processId);
             header.setProcessName(processName);
             if (task != null)
             {
@@ -1435,16 +1447,19 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
                 line.setItemCode(bom.getItemCode());
                 line.setItemName(bom.getItemName());
                 line.setItemSpc(bom.getItemSpc());
-                line.setUnitOfMeasure(bom.getUnitOfMeasure());
-                line.setUnitName(bom.getUnitName());
-                line.setQuantityIssue(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO);
-                line.setProcessId(processId);
+                MdItem lineItem = items.get(bom.getItemId());
+                BigDecimal qtyBase = mesQuantityService.toBaseQty(
+                        mesQuantityService.requiredTotalQty(bom, wo.getQuantity()), bom.getUnitOfMeasure(), lineItem);
+                line.setUnitOfMeasure(lineItem != null ? lineItem.getUnitOfMeasure() : bom.getUnitOfMeasure());
+                line.setUnitName(lineItem != null ? lineItem.getUnitName() : bom.getUnitName());
+                line.setQuantityIssue(qtyBase);
+                line.setProcessId(productLevel ? null : processId);
                 line.setProcessCode(processCode);
                 line.setProcessName(processName);
                 line.setWarehouseId(defaultWarehouseId);
                 wmIssueLineService.insertWmIssueLine(line);
 
-                BigDecimal lineQty = bom.getTotalQuantity() != null ? bom.getTotalQuantity() : BigDecimal.ZERO;
+                BigDecimal lineQty = qtyBase;
                 totalQty = totalQty.add(lineQty);
             }
 
@@ -1604,21 +1619,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             throw new ServiceException("工单创建失败：未能获取工单ID");
         }
 
-        // 4. 批量插入BOM行
-        if (bomList != null && !bomList.isEmpty())
-        {
-            for (ProWorkorderBom bom : bomList)
-            {
-                bom.setWorkorderId(workorderId);
-                if (bom.getFactoryId() == null)
-                    bom.setFactoryId(workorder.getFactoryId());
-                if (bom.getQuantity() != null && workorder.getQuantity() != null)
-                {
-                    bom.setTotalQuantity(bom.getQuantity().multiply(workorder.getQuantity()));
-                }
-                proWorkorderBomService.insertProWorkorderBom(bom);
-            }
-        }
+        // 4. 批量插入BOM行（自动合并产品BOM + 计算用量方式/损耗/基准单位）
+        saveWorkorderBomRows(workorder, bomList);
 
         // 5. 批量插入工序参数行
         if (paramList != null && !paramList.isEmpty())
@@ -1768,6 +1770,141 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     }
 
     /**
+     * 保存工单 BOM：未携带 bomSource 的旧调用自动合并产品 BOM；
+     * 计算用量方式 + 损耗后的总用量，并快照单位/换算率与库存基准单位用量。
+     */
+    private void saveWorkorderBomRows(ProWorkorder workorder, List<ProWorkorderBom> bomList)
+    {
+        List<ProWorkorderBom> rows = bomList == null ? new ArrayList<>() : new ArrayList<>(bomList);
+        if (allRowsWithoutSource(rows)) rows = mergeProductBom(workorder, rows);
+        rows = dedupeProductRows(rows);
+        if (rows.isEmpty()) return;
+        Map<Long, MdItem> items = loadBomItems(rows);
+        for (ProWorkorderBom bom : rows) persistBomRow(workorder, bom, items);
+    }
+
+    private boolean allRowsWithoutSource(List<ProWorkorderBom> rows)
+    {
+        for (ProWorkorderBom bom : rows)
+        {
+            if (StringUtils.isNotEmpty(bom.getBomSource())) return false;
+        }
+        return true;
+    }
+
+    private Map<Long, MdItem> loadBomItems(List<ProWorkorderBom> rows)
+    {
+        List<Long> ids = new ArrayList<>();
+        for (ProWorkorderBom bom : rows)
+        {
+            if (bom.getItemId() != null) ids.add(bom.getItemId());
+        }
+        return mesQuantityService.loadItems(ids);
+    }
+
+    /**
+     * 合并产品 BOM（qxx_md_product_bom）为工单级物料行（processId 为空）。
+     * 用户已手工调整过（前端传入 bomSource）时不合并，保留人工结果。
+     */
+    private List<ProWorkorderBom> mergeProductBom(ProWorkorder workorder, List<ProWorkorderBom> routeRows)
+    {
+        if (workorder.getProductId() == null) return routeRows;
+        MdProductBom q = new MdProductBom();
+        q.setItemId(workorder.getProductId());
+        q.setEnableFlag("1");
+        List<MdProductBom> productBoms = mdProductBomService.selectMdProductBomList(q);
+        if (productBoms == null || productBoms.isEmpty()) return routeRows;
+        Set<Long> existing = new HashSet<>();
+        for (ProWorkorderBom b : routeRows)
+        {
+            if (b.getItemId() != null) existing.add(b.getItemId());
+        }
+        List<ProWorkorderBom> merged = new ArrayList<>(routeRows);
+        for (MdProductBom pb : productBoms)
+        {
+            if (pb.getBomItemId() == null || existing.contains(pb.getBomItemId())) continue;
+            ProWorkorderBom bom = new ProWorkorderBom();
+            bom.setProcessId(null);
+            bom.setProcessName("产品级原料");
+            bom.setBomSource("PRODUCT");
+            bom.setItemId(pb.getBomItemId());
+            bom.setItemCode(pb.getBomItemCode());
+            bom.setItemName(pb.getBomItemName());
+            bom.setItemOrProduct("RAW");
+            bom.setUnitOfMeasure(pb.getUnitOfMeasure());
+            bom.setQuantity(pb.getQuantity() != null ? pb.getQuantity() : BigDecimal.ZERO);
+            bom.setScrapRate(pb.getScrapRate());
+            bom.setQuantityMode(MesQuantityService.MODE_PER_UNIT);
+            merged.add(bom);
+        }
+        return merged;
+    }
+
+    /** 同一物料同时来自产品BOM与工序BOM时，以工序BOM为准（避免重复计算） */
+    private List<ProWorkorderBom> dedupeProductRows(List<ProWorkorderBom> rows)
+    {
+        Set<Long> processItems = new HashSet<>();
+        for (ProWorkorderBom b : rows)
+        {
+            if (!"PRODUCT".equalsIgnoreCase(b.getBomSource()) && b.getItemId() != null)
+                processItems.add(b.getItemId());
+        }
+        List<ProWorkorderBom> result = new ArrayList<>();
+        for (ProWorkorderBom b : rows)
+        {
+            boolean duplicateProduct = "PRODUCT".equalsIgnoreCase(b.getBomSource())
+                    && processItems.contains(b.getItemId());
+            if (!duplicateProduct) result.add(b);
+        }
+        return result;
+    }
+
+    private void persistBomRow(ProWorkorder workorder, ProWorkorderBom bom, Map<Long, MdItem> items)
+    {
+        bom.setWorkorderId(workorder.getWorkorderId());
+        if (bom.getFactoryId() == null) bom.setFactoryId(workorder.getFactoryId());
+        MdItem item = items.get(bom.getItemId());
+        fillUnitSnapshot(bom, item);
+        if (StringUtils.isEmpty(bom.getItemCode())) bom.setItemCode("ITEM-" + bom.getItemId());
+        if (StringUtils.isEmpty(bom.getItemName())) bom.setItemName(bom.getItemCode());
+        if (StringUtils.isEmpty(bom.getItemOrProduct())) bom.setItemOrProduct("RAW");
+        if (bom.getQuantity() == null) bom.setQuantity(BigDecimal.ZERO);
+        if (StringUtils.isEmpty(bom.getQuantityMode()))
+            bom.setQuantityMode(MesQuantityService.MODE_PER_UNIT);
+        if (bom.getScrapRate() == null) bom.setScrapRate(BigDecimal.ZERO);
+        // 用户显式填写的整单总量优先（人工覆盖）；工单数量为空时不自动计算
+        if (bom.getTotalQuantity() == null && workorder.getQuantity() != null)
+            bom.setTotalQuantity(mesQuantityService.calcTotalQty(bom, workorder.getQuantity()));
+        if (bom.getTotalQuantity() != null)
+            bom.setTotalQuantity2(mesQuantityService.toBaseQty(
+                    bom.getTotalQuantity(), bom.getUnitOfMeasure(), item));
+        proWorkorderBomService.insertProWorkorderBom(bom);
+    }
+
+    private void fillUnitSnapshot(ProWorkorderBom bom, MdItem item)
+    {
+        if (item == null) return;
+        if (StringUtils.isEmpty(bom.getItemCode())) bom.setItemCode(item.getItemCode());
+        if (StringUtils.isEmpty(bom.getItemName())) bom.setItemName(item.getItemName());
+        if (StringUtils.isEmpty(bom.getUnitOfMeasure()))
+        {
+            bom.setUnitOfMeasure(item.getUnitOfMeasure());
+            bom.setUnitName(item.getUnitName());
+        }
+        if (StringUtils.isEmpty(bom.getUnitName()))
+        {
+            bom.setUnitName(mesQuantityService.isAuxUnit(bom.getUnitOfMeasure(), item)
+                    ? item.getUnit2Name() : item.getUnitName());
+        }
+        if (StringUtils.isEmpty(bom.getUnit2()))
+        {
+            bom.setUnit2(item.getUnit2());
+            bom.setUnit2Name(item.getUnit2Name());
+        }
+        if (bom.getConversionRate() == null) bom.setConversionRate(item.getConversionRate());
+    }
+
+    /**
      * 按目标路线实际包含的工序过滤工单 BOM。父产品可同时挂多条工序集合不同的路线，
      * 工单 BOM 只来自开单路线，fan-out 到缺工序的变体路线会产生跨路线孤儿行并触发归属校验；
      * processId 为空的路线级物料不受工序集合限制，保留
@@ -1888,23 +2025,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         // 1. 更新工单头（含非PREPARE变更追踪）
         updateProWorkorder(workorder);
 
-        // 2. 全量替换BOM：先删后插
+        // 2. 全量替换BOM：先删后插（自动合并产品BOM + 计算用量方式/损耗/基准单位）
         proWorkorderBomService.deleteProWorkorderBomByWorkorderId(workorderId);
-        if (bomList != null && !bomList.isEmpty())
-        {
-            for (ProWorkorderBom bom : bomList)
-            {
-                bom.setWorkorderId(workorderId);
-                if (bom.getFactoryId() == null)
-                    bom.setFactoryId(workorder.getFactoryId());
-                // 计算预计总用量 = 单位用量 × 工单计划数量
-                if (bom.getQuantity() != null && workorder.getQuantity() != null)
-                {
-                    bom.setTotalQuantity(bom.getQuantity().multiply(workorder.getQuantity()));
-                }
-                proWorkorderBomService.insertProWorkorderBom(bom);
-            }
-        }
+        saveWorkorderBomRows(workorder, bomList);
 
         // 3. 工序参数 upsert
         if (paramList != null && !paramList.isEmpty())

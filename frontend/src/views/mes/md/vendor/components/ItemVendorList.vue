@@ -19,6 +19,18 @@
           <el-input-number v-model="s.row.leadTimeDays" :min="0" size="small" controls-position="right" @change="handleUpdate(s.row)" />
         </template>
       </el-table-column>
+      <el-table-column label="采购价(元/单位)" width="130" align="center">
+        <template #default="s">
+          <el-input-number v-model="s.row.purchasePrice" :min="0" :precision="4" size="small"
+            controls-position="right" placeholder="未维护" style="width:105px" @change="handleUpdate(s.row)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="税率%" width="100" align="center">
+        <template #default="s">
+          <el-input-number v-model="s.row.taxRate" :min="0" :max="100" :precision="2" size="small"
+            controls-position="right" style="width:75px" @change="handleUpdate(s.row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="60" align="center">
         <template #default="s"><el-button link type="danger" icon="Delete" size="small" @click="handleDelete(s.row)" /></template>
       </el-table-column>
@@ -35,6 +47,8 @@
         </el-form-item>
         <el-form-item label="最小起订量"><el-input-number v-model="addForm.minOrderQty" :min="0" style="width:100%" /></el-form-item>
         <el-form-item label="提前期(天)"><el-input-number v-model="addForm.leadTimeDays" :min="0" style="width:100%" /></el-form-item>
+        <el-form-item label="采购价"><el-input-number v-model="addForm.purchasePrice" :min="0" :precision="4" style="width:100%" placeholder="元/主单位" /></el-form-item>
+        <el-form-item label="税率(%)"><el-input-number v-model="addForm.taxRate" :min="0" :max="100" :precision="2" style="width:100%" /></el-form-item>
       </el-form>
       <template #footer><el-button type="primary" @click="submitAdd">确 定</el-button><el-button @click="addOpen=false">取 消</el-button></template>
     </el-dialog>
@@ -52,7 +66,7 @@ const props = defineProps<{ vendorId: number }>()
 const list = ref<any[]>([])
 const addOpen = ref(false)
 const itemSelectRef = ref()
-const addForm = ref({ itemId: null as number | null, itemCode: '', itemName: '', minOrderQty: 0, leadTimeDays: 0 })
+const addForm = ref({ itemId: null as number | null, itemCode: '', itemName: '', minOrderQty: 0, leadTimeDays: 0, purchasePrice: 0, taxRate: 0 })
 
 function load() {
   if (!props.vendorId) return
@@ -63,7 +77,7 @@ watch(() => props.vendorId, load)
 onMounted(load)
 
 function handleAdd() {
-  addForm.value = { itemId: null, itemCode: '', itemName: '', minOrderQty: 0, leadTimeDays: 0 }
+  addForm.value = { itemId: null, itemCode: '', itemName: '', minOrderQty: 0, leadTimeDays: 0, purchasePrice: 0, taxRate: 0 }
   addOpen.value = true
 }
 
@@ -82,7 +96,8 @@ function submitAdd() {
   addItemVendor({
     vendorId: props.vendorId, itemId: addForm.value.itemId,
     itemCode: addForm.value.itemCode, itemName: addForm.value.itemName,
-    isPreferred: 'N', minOrderQty: addForm.value.minOrderQty, leadTimeDays: addForm.value.leadTimeDays
+    isPreferred: 'N', minOrderQty: addForm.value.minOrderQty, leadTimeDays: addForm.value.leadTimeDays,
+    purchasePrice: addForm.value.purchasePrice, taxRate: addForm.value.taxRate
   }).then(() => { addOpen.value = false; load(); ElMessage.success('添加成功') }).catch(() => {})
 }
 

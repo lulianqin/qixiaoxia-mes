@@ -1,8 +1,10 @@
 package com.ruoyi.system.service.mes.pur.impl;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
@@ -130,8 +132,36 @@ public class PurOrderServiceImpl implements IPurOrderService
     }
 
     /**
+     * 校验采购订单是否允许人工编辑（供 Controller 调用）。
+     *
+     * 放在 Controller 层而非 updatePurOrder 内部，是因为 updatePurOrder 还被
+     * 收货回写（WmItemRecptServiceImpl）、异常单调整、齐套生成 PO 等内部流程复用，
+     * 在 Service 层统一拦截会误伤 RECEIVING/RECEIVED 状态的正常回写。
+     *
+     * 规则：DRAFT / APPROVED 可编辑（APPROVED 需补录"待定"供应商与单价）；
+     * ORDERED 及之后的状态一律只读，变更请走取消重下。
+     */
+    @Override
+    public void assertUserEditable(Long orderId)
+    {
+        if (orderId == null) return;
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new ServiceException("采购订单不存在");
+        }
+        String status = order.getStatus();
+        if (PurOrderStatus.DRAFT.is(status) || PurOrderStatus.APPROVED.is(status)) {
+            return;
+        }
+        PurOrderStatus orderStatus = PurOrderStatus.fromCode(status);
+        String statusText = orderStatus != null ? orderStatus.getInfo() : status;
+        throw new ServiceException("采购订单[" + order.getOrderCode() + "]当前状态为["
+                + statusText + "]，已下单后不可修改，请取消后重新下单");
+    }
+
+    /**
      * 修改采购订单头
-     * 
+     *
      * @param purOrder 采购订单头
      * @return 结果
      */
@@ -175,7 +205,8 @@ public class PurOrderServiceImpl implements IPurOrderService
 
     /**
      * 审批采购订单（DRAFT → APPROVED）
-     * 校验：status == DRAFT，自动写入审批人，所有行状态同步 → APPROVED
+     * 校验：status == DRAFT，明细单价必须已填（> 0），
+     * 自动写入审批人，所有行状态同步 → APPROVED
      */
     @Override
     @Transactional
@@ -188,15 +219,17 @@ public class PurOrderServiceImpl implements IPurOrderService
         if (!PurOrderStatus.DRAFT.is(order.getStatus())) {
             throw new RuntimeException("只有草稿状态的采购订单才能审批，当前状态：" + order.getStatus());
         }
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        // 审批即进入供应链：明细必须已有单价，否则无法对账/生成应付
+        assertLinePricesPresent(lines);
         order.setStatus(PurOrderStatus.APPROVED.getCode());
         order.setApprover(SecurityUtils.getUsername());
         order.setUpdateTime(DateUtils.getNowDate());
         order.setUpdateBy(SecurityUtils.getUsername());
         int result = purOrderMapper.updatePurOrder(order);
         // 批量更新所有行状态 → APPROVED（与头同步，修复历史「头审批行未同步」缺陷）
-        PurOrderLine queryLine = new PurOrderLine();
-        queryLine.setOrderId(orderId);
-        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
         for (PurOrderLine line : lines) {
             line.setStatus(PurOrderStatus.APPROVED.getCode());
             line.setUpdateTime(DateUtils.getNowDate());
@@ -204,6 +237,25 @@ public class PurOrderServiceImpl implements IPurOrderService
             purOrderLineService.updatePurOrderLine(line);
         }
         return result;
+    }
+
+    /**
+     * 审批前校验所有明细单价 > 0。
+     * 草稿阶段允许单价为空（齐套一键建单会先落 0），审批时统一拦截。
+     */
+    private void assertLinePricesPresent(List<PurOrderLine> lines)
+    {
+        if (lines == null || lines.isEmpty()) return;
+        List<String> missing = new ArrayList<>();
+        for (PurOrderLine line : lines) {
+            if (line.getUnitPrice() == null || line.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                missing.add(StringUtils.isNotEmpty(line.getItemCode()) ? line.getItemCode() : ("行" + line.getLineId()));
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new ServiceException("采购明细存在未填单价的物料：" + String.join("、", missing)
+                    + "，请补全单价后再审批");
+        }
     }
 
     /**

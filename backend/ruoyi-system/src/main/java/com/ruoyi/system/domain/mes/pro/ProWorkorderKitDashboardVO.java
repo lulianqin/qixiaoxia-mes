@@ -28,6 +28,10 @@ public class ProWorkorderKitDashboardVO
     private int shortageCount;
     private boolean allSufficient;
 
+    /** 产品BOM与工序BOM重复物料提示（已按工序BOM计算，避免重复需求） */
+    private List<String> duplicateBomWarnings;
+    private boolean hasDuplicateBom;
+
     // ---- 2. 采购单建议 ----
     private List<ProKitPurchaseRecommendVO> purchaseRecommends;
     private boolean hasPurchaseRecommend;
@@ -85,6 +89,12 @@ public class ProWorkorderKitDashboardVO
 
     public boolean isAllSufficient() { return allSufficient; }
     public void setAllSufficient(boolean v) { this.allSufficient = v; }
+
+    public List<String> getDuplicateBomWarnings() { return duplicateBomWarnings; }
+    public void setDuplicateBomWarnings(List<String> v) { this.duplicateBomWarnings = v; }
+
+    public boolean isHasDuplicateBom() { return hasDuplicateBom; }
+    public void setHasDuplicateBom(boolean v) { this.hasDuplicateBom = v; }
 
     public List<ProKitPurchaseRecommendVO> getPurchaseRecommends() { return purchaseRecommends; }
     public void setPurchaseRecommends(List<ProKitPurchaseRecommendVO> v) { this.purchaseRecommends = v; }

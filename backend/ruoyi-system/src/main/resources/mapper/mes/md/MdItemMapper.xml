@@ -31,6 +31,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="extAttrs"        column="ext_attrs"
                 typeHandler="com.ruoyi.common.core.handler.JsonMapTypeHandler" />
         <result property="batchFlag"       column="batch_flag"       />
+        <result property="defaultPurchasePrice" column="default_purchase_price" />
+        <result property="defaultTaxRate"  column="default_tax_rate"  />
         <result property="remark"          column="remark"           />
         <result property="createBy"        column="create_by"        />
         <result property="createTime"      column="create_time"      />
@@ -45,7 +47,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                coalesce(nullif(i.item_type_name, ''), t.item_type_name) as item_type_name,
                i.parent_id, i.product_size, i.package_spec, i.printing_req,
                i.enable_flag, i.safe_stock_flag, i.min_stock, i.max_stock, i.alert_stock,
-               i.high_value, i.ext_attrs, i.batch_flag, i.remark, i.create_by, i.create_time, i.update_by, i.update_time
+               i.high_value, i.ext_attrs, i.batch_flag,
+               i.default_purchase_price, i.default_tax_rate,
+               i.remark, i.create_by, i.create_time, i.update_by, i.update_time
         from qxx_md_item i
         left join qxx_md_item_type t on i.item_type_id = t.item_type_id
     </sql>
@@ -71,6 +75,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMdItemById" parameterType="Long" resultMap="MdItemResult">
         <include refid="selectMdItemVo"/>
         where i.item_id = #{itemId}
+    </select>
+
+    <select id="selectMdItemByIds" resultMap="MdItemResult">
+        <include refid="selectMdItemVo"/>
+        where i.item_id in
+        <foreach item="itemId" collection="array" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
     </select>
 
     <select id="checkItemCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdItem" resultMap="MdItemResult">
@@ -103,6 +115,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="highValue != null">high_value,</if>
             <if test="extAttrs != null">ext_attrs,</if>
             <if test="batchFlag != null">batch_flag,</if>
+            <if test="defaultPurchasePrice != null">default_purchase_price,</if>
+            <if test="defaultTaxRate != null">default_tax_rate,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -132,6 +146,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="highValue != null">#{highValue},</if>
             <if test="extAttrs != null">#{extAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="batchFlag != null">#{batchFlag},</if>
+            <if test="defaultPurchasePrice != null">#{defaultPurchasePrice},</if>
+            <if test="defaultTaxRate != null">#{defaultTaxRate},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -166,6 +182,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="highValue != null">high_value = #{highValue},</if>
             <if test="extAttrs != null">ext_attrs = #{extAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
             <if test="batchFlag != null">batch_flag = #{batchFlag},</if>
+            <if test="defaultPurchasePrice != null">default_purchase_price = #{defaultPurchasePrice},</if>
+            <if test="defaultTaxRate != null">default_tax_rate = #{defaultTaxRate},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

@@ -64,15 +64,15 @@
         <view class="item-footer">
           <text class="text-grey">{{ item.operator || '-' }} · {{ formatTime(item.issueTime || item.createTime) }}</text>
         </view>
-        <!-- 厂商视角：已发料→签收；已签收/加工中→录入结果；加工中→完成；已完成→发货 -->
-        <view v-if="isVendorRole && item.status === 'ISSUED'" class="item-actions">
+        <!-- 厂商本人或我厂代操作：已发料→签收；已签收/加工中→录入结果；加工中→完成；已完成→发货 -->
+        <view v-if="item.status === 'ISSUED'" class="item-actions">
           <button class="cu-btn bg-blue sm" @click.stop="goVendorReceive(item)">签收</button>
         </view>
-        <view v-if="isVendorRole && (item.status === 'VENDOR_RCVD' || item.status === 'PROCESSING')" class="item-actions">
+        <view v-if="item.status === 'VENDOR_RCVD' || item.status === 'PROCESSING'" class="item-actions">
           <button class="cu-btn bg-blue sm" @click.stop="goResult(item)">{{ item.status === 'VENDOR_RCVD' ? '录入结果' : '补录' }}</button>
           <button v-if="item.status === 'PROCESSING'" class="cu-btn bg-cyan sm" @click.stop="goComplete(item)">完成</button>
         </view>
-        <view v-if="isVendorRole && item.status === 'FINISHED'" class="item-actions">
+        <view v-if="item.status === 'FINISHED'" class="item-actions">
           <button class="cu-btn bg-green sm" @click.stop="goShip(item)">发货回厂</button>
         </view>
         <!-- 我方视角：仅 SHIPPED（厂商已发货）可收货 -->

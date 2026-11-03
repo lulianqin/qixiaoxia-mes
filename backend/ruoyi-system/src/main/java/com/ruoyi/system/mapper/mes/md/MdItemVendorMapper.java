@@ -15,6 +15,8 @@ public interface MdItemVendorMapper
     List<MdItemVendor> selectList(MdItemVendor query);
     List<MdItemVendor> selectByVendorId(Long vendorId);
     List<MdItemVendor> selectByItemId(Long itemId);
+    /** 批量查询多个物料下已启用的供应商（采购向导候选供应商） */
+    List<MdItemVendor> selectEnabledByItemIds(Long[] itemIds);
     int insert(MdItemVendor entity);
     int update(MdItemVendor entity);
     int deleteByRecordId(Long recordId);

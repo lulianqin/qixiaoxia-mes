@@ -41,6 +41,10 @@ export interface MdItem extends BaseEntity {
   alertStock?: number;
   highValue?: string;
   batchFlag?: string;
+  /** 默认采购价(元/主单位)，供应商未维护报价时兜底 */
+  defaultPurchasePrice?: number;
+  /** 默认税率(%) */
+  defaultTaxRate?: number;
   /** 扩展属性(扁平JSON {attrCode:value})，分类驱动的动态属性 */
   extAttrs?: Record<string, any>;
 }

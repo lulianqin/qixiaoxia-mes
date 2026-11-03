@@ -96,6 +96,9 @@ public class OutsourceServiceImpl implements IOutsourceService
     private static final String SOURCE_TYPE_SLITTING = "SLITTING";
     private static final String SOURCE_TYPE_GENERIC = "GENERIC";
 
+    /** 代厂商操作权限（内部员工代厂商执行签收/录结果/完成/发货） */
+    private static final String AGENT_PERM = "mes:wm:outsource:agentOps";
+
     /** 无关联工单时的占位 workorderId */
     private static final Long PLACEHOLDER_WORKORDER_ID = 0L;
 
@@ -452,8 +455,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Override
     public WmOutsourceOrder vendorReceive(Long orderId)
     {
-        if (SecurityUtils.getVendorId() == null)
-            throw new ServiceException("仅外协厂商可签收，仅我方员工不能操作");
+        final boolean agent = assertVendorOrAgent("厂商签收");
         String lockKey = "wm:outsource:" + orderId;
         return lockTemplate.executeWithResult(lockKey, 10, () -> tx().execute(status -> {
             WmOutsourceOrder order = loadAndCheckVendor(orderId, STATUS_ISSUED);
@@ -463,10 +465,11 @@ public class OutsourceServiceImpl implements IOutsourceService
             upd.setStatus(STATUS_VENDOR_RCVD);
             upd.setVendorReceiveTime(DateUtils.getNowDate());
             upd.setVendorReceiver(operator);
+            upd.setAgentOperator(agent ? operator : null);
             upd.setUpdateBy(operator);
             upd.setUpdateTime(DateUtils.getNowDate());
             orderMapper.updateOutsourceOrder(upd);
-            log.info("外协厂商签收: orderId={}, vendor={}", orderId, operator);
+            log.info("外协签收: orderId={}, operator={}, agent={}", orderId, operator, agent);
             return orderMapper.selectOutsourceOrderByOrderId(orderId);
         }));
     }
@@ -478,16 +481,15 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Override
     public WmOutsourceOrder recordResult(Long orderId, List<WmOutsourceRecptLine> resultLines)
     {
-        if (SecurityUtils.getVendorId() == null)
-            throw new ServiceException("仅外协厂商可录入加工结果，我方员工不能操作");
+        final boolean agent = assertVendorOrAgent("录入加工结果");
         if (resultLines == null || resultLines.isEmpty())
             throw new ServiceException("至少录入一条加工结果");
         String lockKey = "wm:outsource:" + orderId;
         return lockTemplate.executeWithResult(lockKey, 10,
-                () -> tx().execute(status -> doRecordResult(orderId, resultLines)));
+                () -> tx().execute(status -> doRecordResult(orderId, resultLines, agent)));
     }
 
-    private WmOutsourceOrder doRecordResult(Long orderId, List<WmOutsourceRecptLine> resultLines)
+    private WmOutsourceOrder doRecordResult(Long orderId, List<WmOutsourceRecptLine> resultLines, boolean agent)
     {
         // 状态机：必须厂商已签收(VENDOR_RCVD) 或已在加工中(PROCESSING，补录)；
         // 不再允许 ISSUED 直接跳 PROCESSING，强制厂商先签收留审计链
@@ -523,7 +525,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         validatePerItemOverReceipt(order.getSourceType(), processedLines, issueLines, existingRecptByItem);
 
         BigDecimal totalQty = persistRecptLines(processedLines, orderId, operator);
-        applyFinishedStatus(order, orderId, totalQty, processedLines, issueLines, operator, existingRecptByItem);
+        applyFinishedStatus(order, orderId, totalQty, processedLines, issueLines, operator, existingRecptByItem, agent);
         log.info("外协录结果: orderId={}, 行数={}, 累计={}/{}",
                 orderId, processedLines.size(),
                 nvl(order.getRecptTotalQty()).add(totalQty), order.getIssueTotalQty());
@@ -603,7 +605,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     private void applyFinishedStatus(WmOutsourceOrder order, Long orderId, BigDecimal addedQty,
                                      List<WmOutsourceRecptLine> addedLines,
                                      List<WmOutsourceIssueLine> issueLines, String operator,
-                                     Map<Long, BigDecimal> existingRecptByItem)
+                                     Map<Long, BigDecimal> existingRecptByItem, boolean agent)
     {
         BigDecimal existing = nvl(order.getRecptTotalQty());
         BigDecimal accumulated = existing.add(addedQty);
@@ -615,6 +617,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         WmOutsourceOrder upd = new WmOutsourceOrder();
         upd.setOrderId(orderId);
         upd.setRecptTotalQty(accumulated);
+        if (agent) upd.setAgentOperator(operator);
         // 是否收满的判定按来源类型区分：
         // - SLITTING：母子卷同为 TON，用头部汇总（收货物料不同于发料物料，不能按 itemId 匹配）
         // - GENERIC：按每个发料物料逐项判定，避免跨 UoM 头部求和导致误判 FINISHED
@@ -731,8 +734,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Override
     public WmOutsourceOrder complete(Long orderId)
     {
-        if (SecurityUtils.getVendorId() == null)
-            throw new ServiceException("仅外协厂商可完成，仅我方员工不能操作");
+        final boolean agent = assertVendorOrAgent("加工完成");
         String lockKey = "wm:outsource:" + orderId;
         return lockTemplate.executeWithResult(lockKey, 10, () -> tx().execute(status -> {
             WmOutsourceOrder order = loadAndCheckVendor(orderId, STATUS_PROCESSING);
@@ -745,6 +747,7 @@ public class OutsourceServiceImpl implements IOutsourceService
             upd.setStatus(STATUS_FINISHED);
             upd.setFinishTime(DateUtils.getNowDate());
             upd.setFinishBy(operator);
+            upd.setAgentOperator(agent ? operator : null);
             upd.setUpdateBy(operator);
             upd.setUpdateTime(DateUtils.getNowDate());
             orderMapper.updateOutsourceOrder(upd);
@@ -756,8 +759,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Override
     public WmOutsourceOrder ship(Long orderId)
     {
-        if (SecurityUtils.getVendorId() == null)
-            throw new ServiceException("仅外协厂商可发货，仅我方员工不能操作");
+        final boolean agent = assertVendorOrAgent("发货回厂");
         String lockKey = "wm:outsource:" + orderId;
         return lockTemplate.executeWithResult(lockKey, 10, () -> tx().execute(status -> {
             WmOutsourceOrder order = loadAndCheckVendor(orderId, STATUS_FINISHED);
@@ -767,6 +769,7 @@ public class OutsourceServiceImpl implements IOutsourceService
             upd.setStatus(STATUS_SHIPPED);
             upd.setShipTime(DateUtils.getNowDate());
             upd.setShipBy(operator);
+            upd.setAgentOperator(agent ? operator : null);
             upd.setUpdateBy(operator);
             upd.setUpdateTime(DateUtils.getNowDate());
             orderMapper.updateOutsourceOrder(upd);
@@ -1056,6 +1059,20 @@ public class OutsourceServiceImpl implements IOutsourceService
         if (vendorId != null && !vendorId.equals(order.getVendorId()))
             throw new ServiceException("无权操作此外协单");
         return order;
+    }
+
+    /**
+     * 校验代厂商动作执行人：外协厂商本人，或具备「代厂商操作」权限的内部员工。
+     * 内部员工代办时要求写 agent_operator，便于审计区分本人/代录。
+     *
+     * @return true=内部员工代操作；false=厂商本人
+     */
+    private boolean assertVendorOrAgent(String actionName)
+    {
+        if (SecurityUtils.getVendorId() != null) return false;
+        if (!SecurityUtils.hasPermi(AGENT_PERM))
+            throw new ServiceException("仅外协厂商本人或具备「代厂商操作」权限的内部员工可执行" + actionName);
+        return true;
     }
 
     private Long currentVendorIdOrNull()

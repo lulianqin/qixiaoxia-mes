@@ -23,6 +23,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="quantity"    column="quantity"    />
         <result property="totalQuantity"    column="total_quantity"    />
         <result property="totalQuantity2"    column="total_quantity2"    />
+        <result property="quantityMode"    column="quantity_mode"    />
+        <result property="bomSource"    column="bom_source"    />
+        <result property="scrapRate"    column="scrap_rate"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -31,7 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProWorkorderBomVo">
-        select line_id, factory_id, workorder_id, item_id, item_code, item_name, item_spc, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, process_id, process_name, item_or_product, quantity, total_quantity, total_quantity2, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder_bom
+        select line_id, factory_id, workorder_id, item_id, item_code, item_name, item_spc, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, process_id, process_name, item_or_product, quantity, total_quantity, total_quantity2, quantity_mode, bom_source, scrap_rate, remark, create_by, create_time, update_by, update_time from qxx_pro_workorder_bom
     </sql>
 
     <select id="selectProWorkorderBomList" parameterType="ProWorkorderBom" resultMap="ProWorkorderBomResult">
@@ -74,6 +77,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantity != null">quantity,</if>
             <if test="totalQuantity != null">total_quantity,</if>
             <if test="totalQuantity2 != null">total_quantity2,</if>
+            <if test="quantityMode != null">quantity_mode,</if>
+            <if test="bomSource != null">bom_source,</if>
+            <if test="scrapRate != null">scrap_rate,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -95,6 +101,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantity != null">#{quantity},</if>
             <if test="totalQuantity != null">#{totalQuantity},</if>
             <if test="totalQuantity2 != null">#{totalQuantity2},</if>
+            <if test="quantityMode != null">#{quantityMode},</if>
+            <if test="bomSource != null">#{bomSource},</if>
+            <if test="scrapRate != null">#{scrapRate},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -120,6 +129,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="quantity != null">quantity = #{quantity},</if>
             <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
             <if test="totalQuantity2 != null">total_quantity2 = #{totalQuantity2},</if>
+            <if test="quantityMode != null">quantity_mode = #{quantityMode},</if>
+            <if test="bomSource != null">bom_source = #{bomSource},</if>
+            <if test="scrapRate != null">scrap_rate = #{scrapRate},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

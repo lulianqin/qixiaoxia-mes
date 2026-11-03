@@ -171,7 +171,7 @@ function openAddDraft(draft: any) {
 async function fill(row: any, type: string, ttl: string) { reset(); const r: any = await getIssueDetail(row.issueId); const h = r.data?.header || r.data; const lines = r.data?.lines || []; Object.assign(form, h); lineList.value = lines; title.value = ttl; optType.value = type; activeTab.value = 'header'; await nextTick(); open.value = true }
 function handleView(row: any) { fill(row, 'view', '查看领料单') }
 function handleUpdate(row: any) { fill(row, 'edit', '修改领料单') }
-function handleDelete(row: any) { const idStr = ids.value.join(',') || row.issueId; proxy.$modal.confirm('确认删除？仅草稿/待审核状态可删。').then(() => delIssueHeader(idStr)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
+function handleDelete(row: any) { const idStr = ids.value.join(',') || row.issueId; proxy.$modal.confirm('确认删除？仅草稿/待审核/已作废状态可删。').then(() => delIssueHeader(idStr)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {}) }
 function handleExport() { proxy.download('/mes/wm/issueheader/export', { ...queryParams }, 'issue.xlsx') }
 
 // 状态流转动作

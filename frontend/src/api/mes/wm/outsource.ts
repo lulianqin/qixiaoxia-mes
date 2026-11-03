@@ -30,9 +30,24 @@ export function batchExecuteOutsource(orderIds: number[]) {
   return request({ url: '/mes/wm/outsource/batchExecute', method: 'post', data: orderIds })
 }
 
-// 厂商录加工结果
+// 厂商签收（ISSUED → VENDOR_RCVD；厂商本人或内部代操作）
+export function vendorReceiveOutsource(orderId: number) {
+  return request({ url: `/mes/wm/outsource/${orderId}/vendorReceive`, method: 'post' })
+}
+
+// 厂商录加工结果（厂商本人或内部代操作）
 export function recordOutsourceResult(orderId: number, data: any[]) {
   return request({ url: `/mes/wm/outsource/${orderId}/result`, method: 'post', data })
+}
+
+// 厂商手动完成（PROCESSING → FINISHED；厂商本人或内部代操作）
+export function completeOutsource(orderId: number) {
+  return request({ url: `/mes/wm/outsource/${orderId}/complete`, method: 'post' })
+}
+
+// 厂商发货回厂（FINISHED → SHIPPED；厂商本人或内部代操作）
+export function shipOutsource(orderId: number) {
+  return request({ url: `/mes/wm/outsource/${orderId}/ship`, method: 'post' })
 }
 
 // 我方收货（入库+建报工+推进流转卡）

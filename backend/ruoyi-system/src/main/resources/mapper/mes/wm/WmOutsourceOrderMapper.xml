@@ -35,6 +35,7 @@
         <result property="shipTime" column="ship_time" />
         <result property="shipBy" column="ship_by" />
         <result property="receiveTime" column="receive_time" />
+        <result property="agentOperator" column="agent_operator" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -48,7 +49,7 @@
                source_type, source_ref_id, status, feedback_id, iqc_id, iqc_code,
                issue_total_qty, recpt_total_qty, operator, issue_time,
                vendor_receive_time, vendor_receiver, finish_time, finish_by, ship_time, ship_by,
-               receive_time,
+               receive_time, agent_operator,
                remark, create_by, create_time, update_by, update_time
         from qxx_wm_outsource_order
     </sql>
@@ -62,7 +63,7 @@
                t.source_type, t.source_ref_id, t.status, t.feedback_id, t.iqc_id, t.iqc_code,
                t.issue_total_qty, t.recpt_total_qty, t.operator, t.issue_time,
                t.vendor_receive_time, t.vendor_receiver, t.finish_time, t.finish_by, t.ship_time, t.ship_by,
-               t.receive_time, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               t.receive_time, t.agent_operator, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
                (
                    select case
                        when max(case when i.status = 'COMPLETED' and i.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
@@ -192,6 +193,7 @@
             <if test="shipTime != null">ship_time = #{shipTime},</if>
             <if test="shipBy != null">ship_by = #{shipBy},</if>
             <if test="receiveTime != null">receive_time = #{receiveTime},</if>
+            <if test="agentOperator != null">agent_operator = #{agentOperator},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
