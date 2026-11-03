@@ -73,7 +73,7 @@
   }, {
     "path": "pages/mine/about/index",
     "style": {
-      "navigationBarTitleText": "关于我们"
+      "navigationBarTitleText": "企小侠"
     }
   }, {
     "path": "pages/mes/pur/list",

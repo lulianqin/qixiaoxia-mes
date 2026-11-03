@@ -52,22 +52,16 @@
             <view>编辑资料</view>
           </view>
         </view>
-        <view class="list-cell list-cell-arrow" @click="handleHelp">
-          <view class="menu-item-box">
-            <view class="iconfont icon-help menu-icon"></view>
-            <view>常见问题</view>
-          </view>
-        </view>
         <view class="list-cell list-cell-arrow" @click="handleUsage">
           <view class="menu-item-box">
-            <view class="iconfont icon-message menu-icon"></view>
+            <view class="iconfont icon-help menu-icon"></view>
             <view>使用说明</view>
           </view>
         </view>
         <view class="list-cell list-cell-arrow" @click="handleAbout">
           <view class="menu-item-box">
             <view class="iconfont icon-aixin menu-icon"></view>
-            <view>关于我们</view>
+            <view>企小侠 qixiaoxia.com</view>
           </view>
         </view>
         <view class="list-cell list-cell-arrow" @click="handleToSetting">
@@ -111,10 +105,6 @@
     proxy.$tab.navigateTo('/pages/mine/avatar/index')
   }
       
-  function handleHelp() {
-    proxy.$tab.navigateTo('/pages/mine/help/index')
-  }
-
   function handleUsage() {
     proxy.$tab.navigateTo('/pages/mine/usage/index')
   }

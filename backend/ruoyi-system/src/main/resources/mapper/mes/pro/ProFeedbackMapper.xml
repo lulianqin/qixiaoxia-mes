@@ -106,6 +106,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workstationName != null  and workstationName != ''"> and t.workstation_name like concat('%', #{workstationName}, '%')</if>
             <if test="processName != null  and processName != ''"> and t.process_name like concat('%', #{processName}, '%')</if>
             <if test="status != null  and status != ''"> and t.status = #{status}</if>
+            <!-- 移动端首页「我的报工」：按报工人过滤；不传则保持原全量口径 -->
+            <if test="userId != null"> and t.user_id = #{userId}</if>
         </where>
         order by t.record_id desc
     </select>

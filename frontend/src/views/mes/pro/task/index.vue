@@ -175,6 +175,28 @@
           </el-col>
         </el-row>
         <el-row>
+          <el-col :span="12">
+            <el-form-item label="报工人（派工）" prop="workerId">
+              <el-select v-model="form.workerId" style="width: 100%" filterable remote clearable
+                :remote-method="searchWorkers" :loading="workerLoading"
+                placeholder="不派则报工时默认当前登录人" :disabled="optType === 'view'">
+                <el-option v-for="u in workerOptions" :key="u.userId"
+                  :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="负责人" prop="leaderId">
+              <el-select v-model="form.leaderId" style="width: 100%" filterable remote clearable
+                :remote-method="searchLeaders" :loading="leaderLoading"
+                placeholder="下发必填：质检拦截等待办的处理责任人" :disabled="optType === 'view'">
+                <el-option v-for="u in leaderOptions" :key="u.userId"
+                  :label="`${u.nickName}（${u.userName}）`" :value="u.userId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
           <el-col :span="8">
             <el-form-item label="甘特图颜色" prop="colorCode">
               <el-color-picker v-model="form.colorCode" :disabled="optType === 'view'" />
@@ -238,6 +260,7 @@ import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import { listUser } from '@/api/system/user'
 import { checkPermi } from '@/utils/permission'
 import { TASK_STATUS_LABEL as statusMap, TASK_STATUS_COLOR as statusColor } from '../taskStatus'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
@@ -265,6 +288,51 @@ const optType = ref('')
 const autoGenFlag = ref(false)
 const workorderOptions = ref<any[]>([])
 const processOptions = ref<any[]>([])
+
+// 报工人（派工）/负责人：远程搜索系统用户；回显用任务行内快照构造，避免额外请求
+const workerOptions = ref<any[]>([])
+const leaderOptions = ref<any[]>([])
+const workerLoading = ref(false)
+const leaderLoading = ref(false)
+let workerTimer: any = null
+let leaderTimer: any = null
+
+function searchWorkers(kw: string) {
+  clearTimeout(workerTimer)
+  workerTimer = setTimeout(() => doSearchUsers(kw, workerOptions, workerLoading), 300)
+}
+function searchLeaders(kw: string) {
+  clearTimeout(leaderTimer)
+  leaderTimer = setTimeout(() => doSearchUsers(kw, leaderOptions, leaderLoading), 300)
+}
+async function doSearchUsers(kw: string, opts: typeof workerOptions, loading: typeof workerLoading) {
+  loading.value = true
+  try {
+    // 系统用户列表仅支持账号/手机号模糊（不支持姓名），两路并发查询后按 userId 去重合并
+    const [byName, byPhone] = await Promise.all([
+      listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
+      listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
+    ])
+    const rows: any[] = [...((byName as any)?.rows || []), ...((byPhone as any)?.rows || [])]
+    const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)
+    // 保留已选中但不在搜索结果里的回显项
+    const keep = opts.value.filter((o: any) => !dedup.some((r: any) => r.userId === o.userId) && o.__echo)
+    opts.value = [...keep, ...dedup.map((r: any) => ({ ...r, __echo: false }))]
+  } finally {
+    loading.value = false
+  }
+}
+/** 用任务行内的人员快照构造回显 option（快照存在时无需请求用户接口） */
+function echoUserOption(row: any, idKey: string, nameKey: string, nickKey: string) {
+  const id = row?.[idKey]
+  if (!id) return null
+  return {
+    userId: id,
+    userName: row?.[nameKey] || '',
+    nickName: row?.[nickKey] || String(id),
+    __echo: true
+  }
+}
 
 // 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询
 const QC_STATE_BATCH = 100  // 后端单次最多 100 个任务
@@ -446,6 +514,8 @@ function cancel() { open.value = false; reset() }
 function reset() {
   form.value = {} as any
   autoGenFlag.value = false
+  workerOptions.value = []
+  leaderOptions.value = []
   if (formRef.value) proxy.resetForm('formRef')
 }
 
@@ -468,7 +538,13 @@ function handleUpdate(row?: any) {
   const id = row?.taskId || ids.value[0]
   if (!id) { proxy.$modal.msgWarning('请选择一条记录'); return }
   getTask(id).then((r: any) => {
-    form.value = r.data || {}
+    const task = r.data || {}
+    form.value = task
+    // 报工人/负责人回显：优先用行内快照构造 option，不额外发请求
+    const wo = echoUserOption(task, 'workerId', 'workerName', 'workerNick')
+    const lo = echoUserOption(task, 'leaderId', 'leaderName', 'leaderNick')
+    workerOptions.value = wo ? [wo] : []
+    leaderOptions.value = lo ? [lo] : []
     open.value = true; title.value = '修改排产任务'; optType.value = 'edit'
   })
 }

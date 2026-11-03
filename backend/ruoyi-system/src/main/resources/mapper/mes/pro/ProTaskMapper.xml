@@ -121,6 +121,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processCode != null and processCode != ''">
                 and t.process_code like concat('%', #{processCode}, '%')
             </if>
+            <!-- 移动端首页「我的任务」：按派工人过滤；不传则保持原全量口径 -->
+            <if test="workerId != null">
+                and t.worker_id = #{workerId}
+            </if>
+            <!-- 移动端首页「我负责的」：按负责人过滤；不传则保持原全量口径 -->
+            <if test="leaderId != null">
+                and t.leader_id = #{leaderId}
+            </if>
         </where>
         order by t.task_id desc
     </select>

@@ -1,9 +1,9 @@
 <template>
   <view class="about-container">
     <view class="header-section text-center">
-      <image style="width: 150rpx;height: 150rpx;" src="/static/logo200.png" mode="widthFix">
+      <image style="width: 150rpx;height: 150rpx;border-radius: 20rpx;" src="/static/logo480.jpg" mode="aspectFit">
       </image>
-      <uni-title type="h2" title="若依移动端"></uni-title>
+      <uni-title type="h2" title="企小侠"></uni-title>
     </view>
 
     <view class="content-section">
@@ -12,18 +12,6 @@
           <view class="menu-item-box">
             <view>版本信息</view>
             <view class="text-right">v{{version}}</view>
-          </view>
-        </view>
-        <view class="list-cell list-cell-arrow">
-          <view class="menu-item-box">
-            <view>官方邮箱</view>
-            <view class="text-right">ruoyi@xx.com</view>
-          </view>
-        </view>
-        <view class="list-cell list-cell-arrow">
-          <view class="menu-item-box">
-            <view>服务热线</view>
-            <view class="text-right">400-999-9999</view>
           </view>
         </view>
         <view class="list-cell list-cell-arrow">
@@ -38,7 +26,7 @@
     </view>
 
     <view class="copyright">
-      <view>Copyright &copy; 2025 ruoyi.vip All Rights Reserved.</view>
+      <view>Copyright &copy; 2026 企小侠 qixiaoxia.com All Rights Reserved.</view>
     </view>
   </view>
 </template>
@@ -49,7 +37,7 @@
   import UniLink from '@/uni_modules/uni-link/components/uni-link/uni-link.vue'
   import UniTitle from '@/uni_modules/uni-title/components/uni-title/uni-title.vue'
 
-  const url = useConfigStore().config.appInfo.site_url
+  const url = 'https://qixiaoxia.com'
   const version = useConfigStore().config.appInfo.version
 </script>
 
