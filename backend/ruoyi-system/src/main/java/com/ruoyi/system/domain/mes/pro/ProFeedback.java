@@ -67,6 +67,8 @@ public class ProFeedback extends BaseEntity
     @Excel(name = "其他报废数量") private BigDecimal quantityOtherScrap;
     @Excel(name = "报工人") private String userName;
     @Excel(name = "报工人ID") private Long userId;
+    /** 负责人ID（transient，仅查询参数：移动端「全部」合并我负责任务上的报工记录） */
+    private Long leaderId;
     /** 班组ID(快照) */ private Long teamId;
     /** 班组编码(快照) */ private String teamCode;
     /** 班组名称(快照) */ private String teamName;
@@ -183,6 +185,8 @@ public class ProFeedback extends BaseEntity
     public void setUserName(String v) { this.userName = v; }
     public Long getUserId() { return userId; }
     public void setUserId(Long v) { this.userId = v; }
+    public Long getLeaderId() { return leaderId; }
+    public void setLeaderId(Long v) { this.leaderId = v; }
     public Long getTeamId() { return teamId; }
     public void setTeamId(Long v) { this.teamId = v; }
     public String getTeamCode() { return teamCode; }

@@ -29,9 +29,7 @@
       <el-row>
         <el-col :span="8"><el-form-item label="门幅"><el-switch v-model="form.paperWidthFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
       </el-row>
-      <div style="text-align: center; margin-top: 20px">
-        <el-button type="primary" @click="handleSave">保存批次配置</el-button>
-      </div>
+      <!-- 批次配置随物料编辑弹窗的【确认】统一保存，不再单独提供保存按钮 -->
     </el-form>
   </div>
 </template>
@@ -78,14 +76,14 @@ async function load(itemId: number) {
   } catch (e) { /* ignore */ }
 }
 
-async function handleSave() {
+async function save(silent = true) {
   if (form.value.configId) {
     await updateBatchConfig(form.value)
   } else {
     await addBatchConfig(form.value)
   }
-  proxy.$modal.msgSuccess('批次配置保存成功')
+  if (!silent) proxy.$modal.msgSuccess('批次配置保存成功')
 }
 
-defineExpose({ load })
+defineExpose({ load, save })
 </script>

@@ -410,7 +410,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setClientId(order.getClientId());
         wo.setClientCode(order.getClientCode());
         wo.setClientName(order.getClientName());
-        wo.setClientOrderCode(order.getClientOrderCode());
+        wo.setClientOrderCode(StringUtils.isNotEmpty(req.getClientOrderCode())
+                ? req.getClientOrderCode() : order.getClientOrderCode());
         wo.setProductSize(line.getProductSize());
         wo.setPrintingReq(line.getPrintingReq());
         wo.setRopeSpec(line.getRopeSpec());

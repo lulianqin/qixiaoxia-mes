@@ -150,8 +150,15 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="工位" prop="workstationName">
-              <el-input v-model="form.workstationName" placeholder="请选择工作站" :disabled="optType === 'view'">
+            <!-- 外协工序选供应商（任务级可改，默认带出路线配置），厂内工序选工位 -->
+            <el-form-item :label="isOutsourceProcess ? '外协供应商' : '工位'" :prop="isOutsourceProcess ? 'vendorId' : 'workstationName'">
+              <el-select v-if="isOutsourceProcess" v-model="form.vendorId" filterable clearable
+                style="width: 100%" :loading="vendorLoading" @focus="loadVendorOptions"
+                :disabled="optType === 'view'" placeholder="请选择外协供应商">
+                <el-option v-for="v in vendorOptions" :key="v.vendorId"
+                  :label="v.vendorName + ' (' + v.vendorCode + ')'" :value="v.vendorId" />
+              </el-select>
+              <el-input v-else v-model="form.workstationName" placeholder="请选择工作站" :disabled="optType === 'view'">
                 <template #append v-if="optType !== 'view'">
                   <el-button icon="Search" @click="handleWorkstationSelect" />
                 </template>
@@ -252,12 +259,13 @@
 </template>
 
 <script setup lang="ts" name="ProSchedule">
-import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { ref, reactive, toRefs, computed, getCurrentInstance } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, getQcBlockState } from '@/api/mes/pro/task'
 import { listWorkorder, getWorkorder } from '@/api/mes/pro/workorder'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
+import { listAllVendor } from '@/api/mes/md/vendor'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { listUser } from '@/api/system/user'
@@ -288,6 +296,32 @@ const optType = ref('')
 const autoGenFlag = ref(false)
 const workorderOptions = ref<any[]>([])
 const processOptions = ref<any[]>([])
+
+// 外协供应商下拉（懒加载，仅外协/整单外发类型，与工艺路线工序编辑口径一致）
+const vendorOptions = ref<any[]>([])
+const vendorLoading = ref(false)
+async function loadVendorOptions() {
+  if (vendorOptions.value.length) return
+  vendorLoading.value = true
+  try {
+    const res: any = await listAllVendor()
+    vendorOptions.value = (res.data || []).filter((v: any) => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
+  } finally { vendorLoading.value = false }
+}
+// 供应商回显兜底：列表里找不到已选 id（如已停用供应商）时补一条快照 option
+function ensureVendorEcho() {
+  if (!form.value.vendorId) return
+  loadVendorOptions().then(() => {
+    if (!vendorOptions.value.some((v: any) => v.vendorId === form.value.vendorId) && form.value.vendorCode) {
+      vendorOptions.value.push({ vendorId: form.value.vendorId, vendorCode: form.value.vendorCode, vendorName: form.value.vendorName || form.value.vendorCode })
+    }
+  })
+}
+// 当前选中工序是否外协工序：路线工序 isOutsource='1'，或任务本身已是外协占位机台
+const isOutsourceProcess = computed(() => {
+  const rp = processOptions.value.find((p: any) => p.processId === form.value.processId)
+  return rp?.isOutsource === '1' || form.value.workstationCode === 'VENDOR'
+})
 
 // 报工人（派工）/负责人：远程搜索系统用户；回显用任务行内快照构造，避免额外请求
 const workerOptions = ref<any[]>([])
@@ -414,9 +448,9 @@ function loadSelectOptions() {
 
 // ===================== 工单变更 → 级联加载工序 & 产品信息 =====================
 
-function onWorkorderChange(workorderId: number) {
+function onWorkorderChange(workorderId: number, keepProcess = false) {
   if (!workorderId) return
-  form.value.processId = undefined as any
+  if (!keepProcess) form.value.processId = undefined as any
   getWorkorder(workorderId).then((r: any) => {
     const wo = r.data
     if (!wo) return
@@ -432,9 +466,13 @@ function onWorkorderChange(workorderId: number) {
           listRouteProcessByRouteId(rp.routeId).then((procRes: any) => {
             const procList = procRes.data || []
             if (procList.length > 0) {
+              // 保留 isOutsource/默认供应商：外协工序任务需选供应商（路线供应商为默认，任务级可更换）
               processOptions.value = procList.map((p: any) => ({
-                processId: p.processId, processName: p.processName || p.processCode, processCode: p.processCode
+                processId: p.processId, processName: p.processName || p.processCode, processCode: p.processCode,
+                isOutsource: p.isOutsource, vendorId: p.vendorId, vendorCode: p.vendorCode, vendorName: p.vendorName
               }))
+              // 编辑回显：外协任务补供应商下拉回显
+              ensureVendorEcho()
             }
           })
         }
@@ -482,7 +520,20 @@ function onWorkorderSelected(row: any) {
 // ===================== 工序选择 =====================
 
 function onProcessChange(_processId: number) {
-  // 工序变更时同步信息（如需要可在此扩展）
+  // 切换工序后重置工位/供应商：外协工序锁定外协占位并默认带出路线供应商，厂内工序清空供应商
+  form.value.workstationId = null
+  form.value.workstationCode = ''
+  form.value.workstationName = ''
+  form.value.vendorId = null
+  const rp = processOptions.value.find((p: any) => p.processId === _processId)
+  if (rp?.isOutsource === '1') {
+    form.value.workstationId = 0
+    form.value.workstationCode = 'VENDOR'
+    form.value.workstationName = '外协'
+    loadVendorOptions().then(() => {
+      if (rp.vendorId && !form.value.vendorId) form.value.vendorId = rp.vendorId
+    })
+  }
 }
 
 // ===================== 工作站选择 =====================
@@ -545,6 +596,8 @@ function handleUpdate(row?: any) {
     const lo = echoUserOption(task, 'leaderId', 'leaderName', 'leaderNick')
     workerOptions.value = wo ? [wo] : []
     leaderOptions.value = lo ? [lo] : []
+    // 按工单加载路线工序（含外协标识/默认供应商），保留当前工序不重置
+    if (task.workorderId) onWorkorderChange(task.workorderId, true)
     open.value = true; title.value = '修改排产任务'; optType.value = 'edit'
   })
 }

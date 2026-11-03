@@ -403,6 +403,10 @@ async function submitForm() {
   }
   syncItemTypeName()
   if (form.value.itemId != undefined) {
+    try {
+      // 批次配置随物料编辑【确认】一并保存（tab 仅编辑态显示，静默保存不重复提示）
+      await batchConfigRef.value?.save?.(true)
+    } catch { /* 批次配置保存失败不阻断物料保存 */ }
     updateItem(form.value).then(() => { proxy.$modal.msgSuccess('修改成功'); open.value = false; getList() })
   } else {
     addItem(form.value).then(() => { proxy.$modal.msgSuccess('新增成功'); open.value = false; getList() })

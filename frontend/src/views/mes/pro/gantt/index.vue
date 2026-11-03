@@ -72,17 +72,28 @@
               :label="p.processName" :value="p.processId" />
           </el-select>
         </el-form-item>
-        <el-form-item label="工作站" prop="workstationId">
-          <!-- 外协任务锁定为外协占位（VENDOR），禁止改成厂内机台：否则会漏进厂内报工列表 -->
-          <el-input v-if="isVendorTask" model-value="外协（厂商加工）" disabled />
-          <el-select v-else v-model="taskForm.workstationId" style="width:100%" filterable
-            :disabled="taskDialogMode==='view'"
-            placeholder="请选择机台（必选）"
-            @focus="onWorkstationFocus" @change="onWorkstationChange">
-            <el-option v-for="ws in filteredWorkstationList" :key="ws.workstationId"
-              :label="ws.workstationName + (ws.idle === false ? '（占用）' : (ws.idle === true ? '（空闲）' : ''))"
-              :value="ws.workstationId" />
-          </el-select>
+        <el-form-item :label="isOutsourceProcess ? '外协供应商' : '工作站'" :prop="isOutsourceProcess ? 'vendorId' : 'workstationId'">
+          <!-- 外协工序：不选机台，选择外协供应商（路线供应商为默认，任务级可更换） -->
+          <template v-if="isOutsourceProcess">
+            <el-select v-model="taskForm.vendorId" style="width:100%" filterable clearable
+              :loading="vendorLoading" @focus="loadVendorOptions"
+              :disabled="taskDialogMode==='view'"
+              placeholder="请选择外协供应商">
+              <el-option v-for="v in vendorOptions" :key="v.vendorId"
+                :label="v.vendorName + ' (' + v.vendorCode + ')'" :value="v.vendorId" />
+            </el-select>
+            <div class="form-tip">外协任务由供应商加工，无需指派厂内机台；默认带出工艺路线配置的供应商，可按工单更换</div>
+          </template>
+          <template v-else>
+            <el-select v-model="taskForm.workstationId" style="width:100%" filterable
+              :disabled="taskDialogMode==='view'"
+              placeholder="请选择机台（必选）"
+              @focus="onWorkstationFocus" @change="onWorkstationChange">
+              <el-option v-for="ws in filteredWorkstationList" :key="ws.workstationId"
+                :label="ws.workstationName + (ws.idle === false ? '（占用）' : (ws.idle === true ? '（空闲）' : ''))"
+                :value="ws.workstationId" />
+            </el-select>
+          </template>
         </el-form-item>
         <el-form-item label="报工人（派工）">
           <el-select v-model="taskForm.workerId" style="width:100%" filterable remote clearable
@@ -149,6 +160,7 @@ import request from '@/utils/request'
 import { getWorkOrderGantt, getAvailableWorkstations, getWorkstationView } from '@/api/mes/pro/gantt'
 import { listWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listWorkstation } from '@/api/mes/md/workstation'
+import { listAllVendor } from '@/api/mes/md/vendor'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
 import { listUserWorkstation } from '@/api/mes/pro/userworkstation'
 import { listUser } from '@/api/system/user'
@@ -192,6 +204,23 @@ const selectedTask = ref<any>({})
 const WS_CODE_VENDOR = 'VENDOR'
 // 当前编辑的是否外协任务：机台锁定为外协占位，禁止改成厂内机台（否则 VENDOR 任务会漏进厂内报工列表）
 const isVendorTask = computed(() => taskForm.workstationCode === WS_CODE_VENDOR)
+// 当前选中工序是否外协工序：路线工序 isOutsource='1'，或任务本身已是外协占位机台
+const currentRouteProcess = computed(() =>
+  routeProcesses.value.find((p: any) => p.processId === taskForm.processId))
+const isOutsourceProcess = computed(() =>
+  currentRouteProcess.value?.isOutsource === '1' || isVendorTask.value)
+
+// 外协供应商下拉（懒加载，仅取外协/整单外发类型，与工艺路线工序编辑口径一致）
+const vendorOptions = ref<any[]>([])
+const vendorLoading = ref(false)
+async function loadVendorOptions() {
+  if (vendorOptions.value.length) return
+  vendorLoading.value = true
+  try {
+    const res: any = await listAllVendor()
+    vendorOptions.value = (res.data || []).filter((v: any) => v.vendorType === 'OUTSOURCE' || v.vendorType === 'BOTH')
+  } finally { vendorLoading.value = false }
+}
 
 // 任务状态改用 useDict('mes_pro_task_status') + dict-tag 渲染，不再硬编码 statusMap
 
@@ -206,6 +235,7 @@ const taskForm = reactive({
   workstationId: null as number | null,
   workstationCode: '',
   workstationName: '',
+  vendorId: null as number | null,
   quantity: 1,
   startTime: '' as string | null,
   endTime: '' as string | null,
@@ -251,7 +281,7 @@ function echoUserOption(row: any, idKey: string, nameKey: string, nickKey: strin
   if (!id) return null
   return { userId: id, userName: row?.[nameKey] || '', nickName: row?.[nickKey] || '', __echo: true }
 }
-// 排产弹窗表单 ref + 校验规则（机台必选，未选禁止保存）
+// 排产弹窗表单 ref + 校验规则：厂内任务机台必选；外协供应商选填（路线可未指定，默认带出可改）
 const taskFormRef = ref()
 const taskRules = {
   processId: [{ required: true, message: '请选择工序', trigger: 'change' }],
@@ -331,7 +361,20 @@ function onProcessChange(processId: number | null) {
   // 切换工序后重置工作站选择，按新工序加载可用工作站
   taskForm.workstationId = null
   taskForm.workstationCode = ''
-  loadAvailableWorkstations()
+  taskForm.workstationName = ''
+  taskForm.vendorId = null
+  const rp = routeProcesses.value.find((p: any) => p.processId === processId)
+  if (rp?.isOutsource === '1') {
+    // 外协工序：锁定外协占位机台，默认带出路线配置的供应商（任务级可更换）
+    taskForm.workstationId = 0
+    taskForm.workstationCode = WS_CODE_VENDOR
+    taskForm.workstationName = '外协'
+    loadVendorOptions().then(() => {
+      if (rp.vendorId && !taskForm.vendorId) taskForm.vendorId = rp.vendorId
+    })
+  } else {
+    loadAvailableWorkstations()
+  }
 }
 
 // 对话框关闭时重置状态
@@ -348,6 +391,7 @@ function resetTaskForm() {
   taskForm.workstationId = null
   taskForm.workstationCode = ''
   taskForm.workstationName = ''
+  taskForm.vendorId = null
   taskForm.quantity = 1
   taskForm.startTime = null
   taskForm.endTime = null
@@ -570,6 +614,16 @@ async function onTaskSelect(task: GanttTask) {
   taskForm.workstationId = (task as any).workstationId ?? null
   taskForm.workstationCode = (task as any).workstationCode || ''
   taskForm.workstationName = (task as any).workstationName || ''
+  // 外协供应商回显：优先用甘特数据里的 vendorName；缺失时由供应商列表按 id 补名
+  taskForm.vendorId = (task as any).vendorId ?? null
+  if (isOutsourceProcess.value) {
+    loadVendorOptions().then(() => {
+      if (taskForm.vendorId && !vendorOptions.value.some(v => v.vendorId === taskForm.vendorId)) {
+        const vc = (task as any).vendorCode
+        if (vc) vendorOptions.value.push({ vendorId: taskForm.vendorId, vendorCode: vc, vendorName: (task as any).vendorName || vc })
+      }
+    })
+  }
   taskForm.quantity = task.quantity || 1
   taskForm.startTime = normalizeTime(task.start)               // #6 ISO→空格格式
   taskForm.endTime = normalizeTime(task.end)
@@ -668,13 +722,15 @@ async function submitTaskEdit() {
     : true
   if (!valid) return
   // 兜底：表单规则未生效（如测试桩/程序化调用）时也绝不放行无机器台任务（外协占位 id=0 合法）
-  if (!isVendorTask.value && !taskForm.workstationId) {
+  if (!isOutsourceProcess.value && !taskForm.workstationId) {
     ElMessage.warning('请选择机台')
     return
   }
   taskSaving.value = true
   try {
     const ws = workstationList.value.find(w => w.workstationId === taskForm.workstationId)
+    // 外协供应商快照（vendorId+code 后端落 qxx_pro_task，任务级可不同于路线默认供应商）
+    const vendor = vendorOptions.value.find(v => v.vendorId === taskForm.vendorId)
     const payload: any = {
       workorderId: queryParams.workorderId || (selectedTask.value as any)?.workorderId,
       processId: taskForm.processId,
@@ -694,7 +750,10 @@ async function submitTaskEdit() {
       workstationCode: isVendorTask.value ? WS_CODE_VENDOR
         : (ws?.workstationCode || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationCode) || ''),
       workstationName: isVendorTask.value ? (taskForm.workstationName || '外协')
-        : (ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || '')
+        : (ws?.workstationName || (filteredWorkstationList.value.find((x: any) => x.workstationId === taskForm.workstationId)?.workstationName) || ''),
+      // 外协任务提交供应商；厂内任务置 null（后端 <if> 不覆盖，历史脏值由外协流程自清理）
+      vendorId: isOutsourceProcess.value ? taskForm.vendorId : null,
+      vendorCode: isOutsourceProcess.value ? (vendor?.vendorCode || null) : null
     }
     if (taskForm.taskId) {
       payload.taskId = taskForm.taskId
@@ -750,9 +809,10 @@ async function onBarMove(task: GanttTask, newStart: string, newEnd: string) {
       }
     }
     ganttRef.value?.render()
-    // 更新弹窗数据
+    // 拖动结束弹出编辑任务弹窗：与点击任务一致走 onTaskSelect，完整回填表单
+    // （此前只更新 selectedTask 不回填表单，弹窗显示空工序，看起来像"新增工序"）
     const updated = findTask(task.id)
-    if (updated) { selectedTask.value = updated; detailOpen.value = true }
+    if (updated) await onTaskSelect(updated)
   } catch { /* 静默 */ }
 }
 

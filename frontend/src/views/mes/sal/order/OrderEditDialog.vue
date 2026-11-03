@@ -89,7 +89,9 @@ export default {
       rules: {
         orderCode: [{ required: true, message: '销售订单号不能为空', trigger: 'blur' }],
         orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }],
-        clientName: [{ required: true, message: '请选择客户', trigger: 'change' }]
+        clientName: [{ required: true, message: '请选择客户', trigger: 'change' }],
+        orderDate: [{ required: true, message: '订单日期不能为空', trigger: 'change' }],
+        requestDate: [{ required: true, message: '需求交期不能为空', trigger: 'change' }]
       }
     }
   },

@@ -107,7 +107,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processName != null  and processName != ''"> and t.process_name like concat('%', #{processName}, '%')</if>
             <if test="status != null  and status != ''"> and t.status = #{status}</if>
             <!-- 移动端首页「我的报工」：按报工人过滤；不传则保持原全量口径 -->
-            <if test="userId != null"> and t.user_id = #{userId}</if>
+            <!-- 「全部」合并我负责任务上的报工记录：OR 条件必须括号包裹（FactoryIdInterceptor 在 WHERE 末尾追加 AND factory_id，裸 OR 会改变 AND 优先级导致跨厂泄漏） -->
+            <if test="userId != null and leaderId == null"> and t.user_id = #{userId}</if>
+            <if test="userId == null and leaderId != null"> and exists (select 1 from qxx_pro_task tk where tk.task_id = t.task_id and tk.leader_id = #{leaderId} and tk.factory_id = t.factory_id)</if>
+            <if test="userId != null and leaderId != null"> and (t.user_id = #{userId} or exists (select 1 from qxx_pro_task tk where tk.task_id = t.task_id and tk.leader_id = #{leaderId} and tk.factory_id = t.factory_id))</if>
         </where>
         order by t.record_id desc
     </select>

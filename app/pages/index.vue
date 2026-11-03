@@ -69,7 +69,12 @@
           <view v-for="item in list" :key="'f' + item.recordId" class="card">
             <view class="card-head">
               <text class="process">{{ item.processName || '未知工序' }}</text>
-              <uni-tag :type="statusTagType(item.status)" :text="statusText(item.status)" size="small" />
+              <view class="head-tags">
+                <!-- 全部 tab：区分记录来源（我报的=报工 / 我负责任务上的=负责） -->
+                <uni-tag v-if="activeTab === 'all'" :type="isMine(item) ? 'warning' : 'primary'"
+                  :text="isMine(item) ? '报工' : '负责'" size="small" />
+                <uni-tag :type="statusTagType(item.status)" :text="statusText(item.status)" size="small" />
+              </view>
             </view>
             <text class="workorder">{{ item.workorderCode || item.workorderName || '-' }}</text>
             <view class="card-foot">
@@ -156,6 +161,11 @@
     return STATUS_TAG_MAP[status] || 'default'
   }
 
+  /** 全部 tab 来源判定：报工人是本人 → 「报工」，否则是负责任务上的记录 → 「负责」 */
+  function isMine(item) {
+    return Number(item.userId) === Number(userStore.id)
+  }
+
   /** 2026-07-11 14:52:17 → 07-11 14:52 */
   function formatTime(t) {
     return t ? t.substring(5, 16) : ''
@@ -183,8 +193,10 @@
       if (userStore.id) params.leaderId = userStore.id
       request = listReportableTask(params)
     } else {
-      // 个人报工记录：后端按报工人过滤（feedback.user_id = 当前用户）
+      // 个人报工记录：按报工人过滤（feedback.user_id = 当前用户）
       if (userStore.id) params.userId = userStore.id
+      // 「全部」tab：合并我负责任务上的报工记录（task.leader_id = 当前用户），卡片按来源打「报工/负责」标签
+      if (activeTab.value === 'all' && userStore.id) params.leaderId = userStore.id
       if (currentTab.value && currentTab.value.status) {
         params.status = currentTab.value.status
       }
@@ -364,6 +376,12 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12rpx;
+
+    .head-tags {
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+    }
   }
 
   .process {

@@ -153,6 +153,11 @@ public class GanttDataServiceImpl implements IGanttDataService
                 // 外协 VENDOR 任务 workstationId=0，前端需靠 code 识别并锁定机台选择（防止被改成厂内任务漏进报工列表）
                 item.put("workstationCode", pt.getWorkstationCode());
                 item.put("workstationName", pt.getWorkstationName());
+                // 外协供应商 + 工序外协标识（路线工序为默认供应商，任务级可改）：供排产弹窗回显/切换
+                item.put("isOutsource", rp.getIsOutsource());
+                item.put("vendorId", pt.getVendorId());
+                item.put("vendorCode", pt.getVendorCode());
+                item.put("vendorName", pt.getVendorId() != null && pt.getVendorId().equals(rp.getVendorId()) ? rp.getVendorName() : null);
                 item.put("colorCode", rp.getColorCode() != null ? rp.getColorCode() : com.ruoyi.system.domain.mes.pro.ProConstants.DEFAULT_COLOR_CODE);
                 item.put("predecessorId", pt.getPredecessorId());
                 item.put("status", pt.getStatus());

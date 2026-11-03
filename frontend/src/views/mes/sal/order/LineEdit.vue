@@ -24,7 +24,7 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="行金额">
+              <el-form-item label="行金额" prop="lineAmount">
                 <el-input-number v-model="form.lineAmount" :min="0" :precision="2" style="width:100%" disabled />
               </el-form-item>
             </el-col>
@@ -143,7 +143,9 @@ let attrReqSeq = 0
 const form = reactive<SalOrderLine>({})
 const rules = {
   productName: [{ required: true, message: '请选择产品', trigger: 'change' }],
-  quantity: [{ required: true, message: '订单数量不能为空', trigger: 'blur' }]
+  quantity: [{ required: true, message: '订单数量不能为空', trigger: 'blur' }],
+  unitPrice: [{ required: true, message: '单价不能为空', trigger: 'blur' }],
+  lineAmount: [{ required: true, message: '行金额不能为空（单价×数量自动计算）', trigger: 'change' }]
 }
 
 function initForm() {
@@ -232,7 +234,14 @@ function loadExtAttrsByProduct(itemId: number, snapshot?: Record<string, any>) {
     if (seq !== attrReqSeq || form.productId !== itemId || !showFlag.value) return
     const item = r.data
     // 优先用传入快照（编辑已有行），否则用物料当前 extAttrs（新选料时快照）
-    form.lineAttrs = snapshot && Object.keys(snapshot).length ? { ...snapshot } : { ...(item.extAttrs || {}) }
+    const hasSnapshot = !!(snapshot && Object.keys(snapshot).length)
+    form.lineAttrs = hasSnapshot ? { ...snapshot } : { ...(item.extAttrs || {}) }
+    // 新选产品时默认带出物料上维护的规格值（产品尺寸/印刷要求/装箱规格→包装要求），避免重复手输
+    if (!hasSnapshot) {
+      if (item.productSize) form.productSize = item.productSize
+      if (item.printingReq) form.printingReq = item.printingReq
+      if (item.packageSpec) form.packageReq = item.packageSpec
+    }
     if (item.itemTypeId) {
       getEffAttrSchema(item.itemTypeId).then(s => {
         if (seq !== attrReqSeq || form.productId !== itemId || !showFlag.value) return

@@ -29,6 +29,9 @@ public class SalOrderToWorkorderRequest
     /** 工单名称(为空则用 产品名+订单号 自动生成) */
     private String workorderName;
 
+    /** 客户PO号(为空则回落到订单头的客户PO号) */
+    private String clientOrderCode;
+
     /** 需求交期(前端传 yyyy-MM-dd HH:mm:ss，对齐 ProWorkorder + checkDeviation) */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date requestDate;
@@ -62,6 +65,8 @@ public class SalOrderToWorkorderRequest
     public void setWorkorderCode(String v) { this.workorderCode = v; }
     public String getWorkorderName() { return workorderName; }
     public void setWorkorderName(String v) { this.workorderName = v; }
+    public String getClientOrderCode() { return clientOrderCode; }
+    public void setClientOrderCode(String v) { this.clientOrderCode = v; }
     public Date getRequestDate() { return requestDate; }
     public void setRequestDate(Date v) { this.requestDate = v; }
     public Long getRouteProductId() { return routeProductId; }

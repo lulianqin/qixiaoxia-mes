@@ -150,6 +150,7 @@ export default {
   data() {
     return {
       twLines: [], twOrderCode: '', twAutoGenFlag: true,
+      twOrderInfo: null, // 订单头信息（客户PO号/订单备注等），供转工单默认带出
       twStep: 1, twRouteOptions: [], twProductId: null, twProductCode: '', twProductName: '',
       twRouteProcesses: [], twActiveProcesses: [],
       twBomList: [], twParamList: [],
@@ -198,6 +199,7 @@ export default {
       if (row.orderId) getOrderDetail(row.orderId).then(r => {
         if (seq !== this.twReqSeq) return
         this.twLines = r.data.lines || []
+        this.twOrderInfo = r.data.workorder || r.data.order || r.data || null
       }).catch(() => {})
       this.twAutoGen()
     },
@@ -213,7 +215,11 @@ export default {
       // 默认沿用开单带出的路线, 可改选; 置空不影响 BOM/参数装载
       this.twForm.routeProductId = line.routeProductId || null
       this.twForm.createSkuVariant = false; this.twForm.skuCode = ''; this.twForm.skuName = ''
-      this.twForm.productSize = line.productSize || ''; this.twForm.ropeSpec = line.ropeSpec || ''; this.twForm.printingReq = line.printingReq || ''; this.twForm.packageReq = line.packageReq || ''; this.twForm.clientOrderCode = line.clientOrderCode || ''
+      // 客户PO号/备注默认带出：行级快照优先，否则回落订单头（客户PO号、订单备注在订单头上维护）
+      const head = this.twOrderInfo || {}
+      this.twForm.productSize = line.productSize || ''; this.twForm.ropeSpec = line.ropeSpec || ''; this.twForm.printingReq = line.printingReq || ''; this.twForm.packageReq = line.packageReq || ''
+      this.twForm.clientOrderCode = line.clientOrderCode || head.clientOrderCode || ''
+      this.twForm.remark = head.remark || ''
       this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []
       this.twProductId = line.productId; this.twProductCode = line.productCode || ''; this.twProductName = line.productName || ''
       this.twRouteOptions = []
