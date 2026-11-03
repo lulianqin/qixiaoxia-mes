@@ -1,7 +1,9 @@
 package com.ruoyi.web.controller.mes.sal;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +31,7 @@ import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
+import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 
 /**
  * 销售订单Controller（factory_id 由 FactoryIdInterceptor 自动注入）
@@ -42,6 +45,9 @@ public class SalOrderController extends BaseController
 {
     @Autowired
     private ISalOrderService salOrderService;
+
+    @Autowired
+    private IProWorkorderService proWorkorderService;
 
     @Autowired
     private SalOrderPdfExporter pdfExporter;
@@ -136,6 +142,26 @@ public class SalOrderController extends BaseController
         SalOrder detail = salOrderService.getDetail(orderId);
         if (detail == null) return error("销售订单不存在");
         return AjaxResult.success(detail);
+    }
+
+    /**
+     * 销售订单看板：订单详情 + 其下生产工单（富化工序进度）。
+     * PC 销售订单详情看板页使用此聚合接口。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:query')")
+    @GetMapping("/board/{orderId}")
+    public AjaxResult board(@PathVariable("orderId") Long orderId)
+    {
+        SalOrder detail = salOrderService.getDetail(orderId);
+        if (detail == null) return error("销售订单不存在");
+        ProWorkorder query = new ProWorkorder();
+        query.setSourceCode(detail.getOrderCode());
+        List<ProWorkorder> workorders = proWorkorderService.selectProWorkorderList(query);
+        proWorkorderService.enrichProgress(workorders);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("order", detail);
+        result.put("workorders", workorders);
+        return AjaxResult.success(result);
     }
 
     @PreAuthorize("@ss.hasPermi('mes:sal:order:add')")

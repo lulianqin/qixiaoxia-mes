@@ -83,6 +83,29 @@
           <text class="row-value warn">{{ pendingFeedbackCount }} 条</text>
         </view>
       </view>
+
+      <!-- 关联单据 -->
+      <view class="card">
+        <view class="dim-grid">
+          <view
+            v-for="d in dimCards"
+            :key="d.key"
+            class="dim-tile"
+            :class="{ active: expandedDim === d.key }"
+            @click="toggleDim(d.key)"
+          >
+            <text class="dim-num">{{ d.total }}</text>
+            <text class="dim-label">{{ d.label }}</text>
+          </view>
+        </view>
+        <view v-if="expandedDim" class="dim-list">
+          <view v-for="(row, i) in expandedRows" :key="expandedDim + i" class="dim-row">
+            <text class="dim-row-main">{{ row.primary }}</text>
+            <text class="dim-row-sub">{{ row.secondary }}</text>
+          </view>
+          <text v-if="!expandedRows.length" class="dim-empty">暂无{{ dimLabel(expandedDim) }}明细</text>
+        </view>
+      </view>
     </view>
 
     <!-- 底部操作：仅生产中可进入报工页（外协工序由报工页引导转外协发货） -->
@@ -97,12 +120,18 @@
   import { onLoad, onShow } from '@dcloudio/uni-app'
   import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
   import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
-  import { getWorkorderTasks } from '@/api/mes/pro/feedback'
+  import { getProcessBoard } from '@/api/mes/pro/feedback'
 
   const task = ref(null)
+  const wo = ref(null)
   const loading = ref(true)
+  const dims = ref({ feedback: {}, inspection: {}, outsource: {}, issue: {} })
+  const expandedDim = ref('')
   let workorderCode = ''
   let taskId = null
+
+  const FB_STATUS_MAP = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
+  const DIM_LABEL_MAP = { feedback: '报工', inspection: '检验', outsource: '外协', issue: '领料' }
 
   const TASK_STATUS_MAP = { NORMAL: '未开工', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消' }
 
@@ -132,17 +161,50 @@
     return t ? t.substring(0, 16) : '-'
   }
 
+  const dimCards = computed(() => [
+    { key: 'feedback', label: '报工', total: dims.value.feedback.total ?? 0 },
+    { key: 'inspection', label: '检验', total: dims.value.inspection.total ?? 0 },
+    { key: 'outsource', label: '外协', total: dims.value.outsource.total ?? 0 },
+    { key: 'issue', label: '领料', total: dims.value.issue.total ?? 0 }
+  ])
+
+  const expandedRows = computed(() => {
+    const k = expandedDim.value
+    if (!k) return []
+    const list = (dims.value[k] && dims.value[k].list) || []
+    switch (k) {
+      case 'feedback': return list.map(f => ({ primary: f.processName || f.feedbackCode, secondary: num(f.quantityFeedback) + ' · ' + fbStatusText(f.status) }))
+      case 'inspection': return list.map(x => ({ primary: x.ipqcName || x.ipqcCode, secondary: x.status || '-' }))
+      case 'outsource': return list.map(x => ({ primary: x.vendorName || x.orderCode, secondary: x.status || '-' }))
+      case 'issue': return list.map(x => ({ primary: x.issueName || x.issueCode, secondary: x.status || '-' }))
+      default: return []
+    }
+  })
+
+  function fbStatusText(s) { return FB_STATUS_MAP[s] || s || '-' }
+  function dimLabel(k) { return DIM_LABEL_MAP[k] || k }
+  function toggleDim(k) { expandedDim.value = expandedDim.value === k ? '' : k }
+
   function goReport() {
+    const code = (wo.value && wo.value.workorderCode) || workorderCode
     uni.navigateTo({
-      url: '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(workorderCode) + '&taskId=' + taskId
+      url: '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(code) + '&taskId=' + taskId
     })
   }
 
   function load() {
     loading.value = true
-    getWorkorderTasks(workorderCode).then(res => {
-      const tasks = (res.data && res.data.tasks) || []
-      task.value = tasks.find(t => Number(t.taskId) === Number(taskId)) || null
+    getProcessBoard(taskId).then(res => {
+      if (res.data) {
+        task.value = res.data.task || null
+        wo.value = res.data.workorder || null
+        dims.value = {
+          feedback: res.data.feedback || {},
+          inspection: res.data.inspection || {},
+          outsource: res.data.outsource || {},
+          issue: res.data.issue || {}
+        }
+      }
     }).finally(() => {
       loading.value = false
     })
@@ -305,5 +367,75 @@
     width: 100%;
     border-radius: 44rpx;
     background: linear-gradient(135deg, #3c96f3, #5ba8f5);
+  }
+
+  .dim-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16rpx;
+  }
+
+  .dim-tile {
+    flex: 1 1 40%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20rpx 0;
+    background: #f7f9fc;
+    border-radius: 16rpx;
+    border: 2rpx solid transparent;
+
+    &.active {
+      background: #eef5ff;
+      border-color: #3c96f3;
+    }
+  }
+
+  .dim-num {
+    font-size: 36rpx;
+    font-weight: 600;
+    color: #1f2d3d;
+  }
+
+  .dim-label {
+    margin-top: 4rpx;
+    font-size: 22rpx;
+    color: #8a94a6;
+  }
+
+  .dim-list {
+    margin-top: 20rpx;
+    border-top: 1rpx solid #f0f2f5;
+  }
+
+  .dim-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18rpx 4rpx;
+    border-bottom: 1rpx solid #f5f6f7;
+  }
+
+  .dim-row-main {
+    font-size: 26rpx;
+    color: #1f2d3d;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dim-row-sub {
+    flex-shrink: 0;
+    margin-left: 16rpx;
+    font-size: 24rpx;
+    color: #8a94a6;
+  }
+
+  .dim-empty {
+    display: block;
+    padding: 20rpx 0;
+    text-align: center;
+    font-size: 24rpx;
+    color: #b0b8c5;
   }
 </style>

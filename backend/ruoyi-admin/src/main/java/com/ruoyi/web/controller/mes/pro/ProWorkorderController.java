@@ -45,6 +45,16 @@ import com.ruoyi.system.domain.mes.pro.ProOutsourceWorkorderInfoVO;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
+import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
+import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
+import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
+import com.ruoyi.system.domain.mes.qc.QcIpqc;
+import com.ruoyi.system.service.mes.wm.IOutsourceService;
+import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
+import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
+import com.ruoyi.system.service.mes.wm.IWmProductRecptService;
+import com.ruoyi.system.service.mes.qc.IQcIpqcService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -78,6 +88,21 @@ public class ProWorkorderController extends BaseController
 
     @Autowired
     private ProRouteProcessMapper proRouteProcessMapper;
+
+    @Autowired
+    private IOutsourceService outsourceService;
+
+    @Autowired
+    private IWmIssueHeaderService issueHeaderService;
+
+    @Autowired
+    private IWmItemRecptService itemRecptService;
+
+    @Autowired
+    private IWmProductRecptService productRecptService;
+
+    @Autowired
+    private IQcIpqcService ipqcService;
 
     /**
      * 查询生产工单列表
@@ -421,6 +446,126 @@ public class ProWorkorderController extends BaseController
             return error("未找到工单：" + workorderCode);
         }
         return success(buildWorkorderEntry(wo));
+    }
+
+    /**
+     * 工单看板：工单头 + 全部工序任务 + 关联单据（报工/检验/外协/领料/收料/入库）汇总与明细。
+     * PC 工单详情看板页、APP 工单详情页共用此聚合接口。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @GetMapping("/board/{workorderId}")
+    public AjaxResult board(@PathVariable Long workorderId)
+    {
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) return error("未找到工单：" + workorderId);
+        Map<String, Object> entry = buildWorkorderEntry(wo);
+        proWorkorderService.enrichProgress(Collections.singletonList(wo));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("workorder", wo);
+        result.put("tasks", entry.get("tasks"));
+        result.put("feedback", feedbackDim(workorderId, null, null));
+        result.put("inspection", inspectionDim(workorderId, null, null));
+        result.put("outsource", outsourceDim(workorderId, null));
+        result.put("issue", issueDim(workorderId, null, null));
+        result.put("itemRecpt", itemRecptDim(workorderId));
+        result.put("productRecpt", productRecptDim(workorderId));
+        return success(result);
+    }
+
+    /**
+     * 工序看板：单工序任务 + 其工单 + 关联单据（报工/检验/外协/领料）汇总与明细。
+     * PC 工序详情看板页、APP 工序详情页共用此聚合接口。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @GetMapping("/board/process/{taskId}")
+    public AjaxResult processBoard(@PathVariable Long taskId)
+    {
+        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
+        if (task == null) return error("未找到工序任务：" + taskId);
+        // 与工单详情一致：标记外协、质检锁态、待确认报工数
+        List<ProTask> marked = sortAndMarkTasks(Collections.singletonList(task), Collections.singletonList(task));
+        fillPendingFeedbackCount(marked);
+        defaultsApplier.apply(marked);
+        task = marked.get(0);
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("task", task);
+        result.put("workorder", wo);
+        result.put("feedback", feedbackDim(task.getWorkorderId(), taskId, task.getProcessId()));
+        result.put("inspection", inspectionDim(task.getWorkorderId(), taskId, task.getProcessId()));
+        result.put("outsource", outsourceDim(task.getWorkorderId(), task.getProcessId()));
+        result.put("issue", issueDim(task.getWorkorderId(), taskId, task.getProcessId()));
+        return success(result);
+    }
+
+    /** 报工维度：列表 + 总数 + 待审核数 + 已审核数 */
+    private Map<String, Object> feedbackDim(Long workorderId, Long taskId, Long processId)
+    {
+        com.ruoyi.system.domain.mes.pro.ProFeedback q = new com.ruoyi.system.domain.mes.pro.ProFeedback();
+        q.setWorkorderId(workorderId);
+        q.setTaskId(taskId);
+        q.setProcessId(processId);
+        List<com.ruoyi.system.domain.mes.pro.ProFeedback> list = proFeedbackService.selectProFeedbackList(q);
+        long pending = list.stream().filter(f -> "PREPARE".equals(f.getStatus())).count();
+        long audited = list.stream().filter(f -> "AUDITED".equals(f.getStatus())).count();
+        Map<String, Object> m = dim(list);
+        m.put("pending", pending);
+        m.put("audited", audited);
+        return m;
+    }
+
+    /** 检验（IPQC）维度：列表 + 总数 */
+    private Map<String, Object> inspectionDim(Long workorderId, Long taskId, Long processId)
+    {
+        QcIpqc q = new QcIpqc();
+        q.setWorkorderId(workorderId);
+        q.setTaskId(taskId);
+        q.setProcessId(processId);
+        return dim(ipqcService.selectQcIpqcList(q));
+    }
+
+    /** 外协单维度：列表 + 总数 */
+    private Map<String, Object> outsourceDim(Long workorderId, Long processId)
+    {
+        WmOutsourceOrder q = new WmOutsourceOrder();
+        q.setWorkorderId(workorderId);
+        q.setProcessId(processId);
+        return dim(outsourceService.selectList(q));
+    }
+
+    /** 领料/发料维度：列表 + 总数 */
+    private Map<String, Object> issueDim(Long workorderId, Long taskId, Long processId)
+    {
+        WmIssueHeader q = new WmIssueHeader();
+        q.setWorkorderId(workorderId);
+        q.setTaskId(taskId);
+        q.setProcessId(processId);
+        return dim(issueHeaderService.selectWmIssueHeaderList(q));
+    }
+
+    /** 收料维度：列表 + 总数 */
+    private Map<String, Object> itemRecptDim(Long workorderId)
+    {
+        WmItemRecpt q = new WmItemRecpt();
+        q.setWorkorderId(workorderId);
+        return dim(itemRecptService.selectWmItemRecptList(q));
+    }
+
+    /** 入库维度：列表 + 总数 */
+    private Map<String, Object> productRecptDim(Long workorderId)
+    {
+        WmProductRecpt q = new WmProductRecpt();
+        q.setWorkorderId(workorderId);
+        return dim(productRecptService.selectWmProductRecptList(q));
+    }
+
+    /** 统一维度容器：明细列表 + 总数 */
+    private Map<String, Object> dim(List<?> list)
+    {
+        Map<String, Object> m = new HashMap<>();
+        m.put("total", list == null ? 0 : list.size());
+        m.put("list", list == null ? Collections.emptyList() : list);
+        return m;
     }
 
     /** 工单详情数据装配：工单 + 全部工序任务（按工艺顺序、标记外协、富化待确认报工数与质检锁态） */

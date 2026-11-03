@@ -33,17 +33,14 @@
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
-      <el-table-column label="工序进度" align="center" min-width="170">
+      <el-table-column label="工序进度" align="center" min-width="300">
         <template #default="scope">
-          <div v-if="scope.row.steps && scope.row.steps.length" class="proc-steps">
-            <template v-for="(s,i) in scope.row.steps" :key="i">
-              <el-tooltip :content="stepTip(scope.row, s, i)" placement="top">
-                <span class="proc-dot"
-                  :class="{ current: s.done===false && i===firstUndone(scope.row.steps) && scope.row.status==='PRODUCING' }"
-                  :style="dotStyle(scope.row, s, i)"></span>
-              </el-tooltip>
-              <span v-if="i < scope.row.steps.length-1" class="proc-line" :class="{ done: stepPct(s)>=100 }"></span>
-            </template>
+          <div v-if="scope.row.steps && scope.row.steps.length" class="proc-chips">
+            <el-tooltip v-for="(s,i) in scope.row.steps" :key="i" :content="stepTip(scope.row, s, i)" placement="top">
+              <span class="proc-chip" :class="stepChipClass(scope.row, s, i)" @click="goWorkorderBoard(scope.row)">
+                {{ s.processName }}<em>{{ stepPct(s) }}%</em>
+              </span>
+            </el-tooltip>
           </div>
           <span v-else>—</span>
         </template>
@@ -77,7 +74,7 @@
       <el-table-column label="状态" align="center" prop="status" width="80"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
       <el-table-column label="需求日期" align="center" prop="requestDate" width="100"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="150"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
-      <el-table-column label="操作" align="center" width="260" fixed="right" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="300" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="排产" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="success" icon="Calendar" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']"></el-button></el-tooltip>
           <el-tooltip content="开工" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="VideoPlay" @click="handleStart(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
@@ -86,6 +83,7 @@
           <el-tooltip content="删除" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']"></el-button></el-tooltip>
           <el-tooltip content="取消" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="danger" icon="Close" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
           <el-tooltip content="进度" placement="top"><el-button link type="primary" icon="DataLine" @click="handleProgress(scope.row)"></el-button></el-tooltip>
+          <el-tooltip content="看板" placement="top"><el-button link type="warning" icon="Odometer" @click="goWorkorderBoard(scope.row)"></el-button></el-tooltip>
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)"></el-button></el-tooltip>
         </template>
       </el-table-column>
@@ -547,10 +545,6 @@ export default {
       if (q <= 0) return 0;
       return Math.max(0, Math.min(100, Math.round(p / q * 100)));
     },
-    dotStyle(row, s, i) {
-      const current = s.done === false && i === this.firstUndone(row.steps) && row.status === 'PRODUCING';
-      return { '--pct': this.stepPct(s), '--fill': current ? '#409eff' : '#67c23a' };
-    },
     stepTip(row, s, i) {
       const pct = this.stepPct(s);
       const q = s.quantity == null ? '—' : Number(s.quantity);
@@ -562,6 +556,17 @@ export default {
       else if (row.status === 'PRODUCING' && i === this.firstUndone(row.steps)) state = '进行中';
       else state = '未开始';
       return s.processName + '（' + state + '） ' + p + '/' + q + ' · ' + pct + '%';
+    },
+    // 工序进度 chip 状态样式：已完成/进行中/未开始
+    stepChipClass(row, s, i) {
+      const pct = this.stepPct(s)
+      if (pct >= 100) return 'chip-done'
+      if (row.status === 'PRODUCING' && i === this.firstUndone(row.steps)) return 'chip-current'
+      return 'chip-pending'
+    },
+    // 打开工单详情看板页
+    goWorkorderBoard(row) {
+      this.$router.push({ path: '/mes/pro/workorder_board', query: { workorderId: row.workorderId } })
     },
     cancel() { this.open=false; this.reset() },
     reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'STANDARD', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
@@ -973,40 +978,29 @@ export default {
 </script>
 
 <style scoped>
-.proc-steps {
+.proc-chips {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: center;
 }
-.proc-dot {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: 2px solid #dcdfe6;
-  background:
-    radial-gradient(circle, #fff 56%, transparent 57%),
-    conic-gradient(var(--fill, #67c23a) calc(var(--pct, 0) * 1%), #ebeef5 0);
-  transition: all .2s;
+.proc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  line-height: 18px;
+  border: 1px solid transparent;
+  white-space: nowrap;
 }
-.proc-dot.current {
-  border-color: #409eff;
-  box-shadow: 0 0 0 3px rgba(64,158,255,.2);
-  animation: proc-pulse 1.4s ease-in-out infinite;
-}
-.proc-line {
-  flex: 0 0 14px;
-  height: 2px;
-  background: #c0c4cc;
-}
-.proc-line.done {
-  background: #67c23a;
-}
-@keyframes proc-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(64,158,255,.2); }
-  50% { box-shadow: 0 0 0 5px rgba(64,158,255,.08); }
-}
+.proc-chip em { font-style: normal; opacity: .85; }
+.chip-done { color: #67c23a; background: #f0f9eb; border-color: #e1f3d8; }
+.chip-current { color: #e6a23c; background: #fdf6ec; border-color: #faecd8; }
+.chip-pending { color: #909399; background: #f4f4f5; border-color: #e9e9eb; }
+.proc-chip:hover { filter: brightness(0.95); }
 .mt2 { margin-top: 2px; }
 .ex-line { display: flex; align-items: center; gap: 8px; line-height: 24px; }
 .ex-meta { color: #606266; font-size: 12px; }

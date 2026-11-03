@@ -103,6 +103,34 @@ export const constantRoutes = [
         meta: { title: '帮助中心' }
       }
     ]
+  },
+  {
+    path: '/mes/pro/workorder_board',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/mes/pro/workorder/board.vue'),
+        name: 'WorkorderBoard',
+        meta: { title: '工单看板', activeMenu: '/mes/pro/workorder' }
+      }
+    ]
+  },
+  {
+    path: '/mes/pro/process_board',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/mes/pro/workorder/process-board.vue'),
+        name: 'ProcessBoard',
+        meta: { title: '工序看板', activeMenu: '/mes/pro/workorder' }
+      }
+    ]
   }
 ]
 

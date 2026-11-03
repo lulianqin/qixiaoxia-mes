@@ -67,6 +67,37 @@
         </el-table>
       </el-card>
 
+      <!-- 生产工单看板 -->
+      <el-card shadow="never" class="mt16">
+        <template #header><span>生产工单（{{ workorders.length }}）</span></template>
+        <el-table :data="workorders" size="small" border>
+          <el-table-column label="工单编码" align="center" width="150">
+            <template #default="s"><el-link type="primary" @click="goWorkorderBoard(s.row)">{{ s.row.workorderCode }}</el-link></template>
+          </el-table-column>
+          <el-table-column label="工单名称" align="center" prop="workorderName" min-width="130" :show-overflow-tooltip="true" />
+          <el-table-column label="产品" align="center" prop="productName" min-width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="计划/已产" align="center" width="110">
+            <template #default="s">{{ s.row.quantityProduced || 0 }}/{{ s.row.quantity || 0 }}</template>
+          </el-table-column>
+          <el-table-column label="状态" align="center" width="90">
+            <template #default="s"><el-tag size="small" :type="({PREPARE:'info',PRODUCING:'warning',COMPLETED:'success',CANCEL:'danger',CLOSED:'info'} as any)[s.row.status] || 'info'">{{ woStatusText(s.row.status) }}</el-tag></template>
+          </el-table-column>
+          <el-table-column label="工序进度" align="center" min-width="220">
+            <template #default="s">
+              <div v-if="s.row.steps && s.row.steps.length" class="wo-chips">
+                <el-tooltip v-for="(st, i) in s.row.steps" :key="i" :content="st.processName + ' ' + stepPct(st) + '%'" placement="top">
+                  <span class="wo-chip" :class="{ done: stepPct(st) >= 100 }">{{ st.processName }}<em>{{ stepPct(st) }}%</em></span>
+                </el-tooltip>
+              </div>
+              <span v-else>—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" width="90">
+            <template #default="s"><el-button link type="primary" size="small" @click="goWorkorderBoard(s.row)">看板</el-button></template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
       <!-- 创建/更新审计 -->
       <div class="audit-footer">
         创建人：{{ order.createBy || '-' }}　创建时间：{{ fmtDateTime(order.createTime) }}
@@ -79,7 +110,7 @@
 <script setup lang="ts">
 import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOrderDetail } from '@/api/mes/sal/order'
+import { getOrderBoard } from '@/api/mes/sal/order'
 import type { SalOrder, SalOrderLine } from '@/types'
 
 const { proxy } = getCurrentInstance() as any
@@ -91,6 +122,7 @@ const orderId = computed(() => Number(route.query.orderId))
 const loading = ref(false)
 const order = ref<SalOrder>({} as SalOrder)
 const lines = ref<SalOrderLine[]>([])
+const workorders = ref<any[]>([])
 
 const statusLabel = computed(() => {
   const v = order.value.status
@@ -119,12 +151,26 @@ function fmtDateTime(v?: string): string {
 function loadDetail() {
   if (!orderId.value) return
   loading.value = true
-  getOrderDetail(orderId.value).then(r => {
+  getOrderBoard(orderId.value).then(r => {
     if (r.data) {
-      order.value = r.data
-      lines.value = r.data.lines || []
+      const o = r.data.order || {}
+      order.value = o
+      lines.value = o.lines || []
+      workorders.value = r.data.workorders || []
     }
   }).finally(() => { loading.value = false })
+}
+
+function goWorkorderBoard(wo: any) {
+  router.push({ path: '/mes/pro/workorder_board', query: { workorderId: wo.workorderId } })
+}
+function woStatusText(s?: string): string {
+  return ({ PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' } as any)[s || ''] || s || ''
+}
+function stepPct(s: any): number {
+  if (s.done) return 100
+  const q = Number(s.quantity) || 0, p = Number(s.quantityProduced) || 0
+  return q <= 0 ? 0 : Math.min(100, Math.round(p / q * 100))
 }
 
 function exportPdf() {
@@ -143,6 +189,15 @@ loadDetail()
 <style scoped>
 .mb16 { margin-bottom: 16px; }
 .ml8 { margin-left: 8px; }
+.mt16 { margin-top: 16px; }
 .header-title { font-weight: bold; font-size: 16px; margin-right: 8px; }
 .audit-footer { color: #909399; font-size: 12px; margin-top: 12px; text-align: right; }
+.wo-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.wo-chip {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12px;
+  padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+  color: #909399; background: #f4f4f5; border: 1px solid #e9e9eb;
+}
+.wo-chip.done { color: #67c23a; background: #f0f9eb; border-color: #e1f3d8; }
+.wo-chip em { font-style: normal; opacity: .85; }
 </style>

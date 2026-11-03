@@ -49,3 +49,13 @@ export function getMyWorkorders() {
 export function getWorkorderTasks(workorderCode) {
   return request({ url: '/mes/pro/workorder/workorderTasks/' + encodeURIComponent(workorderCode), method: 'get' })
 }
+
+// 工单看板：工单头 + 工序任务 + 关联单据（报工/检验/外协/领料/收料/入库）汇总与明细
+export function getWorkorderBoard(workorderId) {
+  return request({ url: '/mes/pro/workorder/board/' + workorderId, method: 'get' })
+}
+
+// 工序看板：工序任务 + 关联单据（报工/检验/外协/领料）汇总与明细
+export function getProcessBoard(taskId) {
+  return request({ url: '/mes/pro/workorder/board/process/' + taskId, method: 'get' })
+}

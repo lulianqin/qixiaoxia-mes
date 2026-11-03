@@ -13,6 +13,10 @@ export function getOrder(id: number): Promise<AjaxResult<SalOrder>> {
 export function getOrderDetail(id: number): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/detail/' + id, method: 'get' })
 }
+// 销售订单看板：订单详情 + 其下生产工单（富化工序进度）
+export function getOrderBoard(id: number): Promise<AjaxResult<any>> {
+  return request({ url: '/mes/sal/order/board/' + id, method: 'get' })
+}
 export function createOrderWithLines(data: SalOrderCreateRequest): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/createWithLines', method: 'post', data })
 }

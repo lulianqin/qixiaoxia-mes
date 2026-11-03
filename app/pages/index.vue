@@ -276,7 +276,7 @@
 
   /** 工单卡片 → 工单详情页 */
   function goWorkorderDetail(entry) {
-    proxy.$tab.navigateTo('/pages/mes/pro/workorder-detail?workorderCode=' + encodeURIComponent(entry.workorder.workorderCode))
+    proxy.$tab.navigateTo('/pages/mes/pro/workorder-detail?workorderId=' + entry.workorder.workorderId)
   }
 
   /** 工序 chip → 工序详情页 */
