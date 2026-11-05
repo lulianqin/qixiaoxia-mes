@@ -27,9 +27,9 @@
 
     <el-table v-loading="loading" :data="memberList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="用户名" align="center" prop="userName" />
-      <el-table-column label="用户昵称" align="center" prop="nickName" />
-      <el-table-column label="电话" align="center" prop="tel" />
+      <el-table-column label="用户名" align="center" prop="userName"  :show-overflow-tooltip="true" />
+      <el-table-column label="用户昵称" align="center" prop="nickName"  :show-overflow-tooltip="true" />
+      <el-table-column label="电话" align="center" prop="tel"  :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" v-if="optType !== 'view'" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button

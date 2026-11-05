@@ -38,24 +38,24 @@
 
     <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
-      <el-table-column label="销售订单号" align="center" prop="orderCode" width="140">
+      <el-table-column label="销售订单号" align="center" prop="orderCode" width="140" :show-overflow-tooltip="true">
         <template #default="s"><el-link type="primary" @click="handleView(s.row)">{{ s.row.orderCode }}</el-link></template>
       </el-table-column>
       <el-table-column label="订单名称" align="center" prop="orderName" :show-overflow-tooltip="true" />
       <el-table-column label="订单类型" align="center" prop="orderType" width="90"><template #default="s"><el-tag :type="orderTypeMeta(s.row.orderType).type" size="small">{{ orderTypeMeta(s.row.orderType).text }}</el-tag></template></el-table-column>
       <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" />
-      <el-table-column label="客户PO号" align="center" prop="clientOrderCode" width="120" />
-      <el-table-column label="业务线" align="center" prop="businessLine" width="80"><template #default="s">{{ businessLineText(s.row.businessLine) }}</template></el-table-column>
+      <el-table-column label="客户PO号" align="center" prop="clientOrderCode" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="业务线" align="center" prop="businessLine" width="80" :show-overflow-tooltip="true"><template #default="s">{{ businessLineText(s.row.businessLine) }}</template></el-table-column>
       <el-table-column label="来源" align="center" prop="source" width="90"><template #default="s"><el-tag :type="sourceTag(s.row.source)">{{ sourceText(s.row.source) }}</el-tag></template></el-table-column>
-      <el-table-column label="交期" align="center" prop="requestDate" width="110"><template #default="s">{{ parseTime(s.row.requestDate, '{y}-{m}-{d}') }}</template></el-table-column>
-      <el-table-column label="总金额" align="center" prop="totalAmount" width="100" />
+      <el-table-column label="交期" align="center" prop="requestDate" width="180" :show-overflow-tooltip="true"><template #default="s">{{ parseTime(s.row.requestDate, '{y}-{m}-{d}') }}</template></el-table-column>
+      <el-table-column label="总金额" align="center" prop="totalAmount" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="生产进度" align="center" width="150">
         <template #default="s">
           <el-progress :percentage="progressBar(s.row).percentage" :stroke-width="10" :status="progressBar(s.row).status" />
         </template>
       </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="90"><template #default="s"><el-tag :type="statusMeta(s.row.status).type">{{ statusMeta(s.row.status).text }}</el-tag></template></el-table-column>
-      <el-table-column label="操作" align="center" width="360" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="360" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
           <el-button v-if="scope.row.status==='PENDING_ACCEPT'" link type="success" size="small" @click="handleAccept(scope.row)" v-hasPermi="['mes:sal:order:edit']">接单</el-button>

@@ -29,10 +29,10 @@
       <el-table-column label="盘点任务ID" align="center" prop="takingId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="盘点任务编码" align="center" prop="takingCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="盘点方案编码" align="center" prop="planCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="单位名称" align="center" prop="unitName" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:stock_taking:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:stock_taking:remove']">删除</el-button>

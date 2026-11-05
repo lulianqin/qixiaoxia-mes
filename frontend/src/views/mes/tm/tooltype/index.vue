@@ -42,18 +42,18 @@
         </template>
       </el-table-column>
       <el-table-column label="类型名称" align="center" prop="toolTypeName" :show-overflow-tooltip="true" />
-      <el-table-column label="是否编码管理" align="center" prop="needCodeFlag" width="110">
+      <el-table-column label="是否编码管理" align="center" prop="needCodeFlag" width="110" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="sys_yes_no_options" :value="scope.row.needCodeFlag" />
         </template>
       </el-table-column>
-      <el-table-column label="保养类型" align="center" prop="maintenType" width="120">
+      <el-table-column label="保养类型" align="center" prop="maintenType" width="120" :show-overflow-tooltip="true">
         <template #default="scope">
           <span v-if="scope.row.needCodeFlag === '1'">{{ maintenTypeMap[scope.row.maintenType] || scope.row.maintenType }}</span>
           <span v-else>无</span>
         </template>
       </el-table-column>
-      <el-table-column label="保养周期" align="center" prop="maintenCycle" width="110">
+      <el-table-column label="保养周期" align="center" prop="maintenCycle" width="110" :show-overflow-tooltip="true">
         <template #default="scope">
           <span v-if="scope.row.needCodeFlag === '1' && scope.row.maintenType && maintenTypePeriodUnit[scope.row.maintenType] && scope.row.maintenCycle != null && scope.row.maintenCycle > 0">
             {{ scope.row.maintenCycle + maintenTypePeriodUnit[scope.row.maintenType] }}
@@ -67,7 +67,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="150">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tooltype:edit']"></el-button></el-tooltip>
         </template>

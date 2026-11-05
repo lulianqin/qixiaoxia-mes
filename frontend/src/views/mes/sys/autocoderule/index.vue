@@ -37,10 +37,10 @@
 
     <el-table v-loading="loading" :data="ruleList" @selection-change="handleSelectionChange" @row-click="onRowClick" highlight-current-row>
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="规则编码" align="center" prop="ruleCode" />
-      <el-table-column label="规则名称" align="center" prop="ruleName" />
-      <el-table-column label="最大长度" align="center" prop="maxLength" width="80" />
-      <el-table-column label="是否补齐" align="center" prop="isPadded" width="80">
+      <el-table-column label="规则编码" align="center" prop="ruleCode" :show-overflow-tooltip="true" />
+      <el-table-column label="规则名称" align="center" prop="ruleName" :show-overflow-tooltip="true" />
+      <el-table-column label="最大长度" align="center" prop="maxLength" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="是否补齐" align="center" prop="isPadded" width="80" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.isPadded === '1' ? '是' : '否' }}</span>
         </template>
@@ -51,7 +51,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="250" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="250" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click.stop="handleUpdate(scope.row)" v-hasPermi="['mes:sys:autocoderule:edit']">修改</el-button>
           <el-button link type="primary" icon="View" @click.stop="showGenDialog(scope.row)">生成编码</el-button>
@@ -70,7 +70,7 @@
         </div>
       </template>
       <el-table :data="partList" v-loading="partLoading">
-        <el-table-column label="序号" align="center" prop="partIndex" width="60" />
+        <el-table-column label="序号" align="center" prop="partIndex" width="60"  :show-overflow-tooltip="true" />
         <el-table-column label="分段类型" align="center" prop="partType" width="100">
           <template #default="scope">
             <el-tag v-if="scope.row.partType === 'FIXCHAR'" type="info">固定字符</el-tag>
@@ -79,9 +79,9 @@
             <el-tag v-else-if="scope.row.partType === 'INPUTCHAR'" type="warning">输入字符</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="分段编码" align="center" prop="partCode" />
-        <el-table-column label="分段名称" align="center" prop="partName" />
-        <el-table-column label="分段长度" align="center" prop="partLength" width="80" />
+        <el-table-column label="分段编码" align="center" prop="partCode"  :show-overflow-tooltip="true" />
+        <el-table-column label="分段名称" align="center" prop="partName"  :show-overflow-tooltip="true" />
+        <el-table-column label="分段长度" align="center" prop="partLength" width="80"  :show-overflow-tooltip="true" />
         <el-table-column label="操作" align="center" width="150">
           <template #default="scope">
             <el-button link type="primary" icon="Edit" @click="handleUpdatePart(scope.row)">修改</el-button>

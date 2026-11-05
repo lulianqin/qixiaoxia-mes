@@ -58,10 +58,10 @@
     <el-card shadow="hover" class="table-card">
       <template #header><span>产能效率</span></template>
       <el-table :data="productivity" size="small" border stripe>
-        <el-table-column label="分组" prop="groupName" min-width="120" />
-        <el-table-column label="工单数" prop="workorderCount" width="80" align="center" />
-        <el-table-column label="完成数" prop="completedCount" width="80" align="center" />
-        <el-table-column label="延期数" prop="delayedCount" width="80" align="center" />
+        <el-table-column label="分组" prop="groupName" min-width="120" :show-overflow-tooltip="true" />
+        <el-table-column label="工单数" prop="workorderCount" width="80" align="center" :show-overflow-tooltip="true" />
+        <el-table-column label="完成数" prop="completedCount" width="80" align="center" :show-overflow-tooltip="true" />
+        <el-table-column label="延期数" prop="delayedCount" width="80" align="center" :show-overflow-tooltip="true" />
         <el-table-column label="完成率" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="rateType(row.completionRate, true)">{{ row.completionRate ?? 0 }}%</el-tag>
@@ -72,8 +72,8 @@
             <el-tag :type="rateType(row.delayRate, false)">{{ row.delayRate ?? 0 }}%</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="标准工时" prop="standardMinutes" width="100" align="center" />
-        <el-table-column label="实际工时" prop="actualMinutes" width="100" align="center" />
+        <el-table-column label="标准工时" prop="standardMinutes" width="100" align="center" :show-overflow-tooltip="true" />
+        <el-table-column label="实际工时" prop="actualMinutes" width="100" align="center" :show-overflow-tooltip="true" />
         <el-table-column label="效率" width="90" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.efficiencyPercent != null" :type="rateType(row.efficiencyPercent, true)">{{ row.efficiencyPercent }}%</el-tag>
@@ -92,17 +92,17 @@
     <el-card shadow="hover" class="table-card">
       <template #header><span>工单明细</span></template>
       <el-table :data="detailList" size="small" border stripe v-loading="detailLoading">
-        <el-table-column label="工单号" prop="workorderCode" min-width="140" />
+        <el-table-column label="工单号" prop="workorderCode" min-width="140"  :show-overflow-tooltip="true" />
         <el-table-column label="产品" prop="productName" min-width="140" show-overflow-tooltip />
-        <el-table-column label="计划量" prop="quantity" width="90" align="center" />
-        <el-table-column label="已产量" prop="quantityProduced" width="90" align="center" />
+        <el-table-column label="计划量" prop="quantity" width="90" align="center"  :show-overflow-tooltip="true" />
+        <el-table-column label="已产量" prop="quantityProduced" width="90" align="center"  :show-overflow-tooltip="true" />
         <el-table-column label="完成率" width="90" align="center">
           <template #default="{ row }">{{ row.completionRate ?? 0 }}%</template>
         </el-table-column>
         <el-table-column label="交期" width="110" align="center">
           <template #default="{ row }">{{ fmtDate(row.requestDate) }}</template>
         </el-table-column>
-        <el-table-column label="完工时间" width="160" align="center">
+        <el-table-column label="完工时间" width="180" align="center">
           <template #default="{ row }">{{ fmtDateTime(row.finishDate) }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90" align="center">
@@ -129,15 +129,15 @@
     <el-card shadow="hover" class="table-card">
       <template #header><span>延期预警</span></template>
       <el-table :data="delayList" size="small" border stripe>
-        <el-table-column label="单号" prop="objectCode" min-width="140" />
+        <el-table-column label="单号" prop="objectCode" min-width="140"  :show-overflow-tooltip="true" />
         <el-table-column label="名称" prop="objectName" min-width="140" show-overflow-tooltip />
         <el-table-column label="产品" prop="productName" min-width="140" show-overflow-tooltip />
-        <el-table-column label="车间" prop="workshopName" width="120" />
-        <el-table-column label="班组" prop="teamName" width="120" />
+        <el-table-column label="车间" prop="workshopName" width="120"  :show-overflow-tooltip="true" />
+        <el-table-column label="班组" prop="teamName" width="120"  :show-overflow-tooltip="true" />
         <el-table-column label="计划/交期" width="110" align="center">
           <template #default="{ row }">{{ fmtDate(row.requestDate) }}</template>
         </el-table-column>
-        <el-table-column label="逾期天数" prop="overdueDays" width="90" align="center">
+        <el-table-column label="逾期天数" prop="overdueDays" width="90" align="center" :show-overflow-tooltip="true">
           <template #default="{ row }">
             <span :style="{ color: row.overdueDays > 0 ? '#f56c6c' : '#e6a23c', fontWeight: 600 }">
               {{ row.overdueDays ?? 0 }}

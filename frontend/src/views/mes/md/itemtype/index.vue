@@ -33,14 +33,14 @@
       :default-expand-all="isExpandAll"
       :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
     >
-      <el-table-column prop="itemTypeName" label="分类" width="260" />
-      <el-table-column prop="orderNum" label="排序" width="100" align="center" />
-      <el-table-column prop="itemOrProduct" label="物料/产品" width="120" align="center">
+      <el-table-column prop="itemTypeName" label="分类" width="260" :show-overflow-tooltip="true" />
+      <el-table-column prop="orderNum" label="排序" width="100" align="center" :show-overflow-tooltip="true" />
+      <el-table-column prop="itemOrProduct" label="物料/产品" min-width="120" align="center" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_item_type" :value="scope.row.itemOrProduct" />
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.createTime }}</span>
         </template>
@@ -50,7 +50,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="280" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="280" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:itemtype:edit']">修改</el-button>
           <el-button v-if="scope.row.parentTypeId" link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['mes:md:itemtype:add']">新增</el-button>
@@ -117,9 +117,9 @@
         为本分类勾选需要填写的扩展属性。父分类已绑定的属性子类会自动继承，通常只需在大类配置。
       </el-alert>
       <el-table :data="attrBindList" v-loading="attrBindLoading" border size="small">
-        <el-table-column label="属性编码" prop="attrCode" width="160" />
-        <el-table-column label="属性名称" prop="attrName" width="140" />
-        <el-table-column label="类型" prop="attrType" width="90" align="center" />
+        <el-table-column label="属性编码" prop="attrCode" width="160"  :show-overflow-tooltip="true" />
+        <el-table-column label="属性名称" prop="attrName" width="140"  :show-overflow-tooltip="true" />
+        <el-table-column label="类型" prop="attrType" width="90" align="center"  :show-overflow-tooltip="true" />
         <el-table-column label="必填" width="70" align="center">
           <template #default="scope">
             <el-checkbox v-model="scope.row.checked" true-value="1" false-value="0" :disabled="scope.row.inheritFromParent" />

@@ -28,9 +28,9 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="装箱单ID" align="center" prop="packageId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="装箱单编码" align="center" prop="packageCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="装箱单名称" align="center" prop="packageName" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="装箱单名称" align="center" prop="packageName" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="生产工单编码" align="center" prop="workorderCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:package:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:package:remove']">删除</el-button>

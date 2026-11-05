@@ -17,13 +17,10 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="供应商ID" prop="vendorId">
-        <el-input
-          v-model="queryParams.vendorId"
-          placeholder="请输入供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
+      <el-form-item label="供应商" prop="vendorId">
+        <el-select v-model="queryParams.vendorId" placeholder="请选择供应商" clearable filterable>
+          <el-option v-for="v in vendorOptions" :key="v.vendorId" :label="v.vendorName" :value="v.vendorId" />
+        </el-select>
       </el-form-item>
       <el-form-item label="供应商编码" prop="vendorCode">
         <el-input
@@ -135,39 +132,39 @@
 
     <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
-<el-table-column label="ID" align="center" prop="orderId" />      <el-table-column label="单据编号" align="center" prop="orderCode" />
-	      <el-table-column label="单据名称" align="center" prop="orderName" />
+<el-table-column label="ID" align="center" prop="orderId" :show-overflow-tooltip="true" />      <el-table-column label="单据编号" align="center" prop="orderCode" :show-overflow-tooltip="true" />
+	      <el-table-column label="单据名称" align="center" prop="orderName" :show-overflow-tooltip="true" />
       
       
-      <el-table-column label="供应商名称" align="center" prop="vendorName" />
-      <el-table-column label="采购类型" align="center" prop="purchaseType" width="100">
+      <el-table-column label="供应商名称" align="center" prop="vendorName" :show-overflow-tooltip="true" />
+      <el-table-column label="采购类型" align="center" prop="purchaseType" width="100" :show-overflow-tooltip="true">
           <template #default="scope">
             <span><dict-tag :options="mes_purchase_type" :value="scope.row.purchaseType" /></span>
           </template>
         </el-table-column>
-      <el-table-column label="下单日期" align="center" prop="orderDate" width="180">
+      <el-table-column label="下单日期" align="center" prop="orderDate" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.orderDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="预计到货" align="center" prop="expectedDate" width="180">
+      <el-table-column label="预计到货" align="center" prop="expectedDate" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="采购人" align="center" prop="purchaser">
+      <el-table-column label="采购人" align="center" prop="purchaser" :show-overflow-tooltip="true">
         <template #default="scope">{{ nickOf(scope.row.purchaser) }}</template>
       </el-table-column>
-      <el-table-column label="审批人" align="center" prop="approver">
+      <el-table-column label="审批人" align="center" prop="approver" :show-overflow-tooltip="true">
         <template #default="scope">{{ nickOf(scope.row.approver) }}</template>
       </el-table-column>
-      <el-table-column label="采购数量" align="center" width="120">
+      <el-table-column label="采购数量" align="center" width="120" :show-overflow-tooltip="true">
         <template #default="scope">
           <div>{{ num(scope.row.receivedQuantity) }} / {{ num(scope.row.totalQuantity) }}</div>
           <div v-if="gt0(scope.row.cancelledQuantity)" class="amt-sub cancel-text">已取消 {{ num(scope.row.cancelledQuantity) }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="采购金额" align="center" width="130">
+      <el-table-column label="采购金额" align="center" width="130" :show-overflow-tooltip="true">
         <template #default="scope">
           <div>{{ money(scope.row.totalAmount) }}</div>
           <div v-if="gt0(scope.row.receivedAmount) || gt0(scope.row.cancelledAmount)" class="amt-sub">
@@ -176,9 +173,9 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="币种" align="center" prop="currency" />
-      <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" />
-      <el-table-column label="状态" align="center" prop="status" width="110">
+      <el-table-column label="币种" align="center" prop="currency" :show-overflow-tooltip="true" />
+      <el-table-column label="关联客户订单" align="center" prop="sourceOrderCode" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" prop="status" width="110" :show-overflow-tooltip="true">
           <template #default="scope">
             <span><dict-tag :options="mes_order_status" :value="scope.row.status" /></span>
             <el-tooltip v-if="isOverdue(scope.row)" content="已超期未到货" placement="top">
@@ -186,8 +183,8 @@
             </el-tooltip>
           </template>
         </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" width="320" class-name="small-padding fixed-width">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column fixed="right" label="操作" align="center" width="320" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pur:order:query']"></el-button></el-tooltip>
           <el-tooltip content="修改" placement="top" v-if="['DRAFT','APPROVED'].includes(scope.row.status)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
@@ -358,6 +355,7 @@
 import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder } from "@/api/mes/pur/order"
 import { listAllOrder } from "@/api/mes/sal/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
+import { listAllVendor } from "@/api/mes/md/vendor"
 import { listUser } from "@/api/system/user"
 import useUserStore from '@/store/modules/user'
 import VendorSelect from "@/components/vendorSelect/single.vue"
@@ -389,6 +387,8 @@ export default {
       orderList: [],
       // 人员选项列表
       userOptions: [],
+      // 供应商下拉选项
+      vendorOptions: [],
       // 销售订单下拉选项
       salOrderOptions: [],
       // 弹出层标题
@@ -443,9 +443,16 @@ export default {
   created() {
     this.loadUserOptions()
     this.loadSalOrderOptions()
+    this.loadVendorOptions()
     this.getList()
   },
   methods: {
+    /** 加载供应商下拉选项 */
+    loadVendorOptions() {
+      listAllVendor().then(response => {
+        this.vendorOptions = response.data || response.rows || []
+      }).catch(() => {})
+    },
     /** 加载人员选项列表 */
     loadUserOptions() {
       listUser({ pageSize: 999 }).then(response => {

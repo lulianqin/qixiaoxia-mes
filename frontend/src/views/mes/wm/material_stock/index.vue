@@ -11,7 +11,9 @@
         <el-input v-model="queryParams.batchCode" placeholder="请输入批次号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="仓库" prop="warehouseId">
-        <el-input v-model="queryParams.warehouseId" placeholder="仓库ID" clearable style="width:100px" />
+        <el-select v-model="queryParams.warehouseId" placeholder="请选择仓库" clearable filterable>
+          <el-option v-for="w in warehouseOptions" :key="w.warehouseId" :label="w.warehouseName" :value="w.warehouseId" />
+        </el-select>
       </el-form-item>
       <el-form-item label="质量状态" prop="qualityStatus">
         <el-select v-model="queryParams.qualityStatus" placeholder="请选择" clearable style="width:110px">
@@ -34,18 +36,18 @@
     </el-row>
 
     <el-table v-loading="loading" :data="stockList" @selection-change="handleSelectionChange" stripe>
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="130" />
-      <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" width="150" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" width="130" :show-overflow-tooltip="true" />
+      <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" min-width="150" />
       <el-table-column label="规格型号" align="center" prop="specification" :show-overflow-tooltip="true" width="120" />
-      <el-table-column label="库存数量" align="center" prop="quantityOnhand" width="100" sortable />
-	      <el-table-column label="可用库存" align="center" prop="quantityAvailable" width="100" sortable />
+      <el-table-column label="库存数量" align="center" prop="quantityOnhand" width="100" sortable :show-overflow-tooltip="true" />
+	      <el-table-column label="可用库存" align="center" prop="quantityAvailable" width="100" sortable :show-overflow-tooltip="true" />
       <el-table-column label="占用库存" align="center" width="100" sortable :sort-method="(a,b) => occupied(a) - occupied(b)">
         <template #default="scope">
           <span :class="{ 'occu-pending': occupied(scope.row) > 0 }">{{ occupied(scope.row) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="单位" align="center" prop="unitName" width="70" />
-      <el-table-column label="批次号" align="center" prop="batchCode" width="130" :show-overflow-tooltip="true">
+      <el-table-column label="单位" align="center" prop="unitName" width="70" :show-overflow-tooltip="true" />
+      <el-table-column label="批次号" align="center" prop="batchCode" width="130">
         <template #default="scope">
           <el-button v-if="scope.row.batchCode" link type="primary" size="small" @click="handleBatchClick(scope.row)">
             {{ scope.row.batchCode }}
@@ -53,10 +55,10 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="仓库" align="center" prop="warehouseName" width="120" />
-      <el-table-column label="库区" align="center" prop="locationId" width="80" />
-      <el-table-column label="库位" align="center" prop="areaId" width="80" />
-      <el-table-column label="供应商" align="center" prop="vendorId" width="80" />
+      <el-table-column label="仓库" align="center" prop="warehouseName" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="库区" align="center" prop="locationId" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="库位" align="center" prop="areaId" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="供应商" align="center" prop="vendorId" width="80" :show-overflow-tooltip="true" />
       <el-table-column label="质量状态" align="center" prop="qualityStatus" width="90">
         <template #default="scope">
           <el-tag :type="scope.row.qualityStatus === 'NORMAL' ? 'success' : scope.row.qualityStatus === 'HOLD' ? 'warning' : 'danger'" size="small">
@@ -64,7 +66,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="更新时间" align="center" prop="updateTime" width="160">
+      <el-table-column label="更新时间" align="center" prop="updateTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.updateTime || '-' }}</span>
         </template>
@@ -76,15 +78,18 @@
 </template>
 
 <script setup lang="ts" name="WmMaterialStock">
-import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue'
 import type { WmMaterialStockQueryParams, WmMaterialStock } from '@/types/api/mes/wm/material_stock'
+import type { WmWarehouse } from '@/types/api/mes/wm/warehouse'
 import { listWmMaterialStock } from '@/api/mes/wm/material_stock'
+import { listAllWmWarehouse } from '@/api/mes/wm/warehouse'
 import { useRouter } from 'vue-router'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
 
 const stockList = ref<WmMaterialStock[]>([])
+const warehouseOptions = ref<WmWarehouse[]>([])
 const loading = ref(true)
 const showSearch = ref(true)
 const ids = ref<number[]>([])
@@ -98,6 +103,11 @@ const { queryParams } = toRefs(data)
 function getList() {
   loading.value = true
   listWmMaterialStock(queryParams.value).then(r => { stockList.value = r.rows; total.value = r.total; loading.value = false })
+}
+function loadWarehouseOptions() {
+  listAllWmWarehouse().then((r: any) => {
+    warehouseOptions.value = r?.data || r?.rows || []
+  }).catch(() => {})
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
@@ -116,6 +126,9 @@ function occupied(row: WmMaterialStock): number {
   return Math.max(0, onhand - avail)
 }
 
+onMounted(() => {
+  loadWarehouseOptions()
+})
 getList()
 </script>
 

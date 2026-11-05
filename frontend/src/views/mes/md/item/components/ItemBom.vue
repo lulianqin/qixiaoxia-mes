@@ -11,11 +11,11 @@
 
     <el-table v-loading="loading" :data="bomList" @selection-change="handleSelectionChange" size="small">
       <el-table-column type="selection" width="45" align="center" />
-      <el-table-column label="子物料编码" align="center" prop="bomItemCode" />
+      <el-table-column label="子物料编码" align="center" prop="bomItemCode"  :show-overflow-tooltip="true" />
       <el-table-column label="子物料名称" align="center" prop="bomItemName" :show-overflow-tooltip="true" />
-      <el-table-column label="用量单位" width="80" align="center" prop="unitOfMeasure" />
-      <el-table-column label="用量" width="80" align="center" prop="quantity" />
-      <el-table-column label="损耗率" width="80" align="center" prop="scrapRate">
+      <el-table-column label="用量单位" width="80" align="center" prop="unitOfMeasure"  :show-overflow-tooltip="true" />
+      <el-table-column label="用量" width="80" align="center" prop="quantity"  :show-overflow-tooltip="true" />
+      <el-table-column label="损耗率" width="80" align="center" prop="scrapRate" :show-overflow-tooltip="true">
         <template #default="s">{{ s.row.scrapRate ? (s.row.scrapRate * 100).toFixed(1) + '%' : '0%' }}</template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />

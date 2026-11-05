@@ -50,12 +50,12 @@
       <el-table-column label="退料单名称" align="center" prop="rtName" min-width="160" :show-overflow-tooltip="true" />
       <el-table-column label="关联工单" align="center" prop="workorderName" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="原领料单" align="center" prop="issueCode" width="140" :show-overflow-tooltip="true" />
-      <el-table-column label="退料日期" align="center" width="110">
+      <el-table-column label="退料日期" align="center" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.rtDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="退料总数" align="center" prop="quantityTotal" width="90" />
+      <el-table-column label="退料总数" align="center" prop="quantityTotal" width="90" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status" width="90">
         <template #default="scope">
           <el-tag :type="statusTag[scope.row.status] || 'info'" size="small">
@@ -160,12 +160,12 @@
                 <span v-else>{{ scope.row.quantityRt }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="已退数量" align="center" prop="quantityRted" width="100">
+            <el-table-column label="已退数量" align="center" prop="quantityRted" width="100" :show-overflow-tooltip="true">
               <template #default="scope">
                 <span>{{ scope.row.quantityRted || 0 }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="单位" align="center" prop="unitName" width="70" />
+            <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
             <el-table-column label="批次号" align="center" prop="batchCode" width="130">
               <template #default="scope">
                 <el-input v-if="!isView && form.status === 'DRAFT'" v-model="scope.row.batchCode" size="small" placeholder="批次号" style="width:110px" />
@@ -199,7 +199,7 @@
         </el-form-item>
       </el-form>
       <el-table v-loading="issueLoading" :data="issueList" size="small" highlight-current-row :row-class-name="issueRowClass" @row-dblclick="onIssueRowDblClick">
-        <el-table-column label="领料单编码" align="center" prop="issueCode" width="160" />
+        <el-table-column label="领料单编码" align="center" prop="issueCode" width="160"  :show-overflow-tooltip="true" />
         <el-table-column label="工单" align="center" prop="workorderName" min-width="140" :show-overflow-tooltip="true" />
         <el-table-column label="状态" align="center" prop="status" width="90">
           <template #default="scope">
@@ -217,7 +217,7 @@
             <el-tag v-else type="danger" size="small">无可退</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="领料日期" align="center" width="110">
+        <el-table-column label="领料日期" align="center" width="180">
           <template #default="scope">
             <span>{{ parseTime(scope.row.issueDate, '{y}-{m}-{d}') }}</span>
           </template>

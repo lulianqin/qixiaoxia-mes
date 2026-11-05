@@ -66,10 +66,10 @@
 
     <el-table v-loading="loading" :data="workshopList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="车间编码" align="center" prop="workshopCode" />
-      <el-table-column label="车间名称" align="center" prop="workshopName" />
+      <el-table-column label="车间编码" align="center" prop="workshopCode" :show-overflow-tooltip="true" />
+      <el-table-column label="车间名称" align="center" prop="workshopName" :show-overflow-tooltip="true" />
       <el-table-column label="车间地址" align="center" prop="address" :show-overflow-tooltip="true" />
-      <el-table-column label="负责人" align="center" prop="manager">
+      <el-table-column label="负责人" align="center" prop="manager" :show-overflow-tooltip="true">
         <template #default="scope">{{ nickOf(scope.row.manager) }}</template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
@@ -78,7 +78,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:workshop:edit']">修改</el-button>
         </template>

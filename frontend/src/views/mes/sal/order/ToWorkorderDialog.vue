@@ -5,9 +5,9 @@
     <el-table :data="twLines" size="small" @row-click="twSelectLine" highlight-current-row v-if="twStep===1" :row-class-name="twRowClass">
       <el-table-column label="选" width="50" align="center"><template #default="s"><el-radio v-model="twForm.lineId" :value="s.row.lineId" :disabled="(s.row.quantityConvertible||0)<=0">{{ '' }}</el-radio></template></el-table-column>
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
-      <el-table-column label="订单数" align="center" prop="quantity" width="90" />
-      <el-table-column label="已转" align="center" prop="quantityProduced" width="90" />
-      <el-table-column label="可转" align="center" prop="quantityConvertible" width="90">
+      <el-table-column label="订单数" align="center" prop="quantity" width="90"  :show-overflow-tooltip="true" />
+      <el-table-column label="已转" align="center" prop="quantityProduced" width="90"  :show-overflow-tooltip="true" />
+      <el-table-column label="可转" align="center" prop="quantityConvertible" width="90" :show-overflow-tooltip="true">
         <template #default="s"><span :style="{color: (s.row.quantityConvertible||0)<=0?'#f56c6c':''}">{{ s.row.quantityConvertible || 0 }}</span></template>
       </el-table-column>
     </el-table>
@@ -62,7 +62,7 @@
           <el-divider content-position="left">BOM 物料清单</el-divider>
           <el-row class="mb8"><el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleTwAddBom(proc.processId)">新增物料行</el-button></el-col></el-row>
           <el-table :data="proc.bomItems" size="small" v-if="proc.bomItems.length>0">
-            <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
+            <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
             <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
             <el-table-column label="单位用量" align="center" prop="quantity" width="100"><template #default="s"><el-input-number v-model="s.row.quantity" :min="0" :precision="4" size="small" controls-position="right" style="width:90px" /></template></el-table-column>
             <el-table-column label="预计总用量" align="center" width="110"><template #default="s">{{ (s.row.quantity * (twForm.quantity||1)).toFixed(2) }}</template></el-table-column>
@@ -72,8 +72,8 @@
           <!-- 参数 -->
           <el-divider content-position="left">工序参数</el-divider>
           <el-table :data="proc.paramItems" size="small" v-if="proc.paramItems.length>0">
-            <el-table-column label="参数名称" align="center" prop="_paramName" width="120" />
-            <el-table-column label="标准值" align="center" prop="standardValue" width="120" />
+            <el-table-column label="参数名称" align="center" prop="_paramName" width="120"  :show-overflow-tooltip="true" />
+            <el-table-column label="标准值" align="center" prop="standardValue" width="120"  :show-overflow-tooltip="true" />
             <el-table-column label="调整值" align="center" width="120"><template #default="s"><el-input v-model="s.row.adjustedValue" size="small" /></template></el-table-column>
             <el-table-column label="备注" align="center" min-width="120"><template #default="s"><el-input v-model="s.row.remark" size="small" placeholder="调整原因" /></template></el-table-column>
           </el-table>
@@ -94,7 +94,7 @@
     <el-alert type="warning" :closable="false" show-icon style="margin-bottom:16px"><template #title>以下物料或工序参数与标准不一致，可能产生新产品变体</template></el-alert>
     <el-table :data="twDeviationList" size="small" max-height="220">
       <el-table-column label="来源" align="center" width="65"><template #default="s"><el-tag size="small" :type="s.row.source==='BOM'?'':'info'">{{ s.row.source }}</el-tag></template></el-table-column>
-      <el-table-column label="名称" align="center" prop="itemName" min-width="120" />
+      <el-table-column label="名称" align="center" prop="itemName" min-width="120"  :show-overflow-tooltip="true" />
       <el-table-column label="标准值" align="center" width="90"><template #default="s">{{ s.row.standardVal }}</template></el-table-column>
       <el-table-column label="实际值" align="center" width="90"><template #default="s">{{ s.row.actualVal }}</template></el-table-column>
       <el-table-column label="差异" align="center" width="80"><template #default="s"><el-tag size="small" :type="s.row.diffType">{{ s.row.diffLabel }}</el-tag></template></el-table-column>

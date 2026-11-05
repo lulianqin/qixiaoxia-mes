@@ -1,33 +1,21 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-row>
-        <el-col :span="8">
           <el-form-item label="工序编码" prop="processCode">
             <el-input v-model="queryParams.processCode" placeholder="请输入" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="工序名称" prop="processName">
             <el-input v-model="queryParams.processName" placeholder="请输入" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="是否启用" prop="enableFlag">
             <el-select v-model="queryParams.enableFlag" placeholder="请选择" clearable>
               <el-option v-for="d in yesNoOptions" :key="d.value" :label="d.label" :value="d.value" />
             </el-select>
           </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8">
           <el-form-item>
             <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
             <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-col>
-      </el-row>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
@@ -48,14 +36,14 @@
 
     <el-table v-loading="loading" :data="processList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="工序编码" align="center" prop="processCode" width="130" />
-      <el-table-column label="工序名称" align="center" prop="processName" :show-overflow-tooltip="true">
+      <el-table-column label="工序编码" align="center" prop="processCode" width="130" :show-overflow-tooltip="true" />
+      <el-table-column label="工序名称" align="center" prop="processName">
         <template #default="scope">
           <el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:process:query']">{{ scope.row.processName }}</el-button>
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
@@ -131,7 +119,7 @@
           </el-col>
         </el-row>
         <el-table :data="contentList" v-loading="contentLoading" size="small">
-          <el-table-column label="顺序号" align="center" prop="orderNum" width="70" />
+          <el-table-column label="顺序号" align="center" prop="orderNum" width="70"  :show-overflow-tooltip="true" />
           <el-table-column label="步骤说明" align="center" prop="contentText" :show-overflow-tooltip="true" min-width="200" />
           <el-table-column label="辅助设备" align="center" prop="device" width="120" :show-overflow-tooltip="true" />
           <el-table-column label="辅助材料" align="center" prop="material" width="120" :show-overflow-tooltip="true" />
@@ -157,12 +145,12 @@
         <el-table :data="paramTemplateList" v-loading="paramLoading" size="small">
           <el-table-column label="参数编码" align="center" prop="paramCode" width="120" :show-overflow-tooltip="true" />
           <el-table-column label="参数名称" align="center" prop="paramName" min-width="120" :show-overflow-tooltip="true" />
-          <el-table-column label="参数类型" align="center" prop="paramType" width="100">
+          <el-table-column label="参数类型" align="center" prop="paramType" width="100" :show-overflow-tooltip="true">
             <template #default="scope">
               <span>{{ paramTypeMap[scope.row.paramType] || scope.row.paramType }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="单位" align="center" prop="unit" width="80" />
+          <el-table-column label="单位" align="center" prop="unit" width="80"  :show-overflow-tooltip="true" />
           <el-table-column label="默认值" align="center" prop="defaultValue" width="100" :show-overflow-tooltip="true" />
           <el-table-column label="图样" align="center" width="70">
             <template #default="scope">
@@ -170,10 +158,10 @@
               <span v-else style="color: #909399">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="必填" align="center" prop="isRequired" width="60">
+          <el-table-column label="必填" align="center" prop="isRequired" width="60" :show-overflow-tooltip="true">
             <template #default="scope"><span :style="{color: scope.row.isRequired === 'Y' ? '#67C23A' : '#909399'}">{{ scope.row.isRequired === 'Y' ? '是' : '否' }}</span></template>
           </el-table-column>
-          <el-table-column label="启用" align="center" prop="enableFlag" width="60">
+          <el-table-column label="启用" align="center" prop="enableFlag" width="60" :show-overflow-tooltip="true">
             <template #default="scope"><span :style="{color: scope.row.enableFlag === '1' ? '#67C23A' : '#909399'}">{{ scope.row.enableFlag === '1' ? '是' : '否' }}</span></template>
           </el-table-column>
           <el-table-column label="操作" align="center" width="80" v-if="optType !== 'view'" class-name="small-padding fixed-width">

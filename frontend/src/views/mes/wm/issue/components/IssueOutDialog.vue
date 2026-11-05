@@ -3,16 +3,16 @@
     <el-alert v-if="header" :title="`领料单：${header.issueCode} | 状态：${statusLabel}`" type="info" :closable="false" class="mb8" />
     <!-- 待发料行（来自领料单 line） -->
     <el-table :data="lines" size="small" border class="mb8">
-      <el-table-column label="物料编码" prop="itemCode" width="120" />
+      <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="120" />
-      <el-table-column label="申请量" prop="quantityIssue" width="80" align="center" />
-      <el-table-column label="已发料" prop="quantityIssued" width="80" align="center">
+      <el-table-column label="申请量" prop="quantityIssue" width="80" align="center"  :show-overflow-tooltip="true" />
+      <el-table-column label="已发料" prop="quantityIssued" width="80" align="center" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.quantityIssued || 0 }}</template>
       </el-table-column>
       <el-table-column label="未发料" width="80" align="center">
         <template #default="scope">{{ remain(scope.row) }}</template>
       </el-table-column>
-      <el-table-column label="单位" prop="unitName" width="60" align="center" />
+      <el-table-column label="单位" prop="unitName" width="60" align="center"  :show-overflow-tooltip="true" />
     </el-table>
 
     <!-- 本次发料录入 -->
@@ -53,11 +53,11 @@
     <div v-if="historyDetails.length" class="mt8">
       <div style="font-size:13px;font-weight:bold;margin-bottom:6px">历史发料记录</div>
       <el-table :data="historyDetails" size="small" border>
-        <el-table-column label="物料编码" prop="itemCode" width="120" />
+        <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
         <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="120" />
-        <el-table-column label="已发料量" prop="quantity" width="90" align="center" />
-        <el-table-column label="批次" prop="batchCode" width="110" />
-        <el-table-column label="发料时间" prop="createTime" width="150" />
+        <el-table-column label="已发料量" prop="quantity" width="90" align="center"  :show-overflow-tooltip="true" />
+        <el-table-column label="批次" prop="batchCode" width="110"  :show-overflow-tooltip="true" />
+        <el-table-column label="发料时间" prop="createTime" width="180"  :show-overflow-tooltip="true" />
       </el-table>
     </div>
 

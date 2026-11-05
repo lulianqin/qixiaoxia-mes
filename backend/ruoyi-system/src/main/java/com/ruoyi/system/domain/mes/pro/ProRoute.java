@@ -34,6 +34,16 @@ public class ProRoute extends BaseEntity
     @Excel(name = "工艺路线描述")
     private String routeDesc;
 
+    /** 路线负责人ID(关联sys_user) */
+    private Long ownerId;
+
+    /** 路线负责人姓名(快照) */
+    @Excel(name = "负责人")
+    private String ownerName;
+
+    /** 前端清空负责人标记（非数据库字段） */
+    private Boolean clearOwner;
+
     /** 是否启用(1-是,0-否) */
     @Excel(name = "是否启用")
     private String enableFlag;
@@ -93,6 +103,36 @@ public class ProRoute extends BaseEntity
         this.enableFlag = enableFlag;
     }
 
+    public Long getOwnerId()
+    {
+        return ownerId;
+    }
+
+    public void setOwnerId(Long ownerId)
+    {
+        this.ownerId = ownerId;
+    }
+
+    public String getOwnerName()
+    {
+        return ownerName;
+    }
+
+    public void setOwnerName(String ownerName)
+    {
+        this.ownerName = ownerName;
+    }
+
+    public Boolean getClearOwner()
+    {
+        return clearOwner;
+    }
+
+    public void setClearOwner(Boolean clearOwner)
+    {
+        this.clearOwner = clearOwner;
+    }
+
     public String getEnableFlag()
     {
         return enableFlag;
@@ -106,6 +146,8 @@ public class ProRoute extends BaseEntity
             .append("routeCode", getRouteCode())
             .append("routeName", getRouteName())
             .append("routeDesc", getRouteDesc())
+            .append("ownerId", getOwnerId())
+            .append("ownerName", getOwnerName())
             .append("enableFlag", getEnableFlag())
             .append("remark", getRemark())
             .append("createBy", getCreateBy())

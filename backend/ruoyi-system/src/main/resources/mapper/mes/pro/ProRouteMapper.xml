@@ -10,6 +10,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="routeCode"    column="route_code"    />
         <result property="routeName"    column="route_name"    />
         <result property="routeDesc"    column="route_desc"    />
+        <result property="ownerId"    column="owner_id"    />
+        <result property="ownerName"    column="owner_name"    />
         <result property="enableFlag"    column="enable_flag"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
@@ -19,7 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProRouteVo">
-        select route_id, factory_id, route_code, route_name, route_desc, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_route
+        select route_id, factory_id, route_code, route_name, route_desc, owner_id, owner_name, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_route
     </sql>
 
     <select id="selectProRouteList" parameterType="ProRoute" resultMap="ProRouteResult">
@@ -54,6 +56,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="routeCode != null and routeCode != ''">route_code,</if>
             <if test="routeName != null and routeName != ''">route_name,</if>
             <if test="routeDesc != null">route_desc,</if>
+            <if test="ownerId != null">owner_id,</if>
+            <if test="ownerName != null">owner_name,</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -63,6 +67,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="routeCode != null and routeCode != ''">#{routeCode},</if>
             <if test="routeName != null and routeName != ''">#{routeName},</if>
             <if test="routeDesc != null">#{routeDesc},</if>
+            <if test="ownerId != null">#{ownerId},</if>
+            <if test="ownerName != null">#{ownerName},</if>
             <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -76,6 +82,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="routeCode != null and routeCode != ''">route_code = #{routeCode},</if>
             <if test="routeName != null and routeName != ''">route_name = #{routeName},</if>
             <if test="routeDesc != null">route_desc = #{routeDesc},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="clearOwner != null and clearOwner == true">owner_id = null, owner_name = null,</if>
+            <if test="ownerName != null">owner_name = #{ownerName},</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

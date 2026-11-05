@@ -1,50 +1,32 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-row>
-        <el-col :span="8">
-          <el-form-item label="夹具编码" prop="toolCode">
-            <el-input v-model="queryParams.toolCode" placeholder="请输入工装夹具编码" clearable @keyup.enter="handleQuery" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="夹具名称" prop="toolName">
-            <el-input v-model="queryParams.toolName" placeholder="请输入工装夹具名称" clearable @keyup.enter="handleQuery" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="夹具类型" prop="toolTypeId">
-            <el-select v-model="queryParams.toolTypeId" placeholder="请选择类型" clearable>
-              <el-option v-for="dict in toolTypeOptions" :key="dict.toolTypeId" :label="dict.toolTypeName" :value="dict.toolTypeId" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="6">
-          <el-form-item label="品牌" prop="brand" label-width="60px">
-            <el-input v-model="queryParams.brand" placeholder="请输入品牌" clearable @keyup.enter="handleQuery" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="6">
-          <el-form-item label="规格" prop="spec" label-width="60px">
-            <el-input v-model="queryParams.spec" placeholder="请输入规格" clearable @keyup.enter="handleQuery" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="6">
-          <el-form-item label="状态" prop="status" label-width="60px">
-            <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-              <el-option v-for="dict in statusOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="6">
-          <el-form-item>
-            <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-            <el-button icon="Refresh" @click="resetQuery">重置</el-button>
-          </el-form-item>
-        </el-col>
-      </el-row>
+      <el-form-item label="夹具编码" prop="toolCode">
+        <el-input v-model="queryParams.toolCode" placeholder="请输入工装夹具编码" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="夹具名称" prop="toolName">
+        <el-input v-model="queryParams.toolName" placeholder="请输入工装夹具名称" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="夹具类型" prop="toolTypeId">
+        <el-select v-model="queryParams.toolTypeId" placeholder="请选择类型" clearable>
+          <el-option v-for="dict in toolTypeOptions" :key="dict.toolTypeId" :label="dict.toolTypeName" :value="dict.toolTypeId" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="品牌" prop="brand" label-width="60px">
+        <el-input v-model="queryParams.brand" placeholder="请输入品牌" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="规格" prop="spec" label-width="60px">
+        <el-input v-model="queryParams.spec" placeholder="请输入规格" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="状态" prop="status" label-width="60px">
+        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
+          <el-option v-for="dict in statusOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
@@ -65,29 +47,29 @@
 
     <el-table v-loading="loading" :data="toolList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
-      <el-table-column label="编码" align="center" prop="toolCode" />
-      <el-table-column label="名称" align="center" prop="toolName" :show-overflow-tooltip="true">
+      <el-table-column label="编码" align="center" prop="toolCode" :show-overflow-tooltip="true" />
+      <el-table-column label="名称" align="center" prop="toolName">
         <template #default="scope">
           <el-button type="text" @click="handleView(scope.row)" v-hasPermi="['mes:tm:tool:query']">{{ scope.row.toolName }}</el-button>
         </template>
       </el-table-column>
       <el-table-column label="品牌" align="center" prop="brand" :show-overflow-tooltip="true" />
       <el-table-column label="规格" align="center" prop="spec" :show-overflow-tooltip="true" />
-      <el-table-column label="类型" align="center" prop="toolTypeName" />
-      <el-table-column label="总数量" align="center" prop="quantity" width="80" />
-      <el-table-column label="可用数量" align="center" prop="availableQuantity" width="80" />
-      <el-table-column label="保养类型" align="center" prop="maintenType" width="120">
+      <el-table-column label="类型" align="center" prop="toolTypeName" :show-overflow-tooltip="true" />
+      <el-table-column label="总数量" align="center" prop="quantity" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="可用数量" align="center" prop="availableQuantity" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="保养类型" align="center" prop="maintenType" width="120" :show-overflow-tooltip="true">
         <template #default="scope">
           <span v-if="scope.row.maintenType">{{ maintenTypeMap[scope.row.maintenType] || scope.row.maintenType }}</span>
           <span v-else>无</span>
         </template>
       </el-table-column>
-      <el-table-column label="下次保养日期" align="center" prop="nextMaintenDate" width="120">
+      <el-table-column label="下次保养日期" align="center" prop="nextMaintenDate" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.nextMaintenDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="80">
+      <el-table-column label="状态" align="center" prop="status" width="80" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="statusOptions" :value="scope.row.status" />
         </template>
@@ -97,7 +79,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="150">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:tm:tool:edit']"></el-button></el-tooltip>
         </template>

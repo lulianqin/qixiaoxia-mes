@@ -183,3 +183,59 @@ aside {
     margin-bottom: 10px;
   }
 }
+
+/* ================= 全局列表页统一规范 ================= */
+
+/* 1. 顶部搜索区：控件统一宽度、高度、字号与标签间距 */
+.app-container .el-form.el-form--inline {
+  --el-component-size: 32px;
+  --el-component-size-small: 32px;
+  --el-form-label-font-size: 13px;
+
+  .el-form-item {
+    margin-right: 16px;
+    margin-bottom: 12px;
+  }
+
+  .el-form-item__label {
+    font-size: 13px !important;
+    line-height: 32px !important;
+    padding-right: 10px !important;
+    box-sizing: border-box;
+  }
+
+  .el-input,
+  .el-select,
+  .el-input-number,
+  .el-date-editor.el-input {
+    width: 200px !important;
+    max-width: 100%;
+  }
+
+  .el-date-editor.el-date-editor--daterange,
+  .el-date-editor.el-date-editor--datetimerange {
+    width: 360px !important;
+  }
+
+  .el-input__wrapper,
+  .el-select__wrapper {
+    min-height: 32px;
+  }
+
+  .el-input__inner,
+  .el-select__selected-item,
+  .el-select__placeholder {
+    font-size: 13px !important;
+  }
+}
+
+/* 2. 表格铺满容器；单元格默认不换行、溢出省略（含标签/按钮/进度条的单元格除外） */
+.el-table {
+  width: 100%;
+}
+
+.el-table .cell:not(:has(.el-tag)):not(:has(.el-button)):not(:has(.el-progress)):not(:has(.el-switch)) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

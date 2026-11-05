@@ -65,7 +65,7 @@
           {{ scope.row.quantity }} {{ scope.row.unitName || scope.row.unitOfMeasure || '' }}
         </template>
       </el-table-column>
-      <el-table-column label="追溯时间" align="center" prop="traceTime" width="160">
+      <el-table-column label="追溯时间" align="center" prop="traceTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.traceTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>

@@ -11,12 +11,12 @@
 
     <el-table v-loading="loading" :data="lineList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="45" align="center" />
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
-      <el-table-column label="物料名称" align="center" prop="itemName" width="150" />
-      <el-table-column label="规格型号" align="center" prop="specification" width="120" />
-      <el-table-column label="单位" align="center" prop="unitName" width="70" />
-      <el-table-column label="调拨数量" align="center" prop="quantityTransfer" width="100" />
-      <el-table-column label="批次号" align="center" prop="batchCode" width="100" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
+      <el-table-column label="物料名称" align="center" prop="itemName" width="150"  :show-overflow-tooltip="true" />
+      <el-table-column label="规格型号" align="center" prop="specification" width="120"  :show-overflow-tooltip="true" />
+      <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
+      <el-table-column label="调拨数量" align="center" prop="quantityTransfer" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="批次号" align="center" prop="batchCode" width="100"  :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="100">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" size="small" @click="handleUpdate(scope.row)">修改</el-button>

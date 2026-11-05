@@ -70,19 +70,19 @@
           <el-table-column label="设备名称" align="center" prop="machineryName" :show-overflow-tooltip="true" />
           <el-table-column label="品牌" align="center" prop="machineryBrand" :show-overflow-tooltip="true" />
           <el-table-column label="规格型号" align="center" prop="machinerySpec" :show-overflow-tooltip="true" width="180" />
-          <el-table-column label="设备类型" align="center" prop="machineryTypeName" />
-          <el-table-column label="所属车间" align="center" prop="workshopName" />
-          <el-table-column label="设备状态" align="center" prop="status" width="100">
+          <el-table-column label="设备类型" align="center" prop="machineryTypeName" :show-overflow-tooltip="true" />
+          <el-table-column label="所属车间" align="center" prop="workshopName" :show-overflow-tooltip="true" />
+          <el-table-column label="设备状态" align="center" prop="status" width="100" :show-overflow-tooltip="true">
             <template #default="scope">
               <span><dict-tag :options="mes_machinery_status" :value="scope.row.status" /></span>
             </template>
           </el-table-column>
-          <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+          <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
             <template #default="scope">
               <span>{{ scope.row.createTime }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+          <el-table-column fixed="right" label="操作" align="center" width="150" class-name="small-padding fixed-width">
             <template #default="scope">
               <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:dv:machinery:edit']">修改</el-button>
               <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:dv:machinery:remove']">删除</el-button>

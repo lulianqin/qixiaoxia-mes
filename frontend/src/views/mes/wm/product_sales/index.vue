@@ -30,17 +30,17 @@
 
     <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="出库单编码" align="center" prop="salesCode" width="150" />
+      <el-table-column label="出库单编码" align="center" prop="salesCode" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="出库单名称" align="center" prop="salesName" :show-overflow-tooltip="true" min-width="140" />
       <el-table-column label="客户名称" align="center" prop="clientName" :show-overflow-tooltip="true" min-width="130" />
-      <el-table-column label="客户订单号" align="center" prop="clientOrderCode" width="120" />
-      <el-table-column label="出库日期" align="center" width="110">
+      <el-table-column label="客户订单号" align="center" prop="clientOrderCode" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="出库日期" align="center" width="180" :show-overflow-tooltip="true">
         <template #default="scope">{{ parseTime(scope.row.salesDate, '{y}-{m}-{d}') }}</template>
       </el-table-column>
-      <el-table-column label="应出/已出" align="center" width="110">
+      <el-table-column label="应出/已出" align="center" width="110" :show-overflow-tooltip="true">
         <template #default="scope"><span>{{ scope.row.totalQuantity || 0 }} / {{ scope.row.postedQuantity || 0 }}</span></template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="状态" align="center" prop="status" width="90" :show-overflow-tooltip="true">
         <template #default="scope"><dict-tag :options="sales_status" :value="scope.row.status" /></template>
       </el-table-column>
       <el-table-column label="检验状态" align="center" width="110">

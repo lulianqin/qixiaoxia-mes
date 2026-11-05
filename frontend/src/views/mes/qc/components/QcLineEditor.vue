@@ -6,7 +6,7 @@
         <el-text size="small" type="info">{{ scope.row.indexCode }}</el-text>
       </template>
     </el-table-column>
-    <el-table-column label="工具" prop="qcTool" width="80" align="center" />
+    <el-table-column label="工具" prop="qcTool" width="80" align="center"  :show-overflow-tooltip="true" />
     <el-table-column label="检测方法" prop="checkMethod" min-width="110" :show-overflow-tooltip="true" />
     <el-table-column label="标准值/区间" width="150" align="center">
       <template #default="scope">

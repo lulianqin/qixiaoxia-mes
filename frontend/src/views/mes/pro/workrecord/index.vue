@@ -5,7 +5,9 @@
         <el-input v-model="queryParams.userName" placeholder="用户名/昵称" clearable style="width:160px" @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="工作站" prop="workstationId">
-        <el-input v-model="queryParams.workstationId" placeholder="工位ID" clearable style="width:130px" @keyup.enter="handleQuery" />
+        <el-select v-model="queryParams.workstationId" placeholder="请选择工作站" clearable filterable>
+          <el-option v-for="w in workstationOptions" :key="w.workstationId" :label="w.workstationName" :value="w.workstationId!" />
+        </el-select>
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="全部" clearable style="width:120px">
@@ -36,20 +38,20 @@
 
     <el-table v-loading="loading" :data="recordList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="操作工" align="center" width="120">
+      <el-table-column label="操作工" align="center" width="120" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.nickName || scope.row.userName || '-' }}</template>
       </el-table-column>
       <el-table-column label="工作站" align="center" prop="workstationName" min-width="120" :show-overflow-tooltip="true" />
       <el-table-column label="关联任务" align="center" width="160" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.processName || scope.row.taskCode || '-' }}</template>
       </el-table-column>
-      <el-table-column label="上工时间" align="center" prop="clockInTime" width="160">
+      <el-table-column label="上工时间" align="center" prop="clockInTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope"><span>{{ parseTime(scope.row.clockInTime) }}</span></template>
       </el-table-column>
-      <el-table-column label="下工时间" align="center" prop="clockOutTime" width="160">
+      <el-table-column label="下工时间" align="center" prop="clockOutTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope"><span>{{ scope.row.clockOutTime ? parseTime(scope.row.clockOutTime) : '—' }}</span></template>
       </el-table-column>
-      <el-table-column label="工时(分钟)" align="center" prop="workDuration" width="100">
+      <el-table-column label="工时(分钟)" align="center" prop="workDuration" width="100" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.status === 'CLOSED' ? scope.row.workDuration : '—' }}</template>
       </el-table-column>
       <el-table-column label="状态" align="center" width="90">
@@ -60,7 +62,7 @@
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" min-width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="100">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="100">
         <template #default="scope">
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workrecord:remove']">删除</el-button>
         </template>
@@ -72,14 +74,17 @@
 </template>
 
 <script setup lang="ts" name="ProWorkrecord">
-import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue'
+import type { MdWorkstation } from '@/types/api/mes/md/workstation'
 import type { WorkrecordQueryParams, Workrecord } from '@/types/api/mes/pro/workrecord'
 import { listWorkrecord, delWorkrecord } from '@/api/mes/pro/workrecord'
+import { listWorkstation } from '@/api/mes/md/workstation'
 import { parseTime } from '@/utils/ruoyi'
 
 const { proxy } = getCurrentInstance() as any
 
 const recordList = ref<Workrecord[]>([])
+const workstationOptions = ref<MdWorkstation[]>([])
 const loading = ref(true)
 const showSearch = ref(true)
 const ids = ref<number[]>([])
@@ -99,6 +104,12 @@ function getList() {
     total.value = r.total
     loading.value = false
   }).catch(() => { loading.value = false })
+}
+
+function loadWorkstationOptions() {
+  listWorkstation({ pageSize: 999 } as any).then((r: any) => {
+    workstationOptions.value = r?.rows || r?.data || []
+  }).catch(() => {})
 }
 
 function handleQuery() {
@@ -129,6 +140,9 @@ function handleExport() {
   proxy.download('/mes/pro/workrecord/export', { ...queryParams.value }, `workrecord_${Date.now()}.xlsx`)
 }
 
+onMounted(() => {
+  loadWorkstationOptions()
+})
 getList()
 </script>
 

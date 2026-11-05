@@ -98,37 +98,37 @@
         </template>
       </el-table-column>
       <el-table-column label="计划名称" width="200" align="center" prop="planName" :show-overflow-tooltip="true" />
-      <el-table-column label="班组类型" align="center" prop="calendarType">
+      <el-table-column label="班组类型" align="center" prop="calendarType" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="dictData.mes_calendar_type" :value="scope.row.calendarType" />
         </template>
       </el-table-column>
-      <el-table-column label="开始日期" align="center" prop="startDate" width="120">
+      <el-table-column label="开始日期" align="center" prop="startDate" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.startDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="结束日期" align="center" prop="endDate" width="120">
+      <el-table-column label="结束日期" align="center" prop="endDate" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.endDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="轮班方式" align="center" prop="shiftType">
+      <el-table-column label="轮班方式" align="center" prop="shiftType" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="dictData.mes_shift_type" :value="scope.row.shiftType" />
         </template>
       </el-table-column>
-      <el-table-column label="倒班方式" align="center" prop="shiftMethod">
+      <el-table-column label="倒班方式" align="center" prop="shiftMethod" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="dictData.mes_shift_method" :value="scope.row.shiftMethod" />
         </template>
       </el-table-column>
-      <el-table-column label="单据状态" align="center" prop="status">
+      <el-table-column label="单据状态" align="center" prop="status" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="dictData.mes_order_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button
             size="small"

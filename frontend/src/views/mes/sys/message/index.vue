@@ -53,9 +53,9 @@
           <el-tag :type="scope.row.readFlag === '1' ? 'success' : 'info'">{{ scope.row.readFlag === '1' ? '已读' : '未读' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="接收人ID" align="center" prop="userId" width="80" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180" />
-      <el-table-column label="操作" align="center" width="200">
+      <el-table-column label="接收人ID" align="center" prop="userId" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true" />
+      <el-table-column fixed="right" label="操作" align="center" width="200">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
           <el-button link type="primary" icon="Check" @click="handleMarkAsRead(scope.row)" v-if="scope.row.readFlag === '0'">标记已读</el-button>

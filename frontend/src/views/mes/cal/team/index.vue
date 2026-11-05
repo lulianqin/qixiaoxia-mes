@@ -86,14 +86,14 @@
           >{{ scope.row.teamCode }}</el-button>
         </template>
       </el-table-column>
-      <el-table-column label="班组名称" align="center" prop="teamName" />
-      <el-table-column label="班组类型" align="center" prop="teamType">
+      <el-table-column label="班组名称" align="center" prop="teamName" :show-overflow-tooltip="true" />
+      <el-table-column label="班组类型" align="center" prop="teamType" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="dictData.mes_calendar_type" :value="scope.row.teamType" />
         </template>
       </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" width="80" class-name="small-padding fixed-width">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column fixed="right" label="操作" align="center" width="80" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:cal:team:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:cal:team:remove']"></el-button></el-tooltip>

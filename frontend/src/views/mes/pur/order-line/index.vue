@@ -1,21 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">      <el-form-item label="订单ID" prop="orderId">
-        <el-input
-          v-model="queryParams.orderId"
-          placeholder="请输入采购订单ID(关联qxx_pur_order)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="物料ID" prop="itemId">
-        <el-input
-          v-model="queryParams.itemId"
-          placeholder="请输入物料ID(关联qxx_md_item)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
+    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="物料编码" prop="itemCode">
         <el-input
           v-model="queryParams.itemCode"
@@ -144,14 +129,6 @@
           placeholder="请选择预计到货日期">
         </el-date-picker>
       </el-form-item>
-      <el-form-item label="到货通知" prop="arrivalNoticeId">
-        <el-input
-          v-model="queryParams.arrivalNoticeId"
-          placeholder="请输入到货通知单ID(关联qxx_wm_arrival_notice,收货后回写)"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
         <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
@@ -206,41 +183,41 @@
 
     <el-table v-loading="loading" :data="lineList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" align="center" prop="lineId" />      <el-table-column label="订单ID" align="center" prop="orderId" />
-      <el-table-column label="物料ID" align="center" prop="itemId" />
-      <el-table-column label="物料编码" align="center" prop="itemCode" />
-      <el-table-column label="物料名称" align="center" prop="itemName" />
-      <el-table-column label="规格" align="center" prop="specification" />
-      <el-table-column label="主单位" align="center" prop="unitOfMeasure" />
-      <el-table-column label="主单位名" align="center" prop="unitName" />
-      <el-table-column label="辅助单位" align="center" prop="unit2" />
-      <el-table-column label="辅助单位名" align="center" prop="unit2Name" />
-      <el-table-column label="换算率" align="center" prop="conversionRate" />
-      <el-table-column label="订购数量" align="center" prop="quantityOrdered" />
-      <el-table-column label="辅助数量" align="center" prop="quantityOrdered2" />
-      <el-table-column label="已收货数" align="center" prop="quantityReceived" />
-      <el-table-column label="辅助已收" align="center" prop="quantityReceived2" />
-      <el-table-column label="单价" align="center" prop="unitPrice" />
-      <el-table-column label="行金额" align="center" prop="amount" />
-      <el-table-column label="税率" align="center" prop="taxRate" />
-      <el-table-column label="门幅(mm)" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_WIDTH') }}</template></el-table-column>
-      <el-table-column label="克重(g)" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_WEIGHT') }}</template></el-table-column>
-      <el-table-column label="纸张种类" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_TYPE') }}</template></el-table-column>
-      <el-table-column label="卷数" align="center"><template #default="scope">{{ getAttr(scope.row, 'PAPER_ROLL_COUNT') }}</template></el-table-column>
-      <el-table-column label="客户订单号" align="center" prop="sourceOrderCode" />
-      <el-table-column label="预计到货日期" align="center" prop="expectedDate" width="180">
+      <el-table-column label="ID" align="center" prop="lineId" :show-overflow-tooltip="true" />      <el-table-column label="订单ID" align="center" prop="orderId" :show-overflow-tooltip="true" />
+      <el-table-column label="物料ID" align="center" prop="itemId" :show-overflow-tooltip="true" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" :show-overflow-tooltip="true" />
+      <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
+      <el-table-column label="规格" align="center" prop="specification" :show-overflow-tooltip="true" />
+      <el-table-column label="主单位" align="center" prop="unitOfMeasure" :show-overflow-tooltip="true" />
+      <el-table-column label="主单位名" align="center" prop="unitName" :show-overflow-tooltip="true" />
+      <el-table-column label="辅助单位" align="center" prop="unit2" :show-overflow-tooltip="true" />
+      <el-table-column label="辅助单位名" align="center" prop="unit2Name" :show-overflow-tooltip="true" />
+      <el-table-column label="换算率" align="center" prop="conversionRate" :show-overflow-tooltip="true" />
+      <el-table-column label="订购数量" align="center" prop="quantityOrdered" :show-overflow-tooltip="true" />
+      <el-table-column label="辅助数量" align="center" prop="quantityOrdered2" :show-overflow-tooltip="true" />
+      <el-table-column label="已收货数" align="center" prop="quantityReceived" :show-overflow-tooltip="true" />
+      <el-table-column label="辅助已收" align="center" prop="quantityReceived2" :show-overflow-tooltip="true" />
+      <el-table-column label="单价" align="center" prop="unitPrice" :show-overflow-tooltip="true" />
+      <el-table-column label="行金额" align="center" prop="amount" :show-overflow-tooltip="true" />
+      <el-table-column label="税率" align="center" prop="taxRate" :show-overflow-tooltip="true" />
+      <el-table-column label="门幅(mm)" align="center" :show-overflow-tooltip="true"><template #default="scope">{{ getAttr(scope.row, 'PAPER_WIDTH') }}</template></el-table-column>
+      <el-table-column label="克重(g)" align="center" :show-overflow-tooltip="true"><template #default="scope">{{ getAttr(scope.row, 'PAPER_WEIGHT') }}</template></el-table-column>
+      <el-table-column label="纸张种类" align="center" :show-overflow-tooltip="true"><template #default="scope">{{ getAttr(scope.row, 'PAPER_TYPE') }}</template></el-table-column>
+      <el-table-column label="卷数" align="center" :show-overflow-tooltip="true"><template #default="scope">{{ getAttr(scope.row, 'PAPER_ROLL_COUNT') }}</template></el-table-column>
+      <el-table-column label="客户订单号" align="center" prop="sourceOrderCode" :show-overflow-tooltip="true" />
+      <el-table-column label="预计到货日期" align="center" prop="expectedDate" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="到货通知" align="center" prop="arrivalNoticeId" />
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="到货通知" align="center" prop="arrivalNoticeId" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" prop="status" width="90" :show-overflow-tooltip="true">
           <template #default="scope">
             <span><dict-tag :options="mes_order_status" :value="scope.row.status" /></span>
           </template>
         </el-table-column>
-      <el-table-column label="备注" align="center" prop="remark" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="操作" align="center" width="150" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
             size="mini"

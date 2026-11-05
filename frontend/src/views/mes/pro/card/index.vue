@@ -2,25 +2,15 @@
   <div class="app-container">
     <!-- 搜索栏 -->
     <el-form :model="queryParams" ref="queryFormRef" size="small" :inline="true" v-show="showSearch" label-width="90px">
-      <el-row>
-        <el-col :span="8">
           <el-form-item label="流转卡编码" prop="cardCode">
             <el-input v-model="queryParams.cardCode" placeholder="请输入流转卡编码" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="工单名称" prop="workorderName">
             <el-input v-model="queryParams.workorderName" placeholder="请输入工单名称" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="产品名称" prop="itemName">
             <el-input v-model="queryParams.itemName" placeholder="请输入产品名称" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8">
           <el-form-item label="状态" prop="status">
             <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
               <el-option
@@ -31,14 +21,10 @@
               />
             </el-select>
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item>
             <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
             <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-col>
-      </el-row>
     </el-form>
 
     <!-- 工具栏 -->
@@ -71,20 +57,20 @@
       </el-table-column>
       <el-table-column label="工单" align="center" prop="workorderName" min-width="140" :show-overflow-tooltip="true" />
       <el-table-column label="产品名称" align="center" prop="itemName" min-width="140" :show-overflow-tooltip="true" />
-      <el-table-column label="批次号" align="center" prop="batchCode" width="120" />
-      <el-table-column label="流转数量" align="center" prop="quantityTransfered" width="100" />
+      <el-table-column label="批次号" align="center" prop="batchCode" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="流转数量" align="center" prop="quantityTransfered" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="当前工序" align="center" prop="currentProcessName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status" width="90">
         <template #default="scope">
           <el-tag :type="statusTagMap[scope.row.status] || 'info'" size="small">{{ statusLabelMap[scope.row.status] || scope.row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="160">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="220" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" size="small" icon="Grid" @click="handleQrCode(scope.row)" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
           <el-button link type="primary" size="small" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pro:card:query']">查看</el-button>
@@ -180,26 +166,26 @@
           <el-table v-loading="processLoading" :data="processList" size="small" border>
             <el-table-column label="序号" type="index" width="55" align="center" />
             <el-table-column label="工序名称" align="center" prop="processName" min-width="120" :show-overflow-tooltip="true" />
-            <el-table-column label="工序编码" align="center" prop="processCode" width="120" />
-            <el-table-column label="顺序号" align="center" prop="orderNum" width="80" />
+            <el-table-column label="工序编码" align="center" prop="processCode" width="120"  :show-overflow-tooltip="true" />
+            <el-table-column label="顺序号" align="center" prop="orderNum" width="80"  :show-overflow-tooltip="true" />
             <el-table-column label="状态" align="center" prop="status" width="90">
               <template #default="scope">
                 <el-tag :type="processStatusTagMap[scope.row.status] || 'info'" size="small">{{ processStatusLabelMap[scope.row.status] || scope.row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="开始时间" align="center" prop="startTime" width="160">
+            <el-table-column label="开始时间" align="center" prop="startTime" width="180" :show-overflow-tooltip="true">
               <template #default="scope">
                 <span>{{ parseTime(scope.row.startTime) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="结束时间" align="center" prop="endTime" width="160">
+            <el-table-column label="结束时间" align="center" prop="endTime" width="180" :show-overflow-tooltip="true">
               <template #default="scope">
                 <span>{{ parseTime(scope.row.endTime) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="加工数量" align="center" prop="quantityTransfered" width="100" />
-            <el-table-column label="合格数" align="center" prop="quantityQualified" width="90" />
-            <el-table-column label="不合格数" align="center" prop="quantityUnqualified" width="90" />
+            <el-table-column label="加工数量" align="center" prop="quantityTransfered" width="100"  :show-overflow-tooltip="true" />
+            <el-table-column label="合格数" align="center" prop="quantityQualified" width="90"  :show-overflow-tooltip="true" />
+            <el-table-column label="不合格数" align="center" prop="quantityUnqualified" width="90"  :show-overflow-tooltip="true" />
             <el-table-column label="备注" align="center" prop="remark" min-width="120" :show-overflow-tooltip="true" />
           </el-table>
           <div v-if="!processLoading && processList.length === 0" style="text-align: center; padding: 40px 0; color: #909399;">

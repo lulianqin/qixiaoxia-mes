@@ -1,13 +1,13 @@
 <template>
   <div>
     <el-table v-loading="loading" :data="detailList" border>
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="130" />
-      <el-table-column label="物料名称" align="center" prop="itemName" width="150" />
-      <el-table-column label="规格型号" align="center" prop="specification" width="120" />
-      <el-table-column label="单位" align="center" prop="unitName" width="70" />
-      <el-table-column label="出库数量" align="center" prop="quantity" width="100" />
-      <el-table-column label="批次号" align="center" prop="batchCode" width="120" />
-      <el-table-column label="出库时间" align="center" prop="createTime" width="160" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" width="130"  :show-overflow-tooltip="true" />
+      <el-table-column label="物料名称" align="center" prop="itemName" width="150"  :show-overflow-tooltip="true" />
+      <el-table-column label="规格型号" align="center" prop="specification" width="120"  :show-overflow-tooltip="true" />
+      <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
+      <el-table-column label="出库数量" align="center" prop="quantity" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="批次号" align="center" prop="batchCode" width="120"  :show-overflow-tooltip="true" />
+      <el-table-column label="出库时间" align="center" prop="createTime" width="180"  :show-overflow-tooltip="true" />
     </el-table>
   </div>
 </template>

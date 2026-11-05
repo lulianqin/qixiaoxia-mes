@@ -11,14 +11,14 @@
 
     <el-table v-loading="loading" :data="lineList" @selection-change="handleSelectionChange" border>
       <el-table-column v-if="!readOnly" type="selection" width="45" align="center" />
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" width="150" />
-      <el-table-column label="规格" align="center" prop="specification" width="100" />
-      <el-table-column label="订购数量" align="center" prop="quantityOrdered" width="100" />
-      <el-table-column label="已收数量" align="center" prop="quantityReceived" width="100" />
-      <el-table-column label="已退数量" align="center" prop="quantityReturned" width="100" />
-      <el-table-column label="单价" align="center" prop="unitPrice" width="90" />
-      <el-table-column label="金额" align="center" prop="amount" width="100" />
+      <el-table-column label="规格" align="center" prop="specification" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="订购数量" align="center" prop="quantityOrdered" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="已收数量" align="center" prop="quantityReceived" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="已退数量" align="center" prop="quantityReturned" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="单价" align="center" prop="unitPrice" width="90"  :show-overflow-tooltip="true" />
+      <el-table-column label="金额" align="center" prop="amount" width="100"  :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status" width="80">
         <template #default="scope"><dict-tag :options="mes_order_status" :value="scope.row.status" /></template>
       </el-table-column>

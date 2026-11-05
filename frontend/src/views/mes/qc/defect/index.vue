@@ -44,26 +44,26 @@
     <!-- 表格 -->
     <el-table v-loading="loading" :data="defectList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="缺陷编码" align="center" prop="defectCode" width="130" />
+      <el-table-column label="缺陷编码" align="center" prop="defectCode" width="130" :show-overflow-tooltip="true" />
       <el-table-column label="缺陷描述" align="center" prop="defectName" :show-overflow-tooltip="true" />
-      <el-table-column label="检验类型" align="center" prop="indexType" width="100">
+      <el-table-column label="检验类型" align="center" prop="indexType" width="100" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag v-if="mes_qc_type" :options="mes_qc_type" :value="scope.row.indexType" />
         </template>
       </el-table-column>
-      <el-table-column label="缺陷等级" align="center" prop="defectLevel" width="110">
+      <el-table-column label="缺陷等级" align="center" prop="defectLevel" width="110" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag v-if="mes_qc_defect_level" :options="mes_qc_defect_level" :value="scope.row.defectLevel" />
         </template>
       </el-table-column>
-      <el-table-column label="处置方法" align="center" prop="processMethod" width="110" />
-      <el-table-column label="启用" align="center" width="70">
+      <el-table-column label="处置方法" align="center" prop="processMethod" width="110" :show-overflow-tooltip="true" />
+      <el-table-column label="启用" align="center" width="70" :show-overflow-tooltip="true">
         <template #default="scope">
           <span :style="{ color: scope.row.enableFlag === '1' ? '#67c23a' : '#909399' }">{{ scope.row.enableFlag === '1' ? '是' : '否' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:qc:defect:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:qc:defect:remove']">删除</el-button>

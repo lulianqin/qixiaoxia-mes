@@ -28,11 +28,11 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="批次ID" align="center" prop="batchId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="批次编码" align="center" prop="batchCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="批次名称" align="center" prop="batchName" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="批次名称" align="center" prop="batchName" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="物料编码" align="center" prop="itemCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="供应商编码" align="center" prop="vendorCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:batch:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:batch:remove']">删除</el-button>

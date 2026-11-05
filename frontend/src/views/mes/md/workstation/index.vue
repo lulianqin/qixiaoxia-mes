@@ -15,20 +15,20 @@
     </el-row>
     <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
-      <el-table-column label="编码" align="center" prop="workstationCode" />
-      <el-table-column label="名称" align="center" prop="workstationName" />
-      <el-table-column label="类型" align="center" prop="workstationType"><template #default="s"><dict-tag :options="mes_workstation_type" :value="s.row.workstationType" /></template></el-table-column>
-      <el-table-column label="工序" align="center" prop="processName">
+      <el-table-column label="编码" align="center" prop="workstationCode" :show-overflow-tooltip="true" />
+      <el-table-column label="名称" align="center" prop="workstationName" :show-overflow-tooltip="true" />
+      <el-table-column label="类型" align="center" prop="workstationType" :show-overflow-tooltip="true"><template #default="s"><dict-tag :options="mes_workstation_type" :value="s.row.workstationType" /></template></el-table-column>
+      <el-table-column label="工序" align="center" prop="processName" :show-overflow-tooltip="true">
         <template #default="s"><span>{{ s.row.processName || s.row.processType || '-' }}</span></template>
       </el-table-column>
-      <el-table-column label="产能(个/时)" align="center" prop="capacity" />
-      <el-table-column label="状态" align="center" prop="status"><template #default="s"><dict-tag :options="mes_workstation_status" :value="s.row.status" /></template></el-table-column>
+      <el-table-column label="产能(个/时)" align="center" prop="capacity" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" prop="status" :show-overflow-tooltip="true"><template #default="s"><dict-tag :options="mes_workstation_status" :value="s.row.status" /></template></el-table-column>
       <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:workstation:edit']">修改</el-button></template></el-table-column>
+      <el-table-column fixed="right" label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:workstation:edit']">修改</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     <el-dialog :title="title" v-model="open" width="750px" append-to-body>
@@ -60,8 +60,8 @@
         <template v-if="form.workstationId">
           <el-divider content-position="left">关联设备</el-divider>
           <el-table :data="machineList" size="small">
-            <el-table-column label="设备编码" prop="machineryCode" />
-            <el-table-column label="设备名称" prop="machineryName" />
+            <el-table-column label="设备编码" prop="machineryCode"  :show-overflow-tooltip="true" />
+            <el-table-column label="设备名称" prop="machineryName"  :show-overflow-tooltip="true" />
             <el-table-column label="操作" width="80">
               <template #default="s"><el-button link type="danger" icon="Delete" @click="handleDelMachine(s.row)" /></template>
             </el-table-column>
@@ -70,7 +70,7 @@
 
           <el-divider content-position="left">操作人员</el-divider>
           <el-table :data="workerList" size="small">
-            <el-table-column label="用户名" prop="userName" />
+            <el-table-column label="用户名" prop="userName"  :show-overflow-tooltip="true" />
             <el-table-column label="角色">
               <template #default="s">{{ roleLabel(s.row.roleType) }}</template>
             </el-table-column>

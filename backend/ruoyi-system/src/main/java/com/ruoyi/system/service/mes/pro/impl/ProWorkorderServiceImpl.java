@@ -692,6 +692,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (proWorkorder.getWorkorderType() == null) proWorkorder.setWorkorderType("SELF");
         if (proWorkorder.getOrderType() == null) proWorkorder.setOrderType(SalOrderType.STANDARD.getCode());
         if (proWorkorder.getOrderSource() == null) proWorkorder.setOrderSource("MANUAL");
+        applyRouteOwnerDefault(proWorkorder);
         fillOwnerSnapshot(proWorkorder);
         return qxxProWorkorderMapper.insertProWorkorder(proWorkorder);
     }
@@ -741,6 +742,25 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             throw new ServiceException("指定的工单负责人不存在：" + proWorkorder.getOwnerId());
         }
         proWorkorder.setOwnerName(user.getNickName() != null ? user.getNickName() : user.getUserName());
+    }
+
+    /** 工单未指定负责人时，继承工艺路线（产品线）负责人 */
+    private void applyRouteOwnerDefault(ProWorkorder proWorkorder)
+    {
+        if (proWorkorder.getOwnerId() != null || proWorkorder.getRouteProductId() == null)
+        {
+            return;
+        }
+        ProRouteProduct routeProduct = proRouteProductService.selectProRouteProductByRecordId(proWorkorder.getRouteProductId());
+        if (routeProduct == null || routeProduct.getRouteId() == null)
+        {
+            return;
+        }
+        ProRoute route = proRouteService.selectProRouteByRouteId(routeProduct.getRouteId());
+        if (route != null && route.getOwnerId() != null)
+        {
+            proWorkorder.setOwnerId(route.getOwnerId());
+        }
     }
 
     /** 记录工单变更 */
@@ -1681,6 +1701,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         // 3. 插入工单头
         workorder.setCreateTime(DateUtils.getNowDate());
         workorder.setCreateBy(SecurityUtils.getUsername());
+        applyRouteOwnerDefault(workorder);
+        fillOwnerSnapshot(workorder);
         qxxProWorkorderMapper.insertProWorkorder(workorder);
 
         Long workorderId = workorder.getWorkorderId();

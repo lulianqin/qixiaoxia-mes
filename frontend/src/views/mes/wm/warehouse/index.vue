@@ -36,12 +36,12 @@
         </template>
       </el-table-column>
       <el-table-column label="仓库名称" align="center" prop="warehouseName" :show-overflow-tooltip="true" />
-      <el-table-column label="仓库类型" align="center" prop="warehouseType" width="90">
+      <el-table-column label="仓库类型" align="center" prop="warehouseType" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_warehouse_type" :value="scope.row.warehouseType" />
         </template>
       </el-table-column>
-      <el-table-column label="归属类型" align="center" prop="ownershipType" width="90">
+      <el-table-column label="归属类型" align="center" prop="ownershipType" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_warehouse_owner_type" :value="scope.row.ownershipType" />
         </template>
@@ -50,14 +50,14 @@
         <template #default="scope">{{ ownerText(scope.row) }}</template>
       </el-table-column>
       <el-table-column label="地址" align="center" prop="address" :show-overflow-tooltip="true" width="200" />
-      <el-table-column label="面积(㎡)" align="center" prop="area" width="90" />
-      <el-table-column label="负责人" align="center" prop="charge" width="90" />
+      <el-table-column label="面积(㎡)" align="center" prop="area" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="负责人" align="center" prop="charge" width="90" :show-overflow-tooltip="true" />
       <el-table-column label="启用" align="center" width="80">
         <template #default="scope">
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="290" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="290" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" size="small" @click="handleLocation(scope.row)" v-hasPermi="['mes:wm:storage_location:list']">库区</el-button>
           <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:warehouse:edit']">修改</el-button>

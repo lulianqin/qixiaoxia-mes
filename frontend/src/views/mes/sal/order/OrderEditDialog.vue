@@ -37,11 +37,11 @@
       <el-col :span="1.5"><el-button type="primary" plain size="small" @click="handleAddLine">添加行</el-button></el-col>
     </el-row>
     <el-table :data="lineList" size="small" v-loading="dimRecalcing">
-      <el-table-column label="行号" align="center" prop="lineNo" width="60" />
+      <el-table-column label="行号" align="center" prop="lineNo" width="60"  :show-overflow-tooltip="true" />
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
-      <el-table-column label="数量" align="center" prop="quantity" width="90" />
-      <el-table-column label="单价" align="center" prop="unitPrice" width="90" />
-      <el-table-column label="行金额" align="center" prop="lineAmount" width="100" />
+      <el-table-column label="数量" align="center" prop="quantity" width="90"  :show-overflow-tooltip="true" />
+      <el-table-column label="单价" align="center" prop="unitPrice" width="90"  :show-overflow-tooltip="true" />
+      <el-table-column label="行金额" align="center" prop="lineAmount" width="100"  :show-overflow-tooltip="true" />
       <el-table-column label="尺寸" align="center" prop="productSize" width="130" :show-overflow-tooltip="true" />
       <el-table-column label="工艺路线" align="center" prop="routeName" width="140" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.routeName || '—' }}</template>

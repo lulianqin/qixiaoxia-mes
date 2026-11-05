@@ -2,25 +2,15 @@
   <div class="app-container">
     <!-- 搜索栏 -->
     <el-form :model="queryParams" ref="queryFormRef" :inline="true" v-show="showSearch" label-width="90px">
-      <el-row>
-        <el-col :span="8">
           <el-form-item label="报工编码" prop="feedbackCode">
             <el-input v-model="queryParams.feedbackCode" placeholder="请输入报工编码" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="工单名称" prop="workorderName">
             <el-input v-model="queryParams.workorderName" placeholder="请输入工单名称" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="工作站名称" prop="workstationName">
             <el-input v-model="queryParams.workstationName" placeholder="请输入工作站名称" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8">
           <el-form-item label="状态" prop="status">
             <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 100%; min-width: 160px" size="default">
               <el-option
@@ -31,8 +21,6 @@
               />
             </el-select>
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="报工类型" prop="feedbackType">
             <el-select v-model="queryParams.feedbackType" placeholder="请选择报工类型" clearable style="width: 100%; min-width: 160px" size="default">
               <el-option
@@ -43,14 +31,10 @@
               />
             </el-select>
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item>
             <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
             <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-col>
-      </el-row>
     </el-form>
 
     <!-- 工具栏 -->
@@ -87,13 +71,13 @@
       <el-table-column label="工单名称" align="center" prop="workorderName" min-width="140" :show-overflow-tooltip="true" />
       <el-table-column label="工序名称" align="center" prop="processName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="工作站" align="center" prop="workstationName" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="报工类型" align="center" prop="feedbackType" width="110">
+      <el-table-column label="报工类型" align="center" prop="feedbackType" width="110" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ feedbackTypeLabelMap[scope.row.feedbackType] || scope.row.feedbackType }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="合格数" align="center" prop="quantityQualified" width="80" />
-      <el-table-column label="不合格数" align="center" prop="quantityUnqualified" width="90" />
+      <el-table-column label="合格数" align="center" prop="quantityQualified" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="不合格数" align="center" prop="quantityUnqualified" width="90" :show-overflow-tooltip="true" />
       <el-table-column label="检验状态" align="center" width="100">
         <template #default="scope">
           <el-tag v-if="scope.row.qcStatus && scope.row.qcStatus !== 'NONE'" size="small"
@@ -112,12 +96,12 @@
           <span>{{ scope.row.nickName || scope.row.userName || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="报工时间" align="center" prop="feedbackTime" width="160">
+      <el-table-column label="报工时间" align="center" prop="feedbackTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.feedbackTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="310" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="310" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="success" size="small" icon="CircleCheck" @click="handleConfirm(scope.row)" v-if="scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:feedback:edit']">确认</el-button>
           <el-button link type="primary" size="small" icon="Check" @click="handleAudit(scope.row)" v-if="scope.row.status==='CONFIRMED'" v-hasPermi="['mes:pro:feedback:edit']">审核</el-button>
@@ -363,8 +347,8 @@
         <!-- Tab3: 工序参数 -->
         <el-tab-pane label="工序参数" name="param">
           <el-table :data="paramList" border size="small" max-height="320">
-            <el-table-column label="参数名称" align="center" prop="paramName" min-width="130" />
-            <el-table-column label="单位" align="center" prop="unit" width="80" />
+            <el-table-column label="参数名称" align="center" prop="paramName" min-width="130"  :show-overflow-tooltip="true" />
+            <el-table-column label="单位" align="center" prop="unit" width="80"  :show-overflow-tooltip="true" />
             <el-table-column label="标准范围" align="center" min-width="140">
               <template #default="scope">
                 <span>{{ formatRange(scope.row) }}</span>
@@ -416,11 +400,11 @@
     <!-- 修改痕迹抽屉：上机数量默认值人工调整 / 报工编辑前后差异 -->
     <el-drawer v-model="changeOpen" :title="'修改痕迹' + (changeFeedbackCode ? ' · ' + changeFeedbackCode : '')" size="620px" append-to-body>
       <el-table v-loading="changeLoading" :data="changeList" border size="small">
-        <el-table-column label="时间" align="center" prop="createTime" width="160" />
-        <el-table-column label="操作人" align="center" prop="createBy" width="90" />
+        <el-table-column label="时间" align="center" prop="createTime" width="180"  :show-overflow-tooltip="true" />
+        <el-table-column label="操作人" align="center" prop="createBy" width="90"  :show-overflow-tooltip="true" />
         <el-table-column label="字段名" align="center" prop="fieldName" width="110" :show-overflow-tooltip="true" />
-        <el-table-column label="原值" align="center" prop="oldValue" width="80" />
-        <el-table-column label="新值" align="center" prop="newValue" width="80" />
+        <el-table-column label="原值" align="center" prop="oldValue" width="80"  :show-overflow-tooltip="true" />
+        <el-table-column label="新值" align="center" prop="newValue" width="80"  :show-overflow-tooltip="true" />
         <el-table-column label="变更说明" align="center" prop="changeReason" min-width="150" :show-overflow-tooltip="true" />
       </el-table>
       <el-empty v-if="!changeLoading && changeList.length === 0" description="暂无修改痕迹" />

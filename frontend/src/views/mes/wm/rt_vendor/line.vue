@@ -11,11 +11,11 @@
 
     <el-table v-loading="loading" :data="lineList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="45" align="center" />
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="规格型号" align="center" prop="specification" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="单位" align="center" prop="unitName" width="70" />
-      <el-table-column label="退货数量" align="center" prop="quantityRt" width="100" />
+      <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
+      <el-table-column label="退货数量" align="center" prop="quantityRt" width="100"  :show-overflow-tooltip="true" />
       <el-table-column label="批次号" align="center" prop="batchCode" width="110" :show-overflow-tooltip="true" />
       <el-table-column label="仓库" align="center" prop="warehouseName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="120">

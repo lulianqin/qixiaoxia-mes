@@ -24,14 +24,14 @@
     <el-table v-loading="loading" :data="transactionList">
       <el-table-column label="事务ID" align="center" prop="transactionId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="来源单据编码" align="center" prop="sourceDocCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="事务类型" align="center" prop="transactionType" width="100">
+      <el-table-column label="事务类型" align="center" prop="transactionType" width="100" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_wm_transaction_type" :value="scope.row.transactionType" />
         </template>
       </el-table-column>
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="变动数量" align="center" prop="quantity" width="120">
+      <el-table-column label="变动数量" align="center" prop="quantity" width="120" :show-overflow-tooltip="true">
         <template #default="scope">
           <span :style="{ color: Number(scope.row.quantity) > 0 ? '#67c23a' : Number(scope.row.quantity) < 0 ? '#f56c6c' : '#909399', fontWeight: 'bold' }">
             {{ Number(scope.row.quantity) > 0 ? '+' : '' }}{{ scope.row.quantity }}
@@ -41,8 +41,8 @@
       <el-table-column label="单位名称" align="center" prop="unitName" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="辅助单位名称" align="center" prop="unit2Name" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="操作人" align="center" prop="createBy" width="100" :show-overflow-tooltip="true" />
-      <el-table-column label="操作时间" align="center" prop="createTime" width="160" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="100">
+      <el-table-column label="操作时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true" />
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="100">
         <template #default="scope">
           <el-button link type="primary" icon="View" size="small" @click="handleDetail(scope.row)">详情</el-button>
         </template>

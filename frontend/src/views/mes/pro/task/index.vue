@@ -50,7 +50,7 @@
     <!-- 表格 -->
     <el-table v-loading="loading" :data="taskList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="任务编码" align="center" prop="taskCode" width="170" :show-overflow-tooltip="true">
+      <el-table-column label="任务编码" align="center" prop="taskCode" width="170">
         <template #default="scope">
           <el-tag v-if="scope.row.isException === 'Y'" type="danger" size="small" effect="dark" class="mr4">异常</el-tag>
           <span>{{ scope.row.taskCode }}</span>
@@ -63,7 +63,7 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="任务名称" align="center" prop="taskName" width="150" :show-overflow-tooltip="true" />
+      <el-table-column label="任务名称" align="center" prop="taskName" min-width="150" :show-overflow-tooltip="true" />
       <el-table-column label="生产工单" align="center" prop="workorderName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="工位" align="center" prop="workstationName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="报工人" align="center" prop="workerNick" width="100" :show-overflow-tooltip="true">
@@ -73,34 +73,34 @@
         <template #default="scope">{{ scope.row.leaderNick || '-' }}</template>
       </el-table-column>
       <el-table-column label="工序" align="center" prop="processName" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
-      <el-table-column label="已生产" align="center" prop="quantityProduced" width="80">
+      <el-table-column label="计划数量" align="center" prop="quantity" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" :show-overflow-tooltip="true">
         <template #default="scope">{{ producedDisplay(scope.row) }}</template>
       </el-table-column>
-      <el-table-column label="颜色" align="center" prop="colorCode" width="80">
+      <el-table-column label="颜色" align="center" prop="colorCode" width="80" :show-overflow-tooltip="true">
         <template #default="scope">
           <el-color-picker v-model="scope.row.colorCode" disabled size="small" v-if="scope.row.colorCode" />
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="开始时间" align="center" prop="startTime" width="155">
+      <el-table-column label="开始时间" align="center" prop="startTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.startTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="结束时间" align="center" prop="endTime" width="155">
+      <el-table-column label="结束时间" align="center" prop="endTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.endTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="总时长(分钟)" align="center" prop="duration" width="110" />
+      <el-table-column label="总时长(分钟)" align="center" prop="duration" width="110" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status" width="110">
         <template #default="scope">
           <el-tag v-if="isQcBlocked(scope.row)" type="danger" size="small" effect="dark">不可开工</el-tag>
           <span v-else :style="{ color: statusColor[scope.row.status] }">{{ statusMap[scope.row.status] || scope.row.status }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="380">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="380">
         <template #default="scope">
           <el-button link type="danger" icon="Unlock" @click="handleReleaseQcBlock(scope.row)" v-if="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:release']">质检放行</el-button>
           <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:task:edit']">下发</el-button>

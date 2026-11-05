@@ -45,36 +45,36 @@
     <!-- 列表 -->
       <el-table ref="tableRef" v-loading="loading" :data="list" border row-key="orderId" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="48" :selectable="canSelectRow" />
-      <el-table-column label="外协单号" align="center" prop="orderCode" width="160" />
-      <el-table-column label="来源" align="center" prop="sourceType" width="80">
+      <el-table-column label="外协单号" align="center" prop="orderCode" width="160" :show-overflow-tooltip="true" />
+      <el-table-column label="来源" align="center" prop="sourceType" width="80" :show-overflow-tooltip="true">
         <template #default="{ row }">
           <dict-tag :options="mes_outsource_type" :value="row.sourceType" />
         </template>
       </el-table-column>
-      <el-table-column label="外协厂商" align="center" prop="vendorName" width="100" />
-      <el-table-column label="工单编码" align="center" prop="workorderCode" width="140" />
-      <el-table-column label="工序" align="center" prop="processName" width="100">
+      <el-table-column label="外协厂商" align="center" prop="vendorName" min-width="100" :show-overflow-tooltip="true" />
+      <el-table-column label="工单编码" align="center" prop="workorderCode" width="140" :show-overflow-tooltip="true" />
+      <el-table-column label="工序" align="center" prop="processName" width="100" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.processName || '-' }}</template>
       </el-table-column>
-      <el-table-column label="发料总量" align="center" prop="issueTotalQty" width="100">
+      <el-table-column label="发料总量" align="center" prop="issueTotalQty" width="100" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.issueTotalQty != null ? row.issueTotalQty + '吨' : '-' }}</template>
       </el-table-column>
-      <el-table-column label="收货总量" align="center" prop="recptTotalQty" width="100">
+      <el-table-column label="收货总量" align="center" prop="recptTotalQty" width="100" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.recptTotalQty != null ? row.recptTotalQty + '吨' : '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作人" align="center" prop="operator" width="80" />
-      <el-table-column label="发料时间" align="center" prop="issueTime" width="160" />
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="操作人" align="center" prop="operator" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="发料时间" align="center" prop="issueTime" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" prop="status" width="90" :show-overflow-tooltip="true">
         <template #default="{ row }">
           <dict-tag :options="mes_outsource_status" :value="row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="检验状态" align="center" width="100">
+      <el-table-column label="检验状态" align="center" width="100" :show-overflow-tooltip="true">
         <template #default="{ row }">
           <qc-status-tag :status="row.qcStatus" @click="goIqc(row)" />
         </template>
       </el-table-column>
-      <el-table-column label="代操作人" align="center" prop="agentOperator" width="90">
+      <el-table-column label="代操作人" align="center" prop="agentOperator" width="90" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.agentOperator || '-' }}</template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="340" fixed="right">
@@ -113,21 +113,21 @@
       </el-descriptions>
       <el-divider content-position="left">发料明细</el-divider>
       <el-table :data="detail?.issueLines || []" border size="small">
-        <el-table-column label="物料编码" prop="itemCode" width="120" />
+        <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
         <el-table-column label="物料名称" prop="itemName" min-width="120" show-overflow-tooltip />
-        <el-table-column label="数量" prop="quantity" width="90" />
-        <el-table-column label="单位" prop="unitName" width="60" />
-        <el-table-column label="批次" prop="batchCode" width="120" />
-        <el-table-column label="仓库" prop="warehouseName" width="100" />
+        <el-table-column label="数量" prop="quantity" width="90"  :show-overflow-tooltip="true" />
+        <el-table-column label="单位" prop="unitName" width="60"  :show-overflow-tooltip="true" />
+        <el-table-column label="批次" prop="batchCode" width="120"  :show-overflow-tooltip="true" />
+        <el-table-column label="仓库" prop="warehouseName" width="100"  :show-overflow-tooltip="true" />
       </el-table>
       <template v-if="detail?.recptLines?.length > 0">
         <el-divider content-position="left">收货明细</el-divider>
         <el-table :data="detail.recptLines" border size="small">
-          <el-table-column label="物料编码" prop="itemCode" width="120" />
+          <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
           <el-table-column label="物料名称" prop="itemName" min-width="120" show-overflow-tooltip />
-          <el-table-column label="数量" prop="quantity" width="90" />
-          <el-table-column label="单位" prop="unitName" width="60" />
-          <el-table-column label="仓库" prop="warehouseName" width="100" />
+          <el-table-column label="数量" prop="quantity" width="90"  :show-overflow-tooltip="true" />
+          <el-table-column label="单位" prop="unitName" width="60"  :show-overflow-tooltip="true" />
+          <el-table-column label="仓库" prop="warehouseName" width="100"  :show-overflow-tooltip="true" />
         </el-table>
       </template>
     </el-dialog>

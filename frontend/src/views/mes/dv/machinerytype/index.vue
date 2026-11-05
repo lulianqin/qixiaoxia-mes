@@ -33,9 +33,9 @@
       :default-expand-all="isExpandAll"
       :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
     >
-      <el-table-column prop="machineryTypeName" label="设备类型" width="260" />
-      <el-table-column prop="orderNum" label="排序" width="100" align="center" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+      <el-table-column prop="machineryTypeName" label="设备类型" min-width="260" :show-overflow-tooltip="true" />
+      <el-table-column prop="orderNum" label="排序" width="100" align="center" :show-overflow-tooltip="true" />
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.createTime }}</span>
         </template>
@@ -45,7 +45,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="200" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:dv:machinerytype:edit']">修改</el-button>
           <el-button link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['mes:dv:machinerytype:add']">新增</el-button>

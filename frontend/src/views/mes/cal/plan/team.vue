@@ -10,8 +10,8 @@
             </div>
           </template>
           <el-table v-loading="loading" :data="teamList" @row-click="onRowClick">
-            <el-table-column label="班组编号" align="center" prop="teamCode" />
-            <el-table-column label="班组名称" align="center" prop="teamName" />
+            <el-table-column label="班组编号" align="center" prop="teamCode"  :show-overflow-tooltip="true" />
+            <el-table-column label="班组名称" align="center" prop="teamName"  :show-overflow-tooltip="true" />
             <el-table-column label="操作" align="center" v-if="optType !== 'view'" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-button
@@ -35,9 +35,9 @@
             </div>
           </template>
           <el-table v-loading="memberLoading" :data="memberList">
-            <el-table-column label="用户名" align="center" prop="userName" />
-            <el-table-column label="用户昵称" align="center" prop="nickName" />
-            <el-table-column label="电话" align="center" prop="tel" />
+            <el-table-column label="用户名" align="center" prop="userName"  :show-overflow-tooltip="true" />
+            <el-table-column label="用户昵称" align="center" prop="nickName"  :show-overflow-tooltip="true" />
+            <el-table-column label="电话" align="center" prop="tel"  :show-overflow-tooltip="true" />
           </el-table>
         </el-card>
       </el-col>

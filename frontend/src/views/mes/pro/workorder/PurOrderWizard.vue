@@ -2,7 +2,7 @@
   <el-dialog v-model="visible" title="采购单快捷创建" width="1100px" append-to-body @open="load">
     <el-table :data="lines" size="small" border ref="tableRef" @selection-change="handleSelection">
       <el-table-column type="selection" width="45" />
-      <el-table-column label="物料编码" prop="itemCode" width="130" align="center" />
+      <el-table-column label="物料编码" prop="itemCode" width="130" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="120" />
       <el-table-column label="缺口" width="95" align="center">
         <template #default="s">{{ s.row.shortageQty }} {{ s.row.unitName }}</template>

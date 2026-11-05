@@ -1,16 +1,14 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-row>
-        <el-col :span="6"><el-form-item label="领料单编码" prop="issueCode"><el-input v-model="queryParams.issueCode" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item></el-col>
-        <el-col :span="6"><el-form-item label="工单名称" prop="workorderName"><el-input v-model="queryParams.workorderName" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item></el-col>
-        <el-col :span="6"><el-form-item label="状态" prop="status">
-          <el-select v-model="queryParams.status" placeholder="请选择" clearable>
-            <el-option v-for="d in issue_status" :key="d.value" :label="d.label" :value="d.value" />
-          </el-select>
-        </el-form-item></el-col>
-        <el-col :span="6"><el-form-item><el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button><el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button></el-form-item></el-col>
-      </el-row>
+      <el-form-item label="领料单编码" prop="issueCode"><el-input v-model="queryParams.issueCode" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item>
+      <el-form-item label="工单名称" prop="workorderName"><el-input v-model="queryParams.workorderName" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item>
+      <el-form-item label="状态" prop="status">
+        <el-select v-model="queryParams.status" placeholder="请选择" clearable>
+          <el-option v-for="d in issue_status" :key="d.value" :label="d.label" :value="d.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item><el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button><el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
@@ -26,14 +24,14 @@
 
     <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="领料单编码" align="center" prop="issueCode" width="150" />
+      <el-table-column label="领料单编码" align="center" prop="issueCode" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="领料单名称" align="center" prop="issueName" :show-overflow-tooltip="true" min-width="150" />
       <el-table-column label="关联工单" align="center" prop="workorderName" width="130" :show-overflow-tooltip="true" />
-      <el-table-column label="领料日期" align="center" width="100"><template #default="scope">{{ parseTime(scope.row.issueDate, '{y}-{m}-{d}') }}</template></el-table-column>
-      <el-table-column label="申请/已发" align="center" width="100">
+      <el-table-column label="领料日期" align="center" width="180" :show-overflow-tooltip="true"><template #default="scope">{{ parseTime(scope.row.issueDate, '{y}-{m}-{d}') }}</template></el-table-column>
+      <el-table-column label="申请/已发" align="center" width="100" :show-overflow-tooltip="true">
         <template #default="scope"><span>{{ scope.row.quantityTotal || 0 }} / {{ scope.row.quantityIssuedTotal || 0 }}</span></template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="状态" align="center" prop="status" width="90" :show-overflow-tooltip="true">
         <template #default="scope"><dict-tag :options="issue_status" :value="scope.row.status" /></template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="260" fixed="right" class-name="small-padding fixed-width">
@@ -76,12 +74,12 @@
             <el-col :span="1.5" v-if="form.workorderId"><el-button type="success" plain icon="MagicStick" size="small" @click="handleLoadBom">重新从BOM拉取</el-button></el-col>
           </el-row>
           <el-table :data="lineList" size="small">
-            <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
+            <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
             <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
             <el-table-column label="规格" align="center" prop="itemSpc" width="120" :show-overflow-tooltip="true" />
             <el-table-column label="申请数量" align="center" width="110"><template #default="scope"><el-input-number v-if="optType!=='view'" v-model="scope.row.quantityIssue" :min="0" :precision="2" size="small" controls-position="right" style="width:100px" /><span v-else>{{ scope.row.quantityIssue }}</span></template></el-table-column>
             <el-table-column label="已发料" align="center" width="80"><template #default="scope">{{ scope.row.quantityIssued || 0 }}</template></el-table-column>
-            <el-table-column label="单位" align="center" prop="unitName" width="60" />
+            <el-table-column label="单位" align="center" prop="unitName" width="60"  :show-overflow-tooltip="true" />
           </el-table>
         </el-tab-pane>
       </el-tabs>

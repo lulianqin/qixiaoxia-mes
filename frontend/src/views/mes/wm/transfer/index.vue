@@ -34,13 +34,13 @@
       <el-table-column label="调拨名称" align="center" prop="transferName" :show-overflow-tooltip="true" />
       <el-table-column label="源仓库" align="center" prop="sourceWarehouseName" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="目标仓库" align="center" prop="targetWarehouseName" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="调拨日期" align="center" prop="transferDate" width="110" />
+      <el-table-column label="调拨日期" align="center" prop="transferDate" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status" width="90">
         <template #default="scope">
           <el-tag :type="scope.row.status === 'CONFIRMED' ? 'success' : scope.row.status === 'POSTED' ? '' : 'info'" size="small">{{ scope.row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="140" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="140" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:transfer:edit']">修改</el-button>
           <el-button link type="primary" size="small" v-if="scope.row.status === 'DRAFT'" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:transfer:remove']">删除</el-button>

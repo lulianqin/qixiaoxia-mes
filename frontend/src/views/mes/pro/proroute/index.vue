@@ -5,33 +5,21 @@
 
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-row>
-        <el-col :span="8">
           <el-form-item label="路线编码" prop="routeCode">
             <el-input v-model="queryParams.routeCode" placeholder="请输入路线编码" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="路线名称" prop="routeName">
             <el-input v-model="queryParams.routeName" placeholder="请输入路线名称" clearable @keyup.enter="handleQuery" />
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="启用状态" prop="enableFlag">
             <el-select v-model="queryParams.enableFlag" placeholder="请选择" clearable>
               <el-option v-for="dict in sys_yes_no_options" :key="dict.value" :label="dict.label" :value="dict.value" />
             </el-select>
           </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8">
           <el-form-item>
             <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
             <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-col>
-      </el-row>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
@@ -49,15 +37,16 @@
 
     <el-table v-loading="loading" :data="routeList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="路线编码" align="center" prop="routeCode" />
-      <el-table-column label="路线名称" align="center" prop="routeName" :show-overflow-tooltip="true">
+      <el-table-column label="路线编码" align="center" prop="routeCode" :show-overflow-tooltip="true" />
+      <el-table-column label="路线名称" align="center" prop="routeName">
         <template #default="scope">
           <el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:proroute:query']">{{ scope.row.routeName }}</el-button>
         </template>
       </el-table-column>
       <el-table-column label="路线说明" align="center" prop="routeDesc" :show-overflow-tooltip="true" />
+      <el-table-column label="负责人" align="center" prop="ownerName" width="110" :show-overflow-tooltip="true" />
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
@@ -67,7 +56,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="80" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="80" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:proroute:edit']"></el-button></el-tooltip>
         </template>
@@ -109,6 +98,16 @@
               </el-col>
             </el-row>
             <el-row>
+              <el-col :span="12">
+                <el-form-item label="负责人" prop="ownerId">
+                  <el-select v-model="form.ownerId" placeholder="请选择负责人" clearable filterable :disabled="optType === 'view'"
+                             :loading="ownerLoading" @change="handleOwnerChange" @visible-change="handleOwnerVisible">
+                    <el-option v-for="u in ownerOptions" :key="u.userId" :label="u.nickName || u.userName" :value="u.userId" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row>
               <el-col :span="24">
                 <el-form-item label="路线说明" prop="routeDesc">
                   <el-input v-model="form.routeDesc" type="textarea" :rows="3" placeholder="请输入路线说明" :disabled="optType === 'view'" maxlength="500" show-word-limit />
@@ -133,7 +132,7 @@
             </el-col>
           </el-row>
           <el-table :data="processList" v-loading="processLoading">
-            <el-table-column label="序号" align="center" prop="orderNum" width="60" />
+            <el-table-column label="序号" align="center" prop="orderNum" width="60"  :show-overflow-tooltip="true" />
             <el-table-column label="工序" align="center">
               <template #default="scope">{{ scope.row.processName || scope.row.processCode }}</template>
             </el-table-column>
@@ -142,12 +141,12 @@
                 <el-tag :type="scope.row.linkType==='SS'?'success':(scope.row.linkType==='FS'?'warning':'info')" size="small">{{ linkTypeMap[scope.row.linkType] || scope.row.linkType }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="关键工序" align="center" prop="keyFlag" width="80">
+            <el-table-column label="关键工序" align="center" prop="keyFlag" width="80" :show-overflow-tooltip="true">
               <template #default="scope">
                 <span :style="{color:scope.row.keyFlag==='Y'?'#E6A23C':'#909399'}">{{ scope.row.keyFlag==='Y'?'是':'否' }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="检验工序" align="center" prop="isCheck" width="80">
+            <el-table-column label="检验工序" align="center" prop="isCheck" width="80" :show-overflow-tooltip="true">
               <template #default="scope">
                 <span :style="{color:scope.row.isCheck==='Y'?'#67C23A':'#909399'}">{{ scope.row.isCheck==='Y'?'是':'否' }}</span>
               </template>
@@ -180,10 +179,10 @@
             </el-col>
           </el-row>
           <el-table :data="filteredProductList" v-loading="productLoading" @row-click="onProductRowClick" highlight-current-row>
-            <el-table-column label="产品编码" align="center" prop="itemCode" />
+            <el-table-column label="产品编码" align="center" prop="itemCode"  :show-overflow-tooltip="true" />
             <el-table-column label="产品名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
-            <el-table-column label="规格型号" align="center" prop="specification" />
-            <el-table-column label="基准批量" align="center" prop="quantity" width="80" />
+            <el-table-column label="规格型号" align="center" prop="specification"  :show-overflow-tooltip="true" />
+            <el-table-column label="基准批量" align="center" prop="quantity" width="80"  :show-overflow-tooltip="true" />
             <el-table-column label="标准工时" align="center" width="100">
               <template #default="scope">{{ scope.row.productionTime }} {{ scope.row.timeUnitType }}</template>
             </el-table-column>
@@ -324,10 +323,10 @@
           </el-row>
           <el-table :data="filteredBomList" v-loading="bomLoading">
             <el-table-column label="工序" align="center" width="100"><template #default="scope">{{ getProcessName(scope.row.processId) }}</template></el-table-column>
-            <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
-            <el-table-column label="物料名称" align="center" prop="itemName" />
-            <el-table-column label="规格" align="center" prop="specification" />
-            <el-table-column label="单位" align="center" prop="unitName" width="70" />
+            <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
+            <el-table-column label="物料名称" align="center" prop="itemName"  :show-overflow-tooltip="true" />
+            <el-table-column label="规格" align="center" prop="specification"  :show-overflow-tooltip="true" />
+            <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
             <el-table-column label="用量" align="center" prop="quantity" width="100"><template #default="scope"><el-input-number v-if="optType!=='view'" v-model="scope.row.quantity" :min="0" :precision="4" size="small" controls-position="right" @change="(v)=>handleBomQtyChange(scope.row,v)" /><span v-else>{{ scope.row.quantity }}</span></template></el-table-column>
             <el-table-column label="操作" align="center" width="70" v-if="optType!=='view'"><template #default="scope"><el-button size="small" link @click="handleDelBomItem(scope.row)">删除</el-button></template></el-table-column>
           </el-table>
@@ -393,10 +392,10 @@
         </el-col>
       </el-row>
       <el-table :data="_procBomList" v-loading="_procBomLoading" size="small">
-        <el-table-column label="物料编码" prop="itemCode" width="130" />
-        <el-table-column label="物料名称" prop="itemName" />
-        <el-table-column label="规格" prop="specification" width="120" />
-        <el-table-column label="单位" prop="unitName" width="70" />
+        <el-table-column label="物料编码" prop="itemCode" width="130"  :show-overflow-tooltip="true" />
+        <el-table-column label="物料名称" prop="itemName"  :show-overflow-tooltip="true" />
+        <el-table-column label="规格" prop="specification" width="120"  :show-overflow-tooltip="true" />
+        <el-table-column label="单位" prop="unitName" width="70"  :show-overflow-tooltip="true" />
         <el-table-column label="用量" width="100"><template #default="scope"><el-input-number v-if="optType!=='view'" v-model="scope.row.quantity" :min="0.0001" :precision="4" size="small" controls-position="right" @change="(v)=>handleProcBomQtyChange(scope.row,v)" /><span v-else>{{ scope.row.quantity }}</span></template></el-table-column>
         <el-table-column label="操作" width="60" v-if="optType!=='view'"><template #default="scope"><el-button size="small" link @click="handleDelProcBomItem(scope.row)">删除</el-button></template></el-table-column>
       </el-table>
@@ -439,6 +438,7 @@ import { listAllProcess } from '@/api/mes/pro/process'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { getDicts } from '@/api/system/dict/data'
+import { listUser } from '@/api/system/user'
 import ItemSelect from '@/components/itemSelect/single.vue'
 
 export default {
@@ -449,7 +449,7 @@ export default {
       autoGenFlag: false, optType: undefined, activeTab: 'base',
       loading: true, processLoading: false, productLoading: false, bomLoading: false, paramLoading: false,
       ids: [], single: true, multiple: true, showSearch: true, total: 0,
-      routeList: [], processList: [], productList: [], bomList: [], paramList: [], allProcessOptions: [], vendorOptions: [],
+      routeList: [], processList: [], productList: [], bomList: [], paramList: [], allProcessOptions: [], vendorOptions: [], ownerOptions: [], ownerLoading: false,
       title: '', open: false,
       // 路线工序弹窗
       rpOpen: false, rpTitle: '', rpForm: {},
@@ -515,9 +515,26 @@ export default {
     /** 订单类型字典, 用于绑定维度下拉与标签 */
     loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.orderTypeOptions = r.data || [] }) },
     orderTypeLabel(v) { const d = this.orderTypeOptions.find(o => o.dictValue === v); return d ? d.dictLabel : v },
+    /** 下拉展开时懒加载用户列表 */
+    handleOwnerVisible(visible) { if (visible) this.searchOwnerOptions() },
+    searchOwnerOptions() {
+      if (this.ownerLoading) return
+      this.ownerLoading = true
+      listUser({ pageNum: 1, pageSize: 200, status: '0' }).then(r => {
+        this.ownerOptions = r.rows || []
+      }).catch(() => {}).finally(() => { this.ownerLoading = false })
+    },
+    /** 编辑时回显负责人（不在已加载列表中则补一条） */
+    echoOwner() {
+      const f = this.form
+      if (f.ownerId && !this.ownerOptions.some(u => u.userId === f.ownerId)) {
+        this.ownerOptions.push({ userId: f.ownerId, nickName: f.ownerName, userName: f.ownerName })
+      }
+    },
+    handleOwnerChange(val) { this.form.ownerName = val ? (this.ownerOptions.find(u => u.userId === val)?.nickName || null) : null },
     cancel() { this.open = false; this.reset() },
     reset() {
-      this.form = { routeId: null, routeCode: null, routeName: null, routeDesc: null, enableFlag: '1', remark: null }
+      this.form = { routeId: null, routeCode: null, routeName: null, routeDesc: null, ownerId: null, ownerName: null, clearOwner: null, enableFlag: '1', remark: null }
       this.autoGenFlag = false; this.activeTab = 'base'; this.processList = []; this.productList = []; this.productSearchKey = ''
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
@@ -526,16 +543,16 @@ export default {
     handleAdd() { this.reset(); this.open = true; this.title = '新增工艺路线'; this.optType = 'add' },
     handleView(row) {
       this.reset(); const id = row.routeId || this.ids[0]
-      getRoute(id).then(r => { this.form = r.data; this.open = true; this.title = '查看工艺路线'; this.optType = 'view'; this.loadProcessList(id); this.loadProductList(id) })
+      getRoute(id).then(r => { this.form = r.data; this.echoOwner(); this.open = true; this.title = '查看工艺路线'; this.optType = 'view'; this.loadProcessList(id); this.loadProductList(id) })
     },
     handleUpdate(row) {
       this.reset(); const id = row.routeId || this.ids[0]
-      getRoute(id).then(r => { this.form = r.data; this.open = true; this.title = '修改工艺路线'; this.optType = 'edit'; this.loadProcessList(id); this.loadProductList(id) })
+      getRoute(id).then(r => { this.form = r.data; this.echoOwner(); this.open = true; this.title = '修改工艺路线'; this.optType = 'edit'; this.loadProcessList(id); this.loadProductList(id) })
     },
     submitForm() {
       this.$refs.form.validate(valid => {
         if (valid) {
-          if (this.form.routeId != null) { updateRoute(this.form).then(() => { this.$modal.msgSuccess('修改成功'); this.open = false; this.getList() }) }
+          if (this.form.routeId != null) { this.form.clearOwner = !this.form.ownerId; updateRoute(this.form).then(() => { this.$modal.msgSuccess('修改成功'); this.open = false; this.getList() }) }
           else { addRoute(this.form).then(r => { this.$modal.msgSuccess('新增成功'); this.form.routeId = r.data?.routeId || r.data; this.activeTab = 'process' }) }
         }
       })

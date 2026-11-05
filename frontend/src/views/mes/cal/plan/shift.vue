@@ -37,11 +37,11 @@
 
     <el-table v-loading="loading" :data="shiftList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="序号" align="center" prop="shiftSeq" />
-      <el-table-column label="班次名称" align="center" prop="shiftName" />
-      <el-table-column label="开始时间" align="center" prop="startTime" width="180" />
-      <el-table-column label="结束时间" align="center" prop="endTime" width="180" />
-      <el-table-column label="备注" align="center" prop="remark" />
+      <el-table-column label="序号" align="center" prop="shiftSeq"  :show-overflow-tooltip="true" />
+      <el-table-column label="班次名称" align="center" prop="shiftName"  :show-overflow-tooltip="true" />
+      <el-table-column label="开始时间" align="center" prop="startTime" width="180"  :show-overflow-tooltip="true" />
+      <el-table-column label="结束时间" align="center" prop="endTime" width="180"  :show-overflow-tooltip="true" />
+      <el-table-column label="备注" align="center" prop="remark"  :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" v-if="optType !== 'view'" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button

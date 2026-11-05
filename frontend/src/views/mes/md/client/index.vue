@@ -15,21 +15,21 @@
     </el-row>
     <el-table v-loading="loading" :data="clientList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="编码" align="center" prop="clientCode" />
+      <el-table-column label="编码" align="center" prop="clientCode" :show-overflow-tooltip="true" />
       <el-table-column label="全称" align="center" prop="clientName" :show-overflow-tooltip="true" />
-      <el-table-column label="简称" align="center" prop="clientNick" />
-      <el-table-column label="类型" align="center" width="80">
+      <el-table-column label="简称" align="center" prop="clientNick" :show-overflow-tooltip="true" />
+      <el-table-column label="类型" align="center" width="80" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_client_type" :value="s.row.clientType" /></template>
       </el-table-column>
-      <el-table-column label="业务员" align="center" prop="salesperson" width="80" />
-      <el-table-column label="联系人" align="center" prop="contact1" />
-      <el-table-column label="联系电话" align="center" prop="contact1Tel" />
+      <el-table-column label="业务员" align="center" prop="salesperson" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="联系人" align="center" prop="contact1" :show-overflow-tooltip="true" />
+      <el-table-column label="联系电话" align="center" prop="contact1Tel" :show-overflow-tooltip="true" />
       <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:client:edit']">修改</el-button></template></el-table-column>
+      <el-table-column fixed="right" label="操作" align="center" width="150"><template #default="s"><el-button link type="primary" icon="Edit" @click="handleUpdate(s.row)" v-hasPermi="['mes:md:client:edit']">修改</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     <el-dialog :title="title" v-model="open" width="750px" append-to-body>

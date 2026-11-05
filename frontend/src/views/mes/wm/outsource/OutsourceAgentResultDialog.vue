@@ -48,7 +48,7 @@
             <el-input v-model="row.lotNumber" size="small" placeholder="选填" />
           </template>
         </el-table-column>
-        <el-table-column label="生产日期" width="150" align="center">
+        <el-table-column label="生产日期" width="180" align="center">
           <template #default="{ row }">
             <el-date-picker v-model="row.produceDate" type="date" value-format="YYYY-MM-DD" size="small" placeholder="选填" style="width: 100%" />
           </template>

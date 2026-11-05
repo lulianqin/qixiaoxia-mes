@@ -369,7 +369,7 @@ public class ProWorkorderController extends BaseController
      * 移动端报工入口：按工单编码一次查询工单 + 可报工任务列表（PRODUCING 状态）。
      * 替代移动端原先的两次请求（先查工单列表再查任务列表）。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
     @GetMapping("/feedbackEntry/{workorderCode}")
     public AjaxResult feedbackEntry(@PathVariable String workorderCode)
     {

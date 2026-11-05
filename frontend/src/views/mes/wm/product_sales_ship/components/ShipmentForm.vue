@@ -42,11 +42,11 @@
       <el-alert v-if="!packedBoxes.length" title="暂无已装箱可发运，请先在「装箱明细」完成装箱" type="warning" :closable="false" class="mb8" />
       <el-table v-else ref="boxTableRef" :data="packedBoxes" size="small" border @selection-change="onBoxSelect" max-height="240">
         <el-table-column type="selection" width="45" />
-        <el-table-column label="箱号" prop="boxNo" width="100" />
-        <el-table-column label="物料编码" prop="itemCode" width="120" />
+        <el-table-column label="箱号" prop="boxNo" width="100"  :show-overflow-tooltip="true" />
+        <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
         <el-table-column label="物料名称" prop="itemName" min-width="140" :show-overflow-tooltip="true" />
-        <el-table-column label="数量" prop="quantity" width="80" align="center" />
-        <el-table-column label="箱规" prop="boxSpec" width="120" />
+        <el-table-column label="数量" prop="quantity" width="80" align="center"  :show-overflow-tooltip="true" />
+        <el-table-column label="箱规" prop="boxSpec" width="120"  :show-overflow-tooltip="true" />
       </el-table>
       <div v-if="packedBoxes.length" class="mt8 hint">
         已选 {{ selectedBoxes.length }} 箱，合计数量 {{ selectedQty }}

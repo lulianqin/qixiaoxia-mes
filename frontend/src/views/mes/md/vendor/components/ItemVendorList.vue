@@ -2,7 +2,7 @@
   <div>
     <el-button type="primary" size="small" icon="Plus" @click="handleAdd" style="margin-bottom:10px">添加物料</el-button>
     <el-table :data="list" size="small" border>
-      <el-table-column label="物料编码" prop="itemCode" width="130" align="center" />
+      <el-table-column label="物料编码" prop="itemCode" width="130" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" />
       <el-table-column label="首选" width="70" align="center">
         <template #default="s">

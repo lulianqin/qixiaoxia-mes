@@ -15,11 +15,11 @@
         <div class="sub">{{ row.finishedProcessCount ?? 0 }} / {{ row.totalProcessCount ?? 0 }}</div>
       </template>
     </el-table-column>
-    <el-table-column label="流转数量" prop="quantityTransfered" width="100" align="center" />
-    <el-table-column label="开始时间" min-width="140">
+    <el-table-column label="流转数量" prop="quantityTransfered" width="100" align="center"  :show-overflow-tooltip="true" />
+    <el-table-column label="开始时间" min-width="180">
       <template #default="{ row }">{{ fmtDateTime(row.actualStartTime) }}</template>
     </el-table-column>
-    <el-table-column label="完工时间" min-width="140">
+    <el-table-column label="完工时间" min-width="180">
       <template #default="{ row }">{{ fmtDateTime(row.actualEndTime) }}</template>
     </el-table-column>
     <el-table-column label="状态" width="100" align="center">

@@ -61,7 +61,7 @@
         </el-alert>
         <el-table :data="dashboard?.materialRows" size="small" border>
           <el-table-column label="序号" type="index" width="55" align="center" />
-          <el-table-column label="物料编码" prop="itemCode" width="120" align="center" />
+          <el-table-column label="物料编码" prop="itemCode" width="120" align="center"  :show-overflow-tooltip="true" />
           <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" />
           <el-table-column label="来源" width="90" align="center">
             <template #default="scope">
@@ -122,7 +122,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="单据编码" prop="issueCode" width="150" align="center" />
+          <el-table-column label="单据编码" prop="issueCode" width="150" align="center"  :show-overflow-tooltip="true" />
           <el-table-column label="单据名称" prop="issueName" :show-overflow-tooltip="true" />
             <el-table-column label="状态" width="90" align="center">
               <template #default="scope">
@@ -132,7 +132,7 @@
                 />
               </template>
             </el-table-column>
-          <el-table-column label="领料总数" prop="totalQuantity" width="100" align="center" />
+          <el-table-column label="领料总数" prop="totalQuantity" width="100" align="center"  :show-overflow-tooltip="true" />
         </el-table>
         <el-empty v-else description="暂无领料单" :image-size="50" />
       </el-collapse-item>
@@ -148,7 +148,7 @@
           </div>
         </template>
         <el-table v-if="dashboard?.hasPurchaseRecommend" :data="dashboard?.purchaseRecommends" size="small" border>
-          <el-table-column label="物料编码" prop="itemCode" width="120" align="center" />
+          <el-table-column label="物料编码" prop="itemCode" width="120" align="center"  :show-overflow-tooltip="true" />
           <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" />
           <el-table-column label="缺口" width="100" align="center">
             <template #default="scope">{{ scope.row.shortageQty }} {{ scope.row.unitName }}</template>
@@ -177,15 +177,15 @@
           </div>
         </template>
         <el-table v-if="dashboard?.hasPendingReturns" :data="dashboard?.returnStatuses" size="small" border>
-          <el-table-column label="单据编码" prop="rtCode" width="150" align="center" />
+          <el-table-column label="单据编码" prop="rtCode" width="150" align="center"  :show-overflow-tooltip="true" />
           <el-table-column label="单据名称" prop="rtName" :show-overflow-tooltip="true" />
-          <el-table-column label="关联领料单" prop="issueCode" width="150" align="center" />
+          <el-table-column label="关联领料单" prop="issueCode" width="150" align="center"  :show-overflow-tooltip="true" />
             <el-table-column label="状态" width="90" align="center">
               <template #default="scope">
                 <dict-tag :options="mes_wm_issue_status" :value="scope.row.status" />
               </template>
             </el-table-column>
-          <el-table-column label="退料总数" prop="totalQuantity" width="100" align="center" />
+          <el-table-column label="退料总数" prop="totalQuantity" width="100" align="center"  :show-overflow-tooltip="true" />
         </el-table>
         <el-empty v-else description="暂无退料单" :image-size="50">
           <span v-if="!isCompleted" style="color: #909399; font-size: 12px">工单完工后自动计算余料</span>

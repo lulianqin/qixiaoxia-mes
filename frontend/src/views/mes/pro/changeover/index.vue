@@ -28,16 +28,16 @@
     <el-table v-loading="loading" :data="dataList" border stripe @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="换型名称" prop="name" min-width="180" show-overflow-tooltip />
-      <el-table-column label="从工序" prop="fromProcessId" width="120" align="center">
+      <el-table-column label="从工序" prop="fromProcessId" width="120" align="center" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.fromProcessId ? getProcessName(row.fromProcessId) : '任意工序' }}</template>
       </el-table-column>
-      <el-table-column label="到工序" prop="toProcessId" width="120" align="center">
+      <el-table-column label="到工序" prop="toProcessId" width="120" align="center" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ getProcessName(row.toProcessId) }}</template>
       </el-table-column>
-      <el-table-column label="工作站" prop="workstationId" width="140" align="center">
+      <el-table-column label="工作站" prop="workstationId" width="140" align="center" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.workstationId ? getWorkstationName(row.workstationId) : '通用' }}</template>
       </el-table-column>
-      <el-table-column label="换型时长(分钟)" prop="durationMinutes" width="130" align="center" />
+      <el-table-column label="换型时长(分钟)" prop="durationMinutes" width="130" align="center" :show-overflow-tooltip="true" />
       <el-table-column label="备注" prop="remark" min-width="150" show-overflow-tooltip />
       <el-table-column label="操作" align="center" width="150" fixed="right">
         <template #default="{ row }">

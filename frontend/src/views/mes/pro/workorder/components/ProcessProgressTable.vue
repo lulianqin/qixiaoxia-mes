@@ -12,13 +12,13 @@
         <span>{{ row.workstationName || '—' }}</span>
       </template>
     </el-table-column>
-    <el-table-column label="计划时间" min-width="150">
+    <el-table-column label="计划时间" min-width="180">
       <template #default="{ row }">
         <div>{{ fmtDateTime(row.planStartTime) }}</div>
         <div class="sub">~ {{ fmtDateTime(row.planEndTime) }}</div>
       </template>
     </el-table-column>
-    <el-table-column label="实际时间" min-width="150">
+    <el-table-column label="实际时间" min-width="180">
       <template #default="{ row }">
         <template v-if="row.actualStartTime || row.actualEndTime">
           <div>{{ fmtDateTime(row.actualStartTime) }}</div>

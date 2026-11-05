@@ -30,18 +30,18 @@
     <el-table v-loading="loading" :data="rtvendorList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="退货单编码" align="center" prop="rtCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="退货单名称" align="center" prop="rtName" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="退货单名称" align="center" prop="rtName" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="采购订单" align="center" prop="purOrderCode" width="160" :show-overflow-tooltip="true" />
       <el-table-column label="供应商" align="center" prop="vendorName" width="160" :show-overflow-tooltip="true" />
       <el-table-column label="退货仓库" align="center" prop="warehouseName" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="退货日期" align="center" prop="rtDate" width="150" />
-      <el-table-column label="退货数量" align="center" prop="totalQuantity" width="100" />
-      <el-table-column label="状态" align="center" prop="status" width="100">
+      <el-table-column label="退货日期" align="center" prop="rtDate" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="退货数量" align="center" prop="totalQuantity" width="100" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" prop="status" width="100" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_rt_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="240">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="240">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:rt_vendor:edit']">修改</el-button>
           <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:rt_vendor:remove']">删除</el-button>

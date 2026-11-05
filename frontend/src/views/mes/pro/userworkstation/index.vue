@@ -41,7 +41,7 @@
       <el-table-column label="昵称" align="center" prop="nickName" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="工位编码" align="center" prop="workstationCode" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="工位名称" align="center" prop="workstationName" min-width="150" :show-overflow-tooltip="true" />
-      <el-table-column label="绑定时间" align="center" width="170">
+      <el-table-column label="绑定时间" align="center" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.operationTime || scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>

@@ -57,9 +57,9 @@
           <el-tag :type="statusType(scope.row.status)">{{ scope.row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="单据编码" align="center" prop="sourceDocCode" width="140" />
-      <el-table-column label="截止时间" align="center" prop="deadline" width="170" />
-      <el-table-column label="操作" align="center" width="250">
+      <el-table-column label="单据编码" align="center" prop="sourceDocCode" width="140" :show-overflow-tooltip="true" />
+      <el-table-column label="截止时间" align="center" prop="deadline" width="180" :show-overflow-tooltip="true" />
+      <el-table-column fixed="right" label="操作" align="center" width="250">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sys:todolist:edit']">修改</el-button>
           <el-button link type="primary" icon="Check" @click="handleDo(scope.row)" v-if="scope.row.status !== 'COMPLETED' && scope.row.status !== 'REJECTED'">处理</el-button>

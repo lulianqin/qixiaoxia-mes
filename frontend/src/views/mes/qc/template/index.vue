@@ -42,20 +42,20 @@
     <!-- 表格 -->
     <el-table v-loading="loading" :data="templateList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="模板编码" align="center" prop="templateCode" width="150" />
+      <el-table-column label="模板编码" align="center" prop="templateCode" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="模板名称" align="center" prop="templateName" :show-overflow-tooltip="true" />
-      <el-table-column label="适用检验种类" align="center" prop="qcTypes" width="180">
+      <el-table-column label="适用检验种类" align="center" prop="qcTypes" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag v-if="mes_qc_type" v-for="t in splitTypes(scope.row.qcTypes)" :key="t" :options="mes_qc_type" :value="t" style="margin-right: 4px" />
         </template>
       </el-table-column>
-      <el-table-column label="启用" align="center" width="70">
+      <el-table-column label="启用" align="center" width="70" :show-overflow-tooltip="true">
         <template #default="scope">
           <span :style="{ color: scope.row.enableFlag === '1' ? '#67c23a' : '#909399' }">{{ scope.row.enableFlag === '1' ? '是' : '否' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:qc:template:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:qc:template:remove']">删除</el-button>

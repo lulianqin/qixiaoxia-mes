@@ -1,14 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-row>
-        <el-col :span="8"><el-form-item label="工单编码" prop="workorderCode"><el-input v-model="queryParams.workorderCode" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="产品名称" prop="productName"><el-input v-model="queryParams.productName" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="工单状态" prop="status"><el-select v-model="queryParams.status" placeholder="请选择" clearable><el-option label="待生产" value="PREPARE" /><el-option label="生产中" value="PRODUCING" /><el-option label="已完成" value="COMPLETED" /><el-option label="已取消" value="CANCEL" /><el-option label="已关闭" value="CLOSED" /></el-select></el-form-item></el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8"><el-form-item><el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button><el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button></el-form-item></el-col>
-      </el-row>
+    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px"><el-form-item label="工单编码" prop="workorderCode"><el-input v-model="queryParams.workorderCode" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item><el-form-item label="产品名称" prop="productName"><el-input v-model="queryParams.productName" placeholder="请输入" clearable @keyup.enter="handleQuery" /></el-form-item><el-form-item label="工单状态" prop="status"><el-select v-model="queryParams.status" placeholder="请选择" clearable><el-option label="待生产" value="PREPARE" /><el-option label="生产中" value="PRODUCING" /><el-option label="已完成" value="COMPLETED" /><el-option label="已取消" value="CANCEL" /><el-option label="已关闭" value="CLOSED" /></el-select></el-form-item><el-form-item><el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button><el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
@@ -28,26 +20,29 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="工单名称" align="center" prop="workorderName" :show-overflow-tooltip="true"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
+      <el-table-column label="工单名称" align="center" prop="workorderName"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
       <el-table-column label="来源销售订单" align="center" prop="sourceCode" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
       <el-table-column label="产品线(工艺路线)" align="center" prop="routeName" min-width="140" :show-overflow-tooltip="true" />
       <el-table-column label="工单负责人" align="center" prop="ownerName" width="110" :show-overflow-tooltip="true" />
-      <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
-      <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
-      <el-table-column label="工序进度" align="center" min-width="300">
+      <el-table-column label="计划数量" align="center" prop="quantity" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="工序进度" align="center" min-width="560">
         <template #default="scope">
-          <div v-if="scope.row.steps && scope.row.steps.length" class="proc-chips">
-            <el-tooltip v-for="(s,i) in scope.row.steps" :key="i" :content="stepTip(scope.row, s, i)" placement="top">
-              <span class="proc-chip" :class="stepChipClass(scope.row, s, i)" @click="goWorkorderBoard(scope.row)">
-                {{ s.processName }}<em>{{ stepPct(s) }}%</em>
-              </span>
-            </el-tooltip>
+          <div v-if="scope.row.steps && scope.row.steps.length" class="proc-timeline">
+            <template v-for="(s,i) in scope.row.steps" :key="i">
+              <el-tooltip :content="stepTip(scope.row, s, i)" placement="top">
+                <span class="proc-chip" :class="stepChipClass(scope.row, s, i)" @click="goWorkorderBoard(scope.row)">
+                  <span>{{ s.processName }}</span><em>{{ stepPct(s) }}%</em>
+                </span>
+              </el-tooltip>
+              <span v-if="i < scope.row.steps.length - 1" class="proc-link" :class="stepChipClass(scope.row, s, i)" />
+            </template>
           </div>
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column label="当前工序" align="center" min-width="120" :show-overflow-tooltip="true">
+      <el-table-column label="当前工序" align="center" min-width="120">
         <template #default="scope">
           <el-tag v-if="scope.row.currentStage==='PRODUCING'" size="small" type="warning">{{ scope.row.currentProcessName || '生产中' }}</el-tag>
           <el-tag v-else-if="scope.row.currentStage==='PENDING_COMPLETE'" size="small" type="success">待完工</el-tag>
@@ -56,12 +51,12 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column label="预计完工" align="center" width="140">
+      <el-table-column label="预计完工" align="center" width="140" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.estimatedEndTime ? parseTime(scope.row.estimatedEndTime, '{y}-{m}-{d} {h}:{i}') : '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="剩余工时" align="center" width="90">
+      <el-table-column label="剩余工时" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ formatRemaining(scope.row.remainingMinutes) }}</span>
         </template>
@@ -73,9 +68,9 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="80"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
-      <el-table-column label="需求日期" align="center" prop="requestDate" width="100"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime" width="150"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
+      <el-table-column label="状态" align="center" prop="status" width="80" :show-overflow-tooltip="true"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
+      <el-table-column label="需求日期" align="center" prop="requestDate" width="180" :show-overflow-tooltip="true"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
       <el-table-column label="操作" align="center" width="300" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="排产" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="success" icon="Calendar" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']"></el-button></el-tooltip>
@@ -213,8 +208,8 @@
               <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAddBom(proc.processId)">新增物料行</el-button></el-col>
             </el-row>
             <el-table :data="proc.bomItems" size="small" v-if="proc.bomItems.length>0">
-              <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
-              <el-table-column label="物料名称" align="center" prop="itemName" />
+              <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
+              <el-table-column label="物料名称" align="center" prop="itemName"  :show-overflow-tooltip="true" />
               <el-table-column label="类型" align="center" width="80"><template #default="scope">{{ itemOrProductMap[scope.row.itemOrProduct] || scope.row.itemOrProduct || '-' }}</template></el-table-column>
               <el-table-column label="单位用量" align="center" prop="quantity" width="100"><template #default="scope"><el-input-number v-if="optType!=='view'" v-model="scope.row.quantity" :min="0" :precision="4" size="small" controls-position="right" style="width:90px" /><span v-else>{{ scope.row.quantity }}</span></template></el-table-column>
               <el-table-column label="预计总用量" align="center" width="110"><template #default="scope">{{ (scope.row.quantity * (form.quantity||1)).toFixed(2) }} {{ scope.row.unitName }}</template></el-table-column>
@@ -225,14 +220,14 @@
             <!-- 工序参数 -->
             <el-divider content-position="left">工序参数</el-divider>
             <el-table :data="proc.paramItems" size="small" v-if="proc.paramItems.length>0">
-              <el-table-column label="参数名称" align="center" prop="_paramName" width="120" />
+              <el-table-column label="参数名称" align="center" prop="_paramName" width="120"  :show-overflow-tooltip="true" />
               <el-table-column label="标准图样" align="center" width="70">
                 <template #default="scope">
                   <image-preview v-if="scope.row.imageUrl" :src="scope.row.imageUrl" :width="40" :height="40" />
                   <span v-else style="color: #909399">-</span>
                 </template>
               </el-table-column>
-              <el-table-column label="标准值" align="center" prop="standardValue" width="120" />
+              <el-table-column label="标准值" align="center" prop="standardValue" width="120"  :show-overflow-tooltip="true" />
               <el-table-column label="调整值" align="center" prop="adjustedValue" width="120"><template #default="scope"><el-input v-if="optType!=='view'" v-model="scope.row.adjustedValue" size="small" /><span v-else>{{ scope.row.adjustedValue || scope.row.standardValue }}</span></template></el-table-column>
               <el-table-column label="调整原因" align="center" min-width="150"><template #default="scope"><el-input v-if="optType!=='view'" v-model="scope.row.remark" size="small" placeholder="调整原因" /><span v-else>{{ scope.row.remark }}</span></template></el-table-column>
             </el-table>
@@ -258,8 +253,8 @@
       </el-alert>
       <el-table :data="skuDeviationList" size="small" max-height="220">
         <el-table-column label="来源" align="center" width="65"><template #default="s"><el-tag size="small" :type="s.row.source==='BOM'?'':'info'">{{ s.row.source }}</el-tag></template></el-table-column>
-        <el-table-column label="名称" align="center" prop="itemName" min-width="120" />
-        <el-table-column label="编码" align="center" prop="itemCode" width="120" />
+        <el-table-column label="名称" align="center" prop="itemName" min-width="120"  :show-overflow-tooltip="true" />
+        <el-table-column label="编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
         <el-table-column label="标准值" align="center" width="90"><template #default="s">{{ s.row.standardVal }}<span v-if="s.row.unitName" style="font-size:11px;color:#909399"> {{ s.row.unitName }}</span></template></el-table-column>
         <el-table-column label="实际值" align="center" width="90"><template #default="s">{{ s.row.actualVal }}<span v-if="s.row.unitName" style="font-size:11px;color:#909399"> {{ s.row.unitName }}</span></template></el-table-column>
         <el-table-column label="差异" align="center" width="80"><template #default="s"><el-tag size="small" :type="s.row.diffType">{{ s.row.diffLabel }}</el-tag></template></el-table-column>
@@ -329,7 +324,7 @@
 
             <!-- Step 1: 物料齐套明细 -->
             <el-table v-if="i===0 && s.details && s.details.length>0" :data="s.details" size="small" max-height="300">
-              <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
+              <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
               <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
               <el-table-column label="需求数量" align="center" width="100"><template #default="scope">{{ scope.row.requiredQty }} {{ scope.row.unitName }}</template></el-table-column>
               <el-table-column label="可用库存" align="center" width="100"><template #default="scope">{{ scope.row.availableQty }} {{ scope.row.unitName }}</template></el-table-column>
@@ -339,7 +334,7 @@
 
             <!-- Step 2: 逐道工序执行方式（厂内机台 / 外协厂商 / 未排产） -->
             <el-table v-if="i===1 && s.details && s.details.length>0" :data="s.details" size="small" max-height="300">
-              <el-table-column label="序号" align="center" prop="orderNum" width="60" />
+              <el-table-column label="序号" align="center" prop="orderNum" width="60"  :show-overflow-tooltip="true" />
               <el-table-column label="工序名称" align="center" prop="processName" :show-overflow-tooltip="true" />
               <el-table-column label="执行方式" align="center" width="90">
                 <template #default="scope">
@@ -387,12 +382,12 @@
               <el-table-column label="单据编码" align="center" width="180">
                 <template #default="scope">{{ scope.row.issueCode || scope.row.orderCode || '-' }}</template>
               </el-table-column>
-              <el-table-column label="工序名称" align="center" prop="processName" width="130" />
-              <el-table-column label="外协厂商" align="center" prop="vendorName" width="120">
+              <el-table-column label="工序名称" align="center" prop="processName" width="130"  :show-overflow-tooltip="true" />
+              <el-table-column label="外协厂商" align="center" prop="vendorName" width="120" :show-overflow-tooltip="true">
                 <template #default="scope">{{ scope.row.vendorName || '-' }}</template>
               </el-table-column>
-              <el-table-column label="物料行数" align="center" prop="lineCount" width="90" />
-              <el-table-column label="关联排产任务" align="center" prop="taskId" width="120">
+              <el-table-column label="物料行数" align="center" prop="lineCount" width="90"  :show-overflow-tooltip="true" />
+              <el-table-column label="关联排产任务" align="center" prop="taskId" width="120" :show-overflow-tooltip="true">
                 <template #default="scope">{{ scope.row.taskId || '-' }}</template>
               </el-table-column>
             </el-table>
@@ -413,8 +408,8 @@
     <!-- 添加工序选择弹窗 -->
     <el-dialog title="添加工序" v-model="showProcessSelector" width="600px" append-to-body>
       <el-table :data="availableProcesses" highlight-current-row @row-dblclick="addRouteProcessByRow">
-        <el-table-column label="工序编码" prop="processCode" width="130" />
-        <el-table-column label="工序名称" prop="processName" />
+        <el-table-column label="工序编码" prop="processCode" width="130"  :show-overflow-tooltip="true" />
+        <el-table-column label="工序名称" prop="processName"  :show-overflow-tooltip="true" />
       </el-table>
       <template #footer><el-button type="primary" @click="showProcessSelector=false">关 闭</el-button></template>
     </el-dialog>
@@ -1011,25 +1006,38 @@ export default {
 </script>
 
 <style scoped>
-.proc-chips {
+.proc-timeline {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
 }
 .proc-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 10px;
   cursor: pointer;
   line-height: 18px;
   border: 1px solid transparent;
-  white-space: nowrap;
 }
-.proc-chip em { font-style: normal; opacity: .85; }
+.proc-chip em { font-style: normal; opacity: .85; flex: none; }
+.proc-link {
+  flex: 0 0 14px;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background: #dcdfe6;
+}
+.proc-link.chip-done { background: #a8d98a; }
+.proc-link.chip-current { background: #efc98e; }
 .chip-done { color: #67c23a; background: #f0f9eb; border-color: #e1f3d8; }
 .chip-current { color: #e6a23c; background: #fdf6ec; border-color: #faecd8; }
 .chip-pending { color: #909399; background: #f4f4f5; border-color: #e9e9eb; }

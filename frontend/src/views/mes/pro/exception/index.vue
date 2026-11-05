@@ -44,27 +44,27 @@
     <!-- 表格 -->
     <el-table v-loading="loading" :data="list" @row-click="goDetail" class="row-link">
       <el-table-column label="异常单号" align="center" prop="exceptionCode" width="160" :show-overflow-tooltip="true" />
-      <el-table-column label="类型" align="center" prop="exceptionType" width="100">
+      <el-table-column label="类型" align="center" prop="exceptionType" width="100" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_pro_exception_type" :value="s.row.exceptionType" /></template>
       </el-table-column>
-      <el-table-column label="关联对象" align="left" min-width="240">
+      <el-table-column label="关联对象" align="left" min-width="240" :show-overflow-tooltip="true">
         <template #default="s">
           <div>{{ s.row.workorderName || s.row.workorderCode || '-' }}</div>
           <div class="sub-text">{{ s.row.taskCode }}<span v-if="s.row.processName"> · {{ s.row.processName }}</span></div>
         </template>
       </el-table-column>
-      <el-table-column label="影响数量" align="center" prop="impactQuantity" width="90" />
-      <el-table-column label="发生时间" align="center" prop="occurTime" width="160">
+      <el-table-column label="影响数量" align="center" prop="impactQuantity" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="发生时间" align="center" prop="occurTime" width="180" :show-overflow-tooltip="true">
         <template #default="s">{{ parseTime(s.row.occurTime, '{y}-{m}-{d} {h}:{i}') }}</template>
       </el-table-column>
-      <el-table-column label="上报人" align="center" prop="reporterName" width="100" />
-      <el-table-column label="责任方" align="center" prop="responsibleParty" width="90">
+      <el-table-column label="上报人" align="center" prop="reporterName" width="100" :show-overflow-tooltip="true" />
+      <el-table-column label="责任方" align="center" prop="responsibleParty" width="90" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_pro_exception_party" :value="s.row.responsibleParty" /></template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="状态" align="center" prop="status" width="90" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_pro_exception_status" :value="s.row.status" /></template>
       </el-table-column>
-      <el-table-column label="出口动作" align="center" prop="resolveType" width="100">
+      <el-table-column label="出口动作" align="center" prop="resolveType" width="100" :show-overflow-tooltip="true">
         <template #default="s">
           <dict-tag v-if="s.row.resolveType" :options="mes_pro_exception_resolve" :value="s.row.resolveType" />
           <span v-else style="color:#909399">-</span>
@@ -73,7 +73,7 @@
       <el-table-column label="处理单据" align="center" prop="targetDocCode" width="150" :show-overflow-tooltip="true">
         <template #default="s">{{ s.row.targetDocCode || '-' }}</template>
       </el-table-column>
-      <el-table-column label="关闭时间" align="center" prop="closeTime" width="160">
+      <el-table-column label="关闭时间" align="center" prop="closeTime" width="180" :show-overflow-tooltip="true">
         <template #default="s">{{ s.row.closeTime ? parseTime(s.row.closeTime, '{y}-{m}-{d} {h}:{i}') : '-' }}</template>
       </el-table-column>
     </el-table>

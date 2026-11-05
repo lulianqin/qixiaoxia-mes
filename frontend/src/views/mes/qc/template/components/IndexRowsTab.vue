@@ -13,7 +13,7 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="工具" prop="qcTool" width="90" align="center" />
+      <el-table-column label="工具" prop="qcTool" width="90" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="值类型" width="80" align="center">
         <template #default="scope">
           <dict-tag v-if="mes_qc_result_type" :options="mes_qc_result_type" :value="scope.row.qcResultType" />

@@ -7,12 +7,6 @@
           <view>修改密码</view>
         </view>
       </view>
-      <view class="list-cell list-cell-arrow" @click="handleToUpgrade">
-        <view class="menu-item-box">
-          <view class="iconfont icon-refresh menu-icon"></view>
-          <view>检查更新</view>
-        </view>
-      </view>
       <view class="list-cell list-cell-arrow" @click="handleCleanTmp">
         <view class="menu-item-box">
           <view class="iconfont icon-clean menu-icon"></view>
@@ -41,12 +35,15 @@
     proxy.$tab.navigateTo('/pages/mine/pwd/index')
   }
 
-  function handleToUpgrade() {
-    proxy.$modal.showToast('模块建设中~')
-  }
-
   function handleCleanTmp() {
-    proxy.$modal.showToast('模块建设中~')
+    proxy.$modal.confirm('确定清理本地缓存吗？登录状态与账号信息会保留。').then(() => {
+      // 保留登录 token 与用户信息，清理其余本地缓存（字典、下拉数据等）
+      const keepKeys = ['App-Token', 'storage_data']
+      const info = uni.getStorageInfoSync()
+      const keys = (info.keys || []).filter(k => !keepKeys.includes(k))
+      keys.forEach(k => uni.removeStorageSync(k))
+      proxy.$modal.showToast(keys.length > 0 ? '缓存已清理' : '暂无缓存可清理')
+    }).catch(() => {})
   }
 
   function handleLogout() {

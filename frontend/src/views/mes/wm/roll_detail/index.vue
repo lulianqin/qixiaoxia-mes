@@ -28,11 +28,11 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="纸卷明细ID" align="center" prop="rollId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="纸卷号" align="center" prop="rollCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="批次编码" align="center" prop="batchCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="供应商编码" align="center" prop="vendorCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="210">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="210">
         <template #default="scope">
           <el-button link type="primary" icon="Grid" @click="handleQrCode(scope.row)">二维码</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:roll_detail:edit']">修改</el-button>

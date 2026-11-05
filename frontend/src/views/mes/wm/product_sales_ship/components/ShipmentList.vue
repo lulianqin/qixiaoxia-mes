@@ -6,8 +6,8 @@
     </el-row>
 
     <el-table :data="shipments" size="small" border>
-      <el-table-column label="发运单号" prop="shipmentCode" width="150" />
-      <el-table-column label="发运日期" width="110">
+      <el-table-column label="发运单号" prop="shipmentCode" width="150"  :show-overflow-tooltip="true" />
+      <el-table-column label="发运日期" width="180">
         <template #default="s">{{ parseTime(s.row.actualShipDate, '{y}-{m}-{d}') }}</template>
       </el-table-column>
       <el-table-column label="发货方式" width="80" align="center">
@@ -21,8 +21,8 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="发运量" prop="shippedQuantity" width="80" align="center" />
-      <el-table-column label="箱数" prop="boxCount" width="60" align="center" />
+      <el-table-column label="发运量" prop="shippedQuantity" width="80" align="center"  :show-overflow-tooltip="true" />
+      <el-table-column label="箱数" prop="boxCount" width="60" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="状态" width="80" align="center">
         <template #default="s"><dict-tag :options="shipment_status" :value="s.row.status" /></template>
       </el-table-column>
@@ -72,11 +72,11 @@
       <div v-if="viewData?.boxes?.length" class="mt8">
         <div class="sub-title">本次发运箱清单</div>
         <el-table :data="viewData.boxes" size="small" border>
-          <el-table-column label="箱号" prop="boxNo" width="100" />
-          <el-table-column label="物料编码" prop="itemCode" width="120" />
-          <el-table-column label="物料名称" prop="itemName" min-width="140" />
-          <el-table-column label="数量" prop="quantity" width="80" align="center" />
-          <el-table-column label="箱规" prop="boxSpec" width="120" />
+          <el-table-column label="箱号" prop="boxNo" width="100"  :show-overflow-tooltip="true" />
+          <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
+          <el-table-column label="物料名称" prop="itemName" min-width="140"  :show-overflow-tooltip="true" />
+          <el-table-column label="数量" prop="quantity" width="80" align="center"  :show-overflow-tooltip="true" />
+          <el-table-column label="箱规" prop="boxSpec" width="120"  :show-overflow-tooltip="true" />
         </el-table>
       </div>
     </el-dialog>

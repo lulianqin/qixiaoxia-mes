@@ -21,19 +21,19 @@
 
     <el-table v-loading="loading" :data="vendorList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
-      <el-table-column label="编码" align="center" prop="vendorCode" width="120" />
+      <el-table-column label="编码" align="center" prop="vendorCode" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="全称" align="center" prop="vendorName" :show-overflow-tooltip="true" min-width="140" />
-      <el-table-column label="类型" align="center" width="110">
+      <el-table-column label="类型" align="center" width="110" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_vendor_type" :value="s.row.vendorType" /></template>
       </el-table-column>
-      <el-table-column label="等级" align="center" prop="vendorLevel" width="60" />
-      <el-table-column label="联系人" align="center" prop="contact1" width="80" />
-      <el-table-column label="电话" align="center" prop="contact1Tel" width="120" />
-      <el-table-column label="结算方式" align="center" width="90">
+      <el-table-column label="等级" align="center" prop="vendorLevel" width="60" :show-overflow-tooltip="true" />
+      <el-table-column label="联系人" align="center" prop="contact1" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="电话" align="center" prop="contact1Tel" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="结算方式" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_settlement_type" :value="s.row.settlementType" /></template>
       </el-table-column>
       <el-table-column label="付款条件" align="center" prop="paymentTerms" width="100" :show-overflow-tooltip="true" />
-      <el-table-column label="合作状态" align="center" width="90">
+      <el-table-column label="合作状态" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="s"><dict-tag :options="mes_coop_status" :value="s.row.coopStatus" /></template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="140" fixed="right">

@@ -1,35 +1,25 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
-      <el-row>
-        <el-col :span="8">
-          <el-form-item label="工单ID" prop="workorderId">
-            <el-input v-model="queryParams.workorderId" placeholder="请输入工单ID" clearable @keyup.enter="handleQuery" />
+          <el-form-item label="工单" prop="workorderId">
+            <el-select v-model="queryParams.workorderId" placeholder="请选择工单" clearable filterable>
+              <el-option v-for="w in workorderOptions" :key="w.workorderId" :label="`${w.workorderCode} ${w.workorderName || ''}`" :value="w.workorderId" />
+            </el-select>
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="变更类型" prop="changeType">
             <el-select v-model="queryParams.changeType" placeholder="请选择" clearable>
               <el-option v-for="d in changeTypeOptions" :key="d.value" :label="d.label" :value="d.value" />
             </el-select>
           </el-form-item>
-        </el-col>
-        <el-col :span="8">
           <el-form-item label="状态" prop="status">
             <el-select v-model="queryParams.status" placeholder="请选择" clearable>
               <el-option v-for="d in statusOptions" :key="d.value" :label="d.label" :value="d.value" />
             </el-select>
           </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8">
           <el-form-item>
             <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
             <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-col>
-      </el-row>
     </el-form>
 
     <el-row :gutter="10" class="mb8">
@@ -47,9 +37,9 @@
 
     <el-table v-loading="loading" :data="changeList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="变更ID" align="center" prop="changeId" width="80" />
-      <el-table-column label="工单ID" align="center" prop="workorderId" width="80" />
-      <el-table-column label="变更类型" align="center" prop="changeType" width="100">
+      <el-table-column label="变更ID" align="center" prop="changeId" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="工单ID" align="center" prop="workorderId" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="变更类型" align="center" prop="changeType" width="100" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ changeTypeMap[scope.row.changeType] || scope.row.changeType }}</span>
         </template>
@@ -63,8 +53,8 @@
           <el-tag :type="scope.row.status === 'APPROVED' ? 'success' : scope.row.status === 'PENDING' ? 'warning' : 'info'" size="small">{{ statusMap[scope.row.status] || scope.row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="审批人" align="center" prop="approver" width="80" />
-      <el-table-column label="审批时间" align="center" prop="approveTime" width="150">
+      <el-table-column label="审批人" align="center" prop="approver" width="80" :show-overflow-tooltip="true" />
+      <el-table-column label="审批时间" align="center" prop="approveTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
           <span v-if="scope.row.approveTime">{{ parseTime(scope.row.approveTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
           <span v-else>-</span>
@@ -121,6 +111,7 @@
 
 <script>
 import { listWorkorderChange, getWorkorderChange, addWorkorderChange, updateWorkorderChange, delWorkorderChange, approveWorkorderChange } from '@/api/mes/pro/workorderchange'
+import { listAllWorkorder } from '@/api/mes/pro/workorder'
 
 export default {
   name: 'WorkorderChange',
@@ -134,6 +125,7 @@ export default {
       showSearch: true,
       total: 0,
       changeList: [],
+      workorderOptions: [],
       title: '',
       open: false,
       // 状态映射
@@ -165,8 +157,16 @@ export default {
       }
     }
   },
-  created() { this.getList() },
+  created() {
+    this.loadWorkorderOptions()
+    this.getList()
+  },
   methods: {
+    loadWorkorderOptions() {
+      listAllWorkorder().then(r => {
+        this.workorderOptions = r.data || r.rows || []
+      }).catch(() => {})
+    },
     getList() {
       this.loading = true
       listWorkorderChange(this.queryParams).then(r => {

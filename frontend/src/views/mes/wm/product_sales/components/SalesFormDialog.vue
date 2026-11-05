@@ -84,7 +84,7 @@
           </el-col>
         </el-row>
         <el-table :data="lineList" size="small" border>
-          <el-table-column label="物料编码" prop="itemCode" width="130" />
+          <el-table-column label="物料编码" prop="itemCode" width="130"  :show-overflow-tooltip="true" />
           <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="140" />
           <el-table-column label="规格" prop="specification" width="120" :show-overflow-tooltip="true" />
           <el-table-column label="仓库" width="130">
@@ -110,7 +110,7 @@
           <el-table-column label="已出库" width="80" align="center">
             <template #default="scope">{{ scope.row.quantityPosted || 0 }}</template>
           </el-table-column>
-          <el-table-column label="单位" prop="unitName" width="60" align="center" />
+          <el-table-column label="单位" prop="unitName" width="60" align="center"  :show-overflow-tooltip="true" />
           <el-table-column label="操作" width="70" align="center" v-if="!readonly">
             <template #default="scope">
               <el-button link type="danger" icon="Delete" @click="handleDelLine(scope.$index)" />

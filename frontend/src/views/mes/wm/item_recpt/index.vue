@@ -5,7 +5,9 @@
         <el-input v-model="queryParams.recptCode" placeholder="请输入入库单号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="供应商" prop="vendorId">
-        <el-input v-model="queryParams.vendorId" placeholder="供应商ID" clearable />
+        <el-select v-model="queryParams.vendorId" placeholder="请选择供应商" clearable filterable>
+          <el-option v-for="v in vendorOptions" :key="v.vendorId" :label="v.vendorName" :value="v.vendorId!" />
+        </el-select>
       </el-form-item>
       <el-form-item label="采购订单号" prop="purOrderCode">
         <el-input v-model="queryParams.purOrderCode" placeholder="请输入采购订单号" clearable />
@@ -38,11 +40,11 @@
           </el-button>
         </template>
       </el-table-column>
-      <el-table-column label="入库名称" align="center" prop="recptName" :show-overflow-tooltip="true" width="150" />
-      <el-table-column label="供应商" align="center" prop="vendorName" width="120" />
-      <el-table-column label="仓库" align="center" prop="warehouseName" width="120" />
-      <el-table-column label="入库日期" align="center" prop="recptDate" width="110" />
-      <el-table-column label="状态" align="center" width="90">
+      <el-table-column label="入库名称" align="center" prop="recptName" :show-overflow-tooltip="true" min-width="150" />
+      <el-table-column label="供应商" align="center" prop="vendorName" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="仓库" align="center" prop="warehouseName" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="入库日期" align="center" prop="recptDate" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
@@ -54,7 +56,7 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:itemrecpt:remove']"></el-button></el-tooltip>
@@ -75,12 +77,14 @@
 </template>
 
 <script setup lang="ts" name="WmItemRecpt">
-import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
+import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import type { MdVendor } from '@/types/api/mes/md/vendor'
 import type { WmItemRecptQueryParams, WmItemRecpt } from '@/types/api/mes/wm/item_recpt'
 import type { WmItemRecptLine } from '@/types/api/mes/wm/item_recpt_line'
 import type { PurOrder } from '@/types/api/mes/pur/order'
 import { listWmItemRecpt, delWmItemRecpt, buildFromPurOrder } from '@/api/mes/wm/item_recpt'
+import { listAllVendor } from '@/api/mes/md/vendor'
 import { listWmItemRecptLine } from '@/api/mes/wm/item_recpt_line'
 import { buildMatPayload } from '@/utils/qrPayload'
 import { printQrLabels } from '@/utils/labelPrint'
@@ -92,6 +96,7 @@ const { proxy } = getCurrentInstance() as any
 const { mes_itemrecpt_status } = useDict('mes_itemrecpt_status')
 const formDialogRef = ref()
 const purOrderSelectRef = ref()
+const vendorOptions = ref<MdVendor[]>([])
 
 const recptList = ref<WmItemRecpt[]>([])
 const loading = ref(true)
@@ -109,6 +114,11 @@ const { queryParams } = toRefs(data)
 function getList() {
   loading.value = true
   listWmItemRecpt(queryParams.value).then(r => { recptList.value = r.rows; total.value = r.total; loading.value = false })
+}
+function loadVendorOptions() {
+  listAllVendor().then((r: any) => {
+    vendorOptions.value = r?.data || r?.rows || []
+  }).catch(() => {})
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
@@ -189,6 +199,9 @@ async function handlePrintLabels(row: WmItemRecpt) {
   if (channel === 'clodop') proxy.$modal.msgSuccess('已发送到标签打印机')
 }
 
+onMounted(() => {
+  loadVendorOptions()
+})
 getList()
 </script>
 

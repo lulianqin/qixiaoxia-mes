@@ -61,13 +61,13 @@
       <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="handleAddLine">新增行</el-button></el-col>
     </el-row>
     <el-table :data="lineList" border size="small">
-      <el-table-column label="物料编码" prop="itemCode" width="120" align="center" />
+      <el-table-column label="物料编码" prop="itemCode" width="120" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="140" />
       <el-table-column label="规格型号" prop="specification" :show-overflow-tooltip="true" width="120" align="center" />
       <el-table-column label="批次码" prop="batchCode" :show-overflow-tooltip="true" width="150" align="center" v-if="form.recptId">
         <template #default="scope">{{ scope.row.batchCode || '-' }}</template>
       </el-table-column>
-      <el-table-column label="单位" prop="unitName" width="60" align="center" />
+      <el-table-column label="单位" prop="unitName" width="60" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="订购量" width="90" align="center">
         <template #default="scope">{{ scope.row.quantityOrdered != null ? scope.row.quantityOrdered : '-' }}</template>
       </el-table-column>

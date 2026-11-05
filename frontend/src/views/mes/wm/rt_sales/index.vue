@@ -28,11 +28,11 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="退货单ID" align="center" prop="rtId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="退货单编码" align="center" prop="rtCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="退货单名称" align="center" prop="rtName" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="退货单名称" align="center" prop="rtName" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="原销售出库单编码" align="center" prop="salesCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="客户编码" align="center" prop="clientCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="客户名称" align="center" prop="clientName" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:rt_sales:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:rt_sales:remove']">删除</el-button>

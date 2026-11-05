@@ -15,7 +15,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createTime" label="时间" width="140" />
+      <el-table-column prop="createTime" label="时间" width="180"  :show-overflow-tooltip="true" />
       <el-table-column label="操作" width="120" align="center">
         <template #default="{row}">
           <el-button v-if="row.status==='DRAFT'" link type="success" size="small"

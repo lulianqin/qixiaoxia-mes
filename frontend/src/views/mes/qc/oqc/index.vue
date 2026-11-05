@@ -52,24 +52,24 @@
         <template #default="scope">{{ scope.row.itemCode }} {{ scope.row.itemName }}</template>
       </el-table-column>
       <el-table-column label="批次号" align="center" prop="batchCode" width="120" :show-overflow-tooltip="true" />
-      <el-table-column label="出库数" align="center" prop="quantityOut" width="90" />
-      <el-table-column label="检测数" align="center" width="140">
+      <el-table-column label="出库数" align="center" prop="quantityOut" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="检测数" align="center" width="140" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.quantityCheck ?? '-' }} / {{ scope.row.quantityMinCheck ?? '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态" align="center" width="90">
+      <el-table-column label="状态" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_qc_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="判定结果" align="center" width="100">
+      <el-table-column label="判定结果" align="center" width="100" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_qc_check_result" :value="scope.row.checkResult" />
         </template>
       </el-table-column>
-      <el-table-column label="检验员" align="center" prop="inspector" width="90" />
-      <el-table-column label="检验日期" align="center" prop="inspectDate" width="160" :show-overflow-tooltip="true" />
+      <el-table-column label="检验员" align="center" prop="inspector" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="检验日期" align="center" prop="inspectDate" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width" fixed="right">
         <template #default="scope">
           <el-button v-if="isEditable(scope.row)" link type="primary" icon="Edit" @click="handleEdit(scope.row)" v-hasPermi="['mes:qc:oqc:edit']">录入检验</el-button>

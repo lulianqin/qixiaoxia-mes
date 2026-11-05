@@ -40,12 +40,12 @@
           <el-table-column label="状态" align="center" width="90">
             <template #default="s"><el-tag :type="taskTagType(s.row)" size="small">{{ taskStatusText(s.row) }}</el-tag></template>
           </el-table-column>
-          <el-table-column label="负责人" align="center" prop="leaderNick" width="90"><template #default="s">{{ s.row.leaderNick || '-' }}</template></el-table-column>
-          <el-table-column label="报工人" align="center" prop="workerNick" width="90"><template #default="s">{{ s.row.workerNick || '-' }}</template></el-table-column>
-          <el-table-column label="排产" align="center" prop="quantity" width="80" />
-          <el-table-column label="已产" align="center" prop="quantityProduced" width="80" />
-          <el-table-column label="合格" align="center" prop="quantityQualified" width="80" />
-          <el-table-column label="不合格" align="center" prop="quantityUnqualified" width="80" />
+          <el-table-column label="负责人" align="center" prop="leaderNick" width="90" :show-overflow-tooltip="true"><template #default="s">{{ s.row.leaderNick || '-' }}</template></el-table-column>
+          <el-table-column label="报工人" align="center" prop="workerNick" width="90" :show-overflow-tooltip="true"><template #default="s">{{ s.row.workerNick || '-' }}</template></el-table-column>
+          <el-table-column label="排产" align="center" prop="quantity" width="80"  :show-overflow-tooltip="true" />
+          <el-table-column label="已产" align="center" prop="quantityProduced" width="80"  :show-overflow-tooltip="true" />
+          <el-table-column label="合格" align="center" prop="quantityQualified" width="80"  :show-overflow-tooltip="true" />
+          <el-table-column label="不合格" align="center" prop="quantityUnqualified" width="80"  :show-overflow-tooltip="true" />
           <el-table-column label="上机" align="center" width="110"><template #default="s">{{ fmtTime(s.row.startTime) }}</template></el-table-column>
           <el-table-column label="完工" align="center" width="110"><template #default="s">{{ fmtTime(s.row.finishDate) }}</template></el-table-column>
           <el-table-column label="操作" align="center" width="90" fixed="right">
@@ -70,20 +70,20 @@
           <el-collapse-item name="feedback" v-if="dims.feedback.total >= 0">
             <template #title><span class="dim-title">报工记录（{{ dims.feedback.total }}）<el-tag v-if="dims.feedback.pending" size="small" type="warning" class="ml8">待审核 {{ dims.feedback.pending }}</el-tag><el-tag v-if="dims.feedback.audited" size="small" type="success" class="ml8">已审核 {{ dims.feedback.audited }}</el-tag></span></template>
             <el-table :data="dims.feedback.list" size="small" border>
-              <el-table-column label="报工编码" align="center" prop="feedbackCode" width="140" />
+              <el-table-column label="报工编码" align="center" prop="feedbackCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
-              <el-table-column label="报工数量" align="center" prop="quantityFeedback" width="90" />
-              <el-table-column label="合格" align="center" prop="quantityQualified" width="80" />
-              <el-table-column label="不合格" align="center" prop="quantityUnqualified" width="80" />
-              <el-table-column label="报工人" align="center" prop="recordNick" width="90" />
+              <el-table-column label="报工数量" align="center" prop="quantityFeedback" width="90"  :show-overflow-tooltip="true" />
+              <el-table-column label="合格" align="center" prop="quantityQualified" width="80"  :show-overflow-tooltip="true" />
+              <el-table-column label="不合格" align="center" prop="quantityUnqualified" width="80"  :show-overflow-tooltip="true" />
+              <el-table-column label="报工人" align="center" prop="recordNick" width="90"  :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s"><el-tag :type="fbTagType(s.row.status)" size="small">{{ fbStatusText(s.row.status) }}</el-tag></template></el-table-column>
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="inspection">
             <template #title><span class="dim-title">检验记录（{{ dims.inspection.total }}）</span></template>
             <el-table :data="dims.inspection.list" size="small" border>
-              <el-table-column label="检验编码" align="center" prop="ipqcCode" width="140" />
-              <el-table-column label="检验类型" align="center" prop="ipqcName" width="110" />
+              <el-table-column label="检验编码" align="center" prop="ipqcCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="检验类型" align="center" prop="ipqcName" width="110"  :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
             </el-table>
@@ -91,7 +91,7 @@
           <el-collapse-item name="outsource">
             <template #title><span class="dim-title">外协单（{{ dims.outsource.total }}）</span></template>
             <el-table :data="dims.outsource.list" size="small" border>
-              <el-table-column label="外协单号" align="center" prop="orderCode" width="140" />
+              <el-table-column label="外协单号" align="center" prop="orderCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="外协厂商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
@@ -100,31 +100,31 @@
           <el-collapse-item name="issue">
             <template #title><span class="dim-title">领料/发料（{{ dims.issue.total }}）</span></template>
             <el-table :data="dims.issue.list" size="small" border>
-              <el-table-column label="单据编码" align="center" prop="issueCode" width="140" />
+              <el-table-column label="单据编码" align="center" prop="issueCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="单据名称" align="center" prop="issueName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
-              <el-table-column label="仓库" align="center" prop="warehouseName" width="110" />
+              <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="itemRecpt">
             <template #title><span class="dim-title">收料（{{ dims.itemRecpt.total }}）</span></template>
             <el-table :data="dims.itemRecpt.list" size="small" border>
-              <el-table-column label="收料单号" align="center" prop="recptCode" width="140" />
-              <el-table-column label="采购单号" align="center" prop="purOrderCode" width="130" />
+              <el-table-column label="收料单号" align="center" prop="recptCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="采购单号" align="center" prop="purOrderCode" width="130"  :show-overflow-tooltip="true" />
               <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
-              <el-table-column label="数量" align="center" prop="totalQuantity" width="90" />
-              <el-table-column label="仓库" align="center" prop="warehouseName" width="110" />
+              <el-table-column label="数量" align="center" prop="totalQuantity" width="90"  :show-overflow-tooltip="true" />
+              <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="productRecpt">
             <template #title><span class="dim-title">成品入库（{{ dims.productRecpt.total }}）</span></template>
             <el-table :data="dims.productRecpt.list" size="small" border>
-              <el-table-column label="入库单号" align="center" prop="recptCode" width="140" />
+              <el-table-column label="入库单号" align="center" prop="recptCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="客户" align="center" prop="clientName" min-width="120" :show-overflow-tooltip="true" />
-              <el-table-column label="数量" align="center" prop="totalQuantity" width="90" />
-              <el-table-column label="仓库" align="center" prop="warehouseName" width="110" />
+              <el-table-column label="数量" align="center" prop="totalQuantity" width="90"  :show-overflow-tooltip="true" />
+              <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
             </el-table>
           </el-collapse-item>

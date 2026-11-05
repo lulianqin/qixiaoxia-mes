@@ -28,7 +28,7 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="库位ID" align="center" prop="areaId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="库位编码" align="center" prop="areaCode" width="180" :show-overflow-tooltip="true" />
-      <el-table-column label="库位名称" align="center" prop="areaName" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="库位名称" align="center" prop="areaName" min-width="180" :show-overflow-tooltip="true" />
       <el-table-column label="库区编码" align="center" prop="locationCode" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="库区名称" align="center" prop="locationName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="仓库编码" align="center" prop="warehouseCode" width="180" :show-overflow-tooltip="true" />
@@ -37,7 +37,7 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
+      <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:storage_area:edit']">修改</el-button>
         </template>

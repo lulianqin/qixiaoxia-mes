@@ -13,10 +13,10 @@
 
     <!-- 待出库行 -->
     <el-table :data="lines" size="small" border class="mb8">
-      <el-table-column label="物料编码" prop="itemCode" width="130" />
+      <el-table-column label="物料编码" prop="itemCode" width="130"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="140" />
-      <el-table-column label="需出库量" prop="quantitySales" width="90" align="center" />
-      <el-table-column label="已出库量" prop="quantityPosted" width="90" align="center">
+      <el-table-column label="需出库量" prop="quantitySales" width="90" align="center"  :show-overflow-tooltip="true" />
+      <el-table-column label="已出库量" prop="quantityPosted" width="90" align="center" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.quantityPosted || 0 }}</template>
       </el-table-column>
       <el-table-column label="未出库量" width="90" align="center">
@@ -29,7 +29,7 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="单位" prop="unitName" width="60" align="center" />
+      <el-table-column label="单位" prop="unitName" width="60" align="center"  :show-overflow-tooltip="true" />
     </el-table>
     <el-alert v-if="insufficientHint" :title="insufficientHint" type="error" :closable="false" class="mb8" show-icon />
 
@@ -73,11 +73,11 @@
     <div v-if="historyDetails.length" class="mt8">
       <div style="font-size:13px;font-weight:bold;margin-bottom:6px">历史出库记录</div>
       <el-table :data="historyDetails" size="small" border>
-        <el-table-column label="物料编码" prop="itemCode" width="130" />
+        <el-table-column label="物料编码" prop="itemCode" width="130"  :show-overflow-tooltip="true" />
         <el-table-column label="物料名称" prop="itemName" :show-overflow-tooltip="true" min-width="140" />
-        <el-table-column label="出库量" prop="quantity" width="90" align="center" />
-        <el-table-column label="批次" prop="batchCode" width="120" />
-        <el-table-column label="出库时间" prop="createTime" width="160" />
+        <el-table-column label="出库量" prop="quantity" width="90" align="center"  :show-overflow-tooltip="true" />
+        <el-table-column label="批次" prop="batchCode" width="120"  :show-overflow-tooltip="true" />
+        <el-table-column label="出库时间" prop="createTime" width="180"  :show-overflow-tooltip="true" />
       </el-table>
     </div>
 

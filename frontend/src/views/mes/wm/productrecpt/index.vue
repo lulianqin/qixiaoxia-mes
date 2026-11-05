@@ -35,14 +35,14 @@
           </el-button>
         </template>
       </el-table-column>
-      <el-table-column label="入库名称" align="center" prop="recptName" :show-overflow-tooltip="true" width="180" />
-      <el-table-column label="工单号" align="center" prop="workorderCode" width="160" />
+      <el-table-column label="入库名称" align="center" prop="recptName" :show-overflow-tooltip="true" min-width="180" />
+      <el-table-column label="工单号" align="center" prop="workorderCode" width="160" :show-overflow-tooltip="true" />
       <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" width="140" />
-      <el-table-column label="产品编码" align="center" prop="produceCode" width="140" />
-      <el-table-column label="仓库" align="center" prop="warehouseName" width="120" />
-      <el-table-column label="入库数量" align="center" prop="totalQuantity" width="100" />
-      <el-table-column label="入库日期" align="center" prop="recptDate" width="160" />
-      <el-table-column label="状态" align="center" width="90">
+      <el-table-column label="产品编码" align="center" prop="produceCode" width="140" :show-overflow-tooltip="true" />
+      <el-table-column label="仓库" align="center" prop="warehouseName" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="入库数量" align="center" prop="totalQuantity" width="100" :show-overflow-tooltip="true" />
+      <el-table-column label="入库日期" align="center" prop="recptDate" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_itemrecpt_status" :value="scope.row.status" />
         </template>
@@ -54,7 +54,7 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:product_recpt:edit']"></el-button></el-tooltip>
           <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:product_recpt:remove']"></el-button></el-tooltip>
@@ -142,13 +142,13 @@
 
       <el-divider v-if="form.recptId" content-position="center">入库行</el-divider>
       <el-table v-if="form.recptId && form.lines" :data="form.lines" border size="small">
-        <el-table-column label="物料编码" align="center" prop="itemCode" />
+        <el-table-column label="物料编码" align="center" prop="itemCode"  :show-overflow-tooltip="true" />
         <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
         <el-table-column label="规格" align="center" prop="specification" :show-overflow-tooltip="true" />
-        <el-table-column label="单位" align="center" prop="unitName" width="80" />
-        <el-table-column label="入库数量" align="center" prop="quantityRecpt" width="100" />
-        <el-table-column label="箱数" align="center" prop="quantityBox" width="80" />
-        <el-table-column label="批次" align="center" prop="batchCode" width="120" />
+        <el-table-column label="单位" align="center" prop="unitName" width="80"  :show-overflow-tooltip="true" />
+        <el-table-column label="入库数量" align="center" prop="quantityRecpt" width="100"  :show-overflow-tooltip="true" />
+        <el-table-column label="箱数" align="center" prop="quantityBox" width="80"  :show-overflow-tooltip="true" />
+        <el-table-column label="批次" align="center" prop="batchCode" width="120"  :show-overflow-tooltip="true" />
       </el-table>
 
       <template #footer>

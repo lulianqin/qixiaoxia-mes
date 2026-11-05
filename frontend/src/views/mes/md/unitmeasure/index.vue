@@ -66,21 +66,21 @@
 
     <el-table v-loading="loading" :data="unitmeasureList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="单位编码" align="center" prop="unitCode" />
-      <el-table-column label="单位名称" align="center" prop="unitName" />
-      <el-table-column label="主单位编码" align="center" prop="primaryUnit">
+      <el-table-column label="单位编码" align="center" prop="unitCode" :show-overflow-tooltip="true" />
+      <el-table-column label="单位名称" align="center" prop="unitName" :show-overflow-tooltip="true" />
+      <el-table-column label="主单位编码" align="center" prop="primaryUnit" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ scope.row.primaryUnit || '主单位' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="换算率" align="center" prop="conversionRate" />
+      <el-table-column label="换算率" align="center" prop="conversionRate" :show-overflow-tooltip="true" />
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
           <el-switch v-model="scope.row.enableFlag" active-value="Y" inactive-value="N" :before-change="(val: string) => handleEnableChange(scope.row, val)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="150" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:unitmeasure:edit']">修改</el-button>
         </template>

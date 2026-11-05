@@ -1,13 +1,13 @@
 <template>
   <div>
     <el-table v-loading="loading" :data="lineList" border>
-      <el-table-column label="物料编码" align="center" prop="itemCode" width="120" />
+      <el-table-column label="物料编码" align="center" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
       <el-table-column label="规格型号" align="center" prop="specification" :show-overflow-tooltip="true" width="120" />
-      <el-table-column label="单位" align="center" prop="unitName" width="70" />
-      <el-table-column label="数量" align="center" prop="quantityRecpt" width="100" />
-      <el-table-column label="批次号" align="center" prop="batchCode" width="100" />
-      <el-table-column label="仓库" align="center" prop="warehouseId" width="80" />
+      <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
+      <el-table-column label="数量" align="center" prop="quantityRecpt" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="批次号" align="center" prop="batchCode" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="仓库" align="center" prop="warehouseId" width="80"  :show-overflow-tooltip="true" />
     </el-table>
   </div>
 </template>

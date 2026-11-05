@@ -7,17 +7,17 @@
     <el-alert v-if="!readonly && postedTotal === 0" title="请先在出库单上完成「出库确认」扣减库存后，再进行装箱发运"
               type="warning" :closable="false" show-icon class="mb8" />
     <el-table :data="boxes" size="small" border show-summary :summary-method="getSummaries">
-      <el-table-column label="箱号" prop="boxNo" width="100" />
-      <el-table-column label="物料编码" prop="itemCode" width="120" />
+      <el-table-column label="箱号" prop="boxNo" width="100"  :show-overflow-tooltip="true" />
+      <el-table-column label="物料编码" prop="itemCode" width="120"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" min-width="140" :show-overflow-tooltip="true" />
-      <el-table-column label="数量" prop="quantity" width="80" align="center" />
-      <el-table-column label="单位" prop="unitName" width="60" align="center" />
+      <el-table-column label="数量" prop="quantity" width="80" align="center"  :show-overflow-tooltip="true" />
+      <el-table-column label="单位" prop="unitName" width="60" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="箱规" prop="boxSpec" width="110" :show-overflow-tooltip="true" />
       <el-table-column label="长×宽×高(cm)" width="140" align="center">
         <template #default="s">{{ s.row.boxLength||0 }} × {{ s.row.boxWidth||0 }} × {{ s.row.boxHeight||0 }}</template>
       </el-table-column>
-      <el-table-column label="体积(m³)" prop="volume" width="90" align="center" />
-      <el-table-column label="重量(kg)" prop="weight" width="90" align="center" />
+      <el-table-column label="体积(m³)" prop="volume" width="90" align="center"  :show-overflow-tooltip="true" />
+      <el-table-column label="重量(kg)" prop="weight" width="90" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="状态" width="80" align="center">
         <template #default="s">
           <el-tag :type="s.row.status==='SHIPPED' ? 'success' : 'info'" size="small">

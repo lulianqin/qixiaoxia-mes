@@ -26,12 +26,12 @@
     <el-table v-loading="loading" :data="attachmentList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="原始文件名" align="center" prop="orignalName" show-overflow-tooltip />
-      <el-table-column label="文件类型" align="center" prop="fileType" width="100" />
-      <el-table-column label="文件大小(KB)" align="center" prop="fileSize" width="120" />
-      <el-table-column label="单据类型" align="center" prop="sourceDocType" width="120" />
-      <el-table-column label="单据ID" align="center" prop="sourceDocId" width="100" />
+      <el-table-column label="文件类型" align="center" prop="fileType" width="100" :show-overflow-tooltip="true" />
+      <el-table-column label="文件大小(KB)" align="center" prop="fileSize" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="单据类型" align="center" prop="sourceDocType" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="单据ID" align="center" prop="sourceDocId" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="备注" align="center" prop="remark" show-overflow-tooltip />
-      <el-table-column label="操作" align="center" width="150">
+      <el-table-column fixed="right" label="操作" align="center" width="150">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sys:attachment:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sys:attachment:remove']">删除</el-button>

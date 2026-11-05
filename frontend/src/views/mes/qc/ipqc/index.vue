@@ -54,7 +54,7 @@
           <el-button link type="primary" @click="handleView(scope.row)">{{ scope.row.ipqcCode }}</el-button>
         </template>
       </el-table-column>
-      <el-table-column label="检验类型" align="center" width="90">
+      <el-table-column label="检验类型" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_qc_ipqc_type" :value="scope.row.ipqcType" />
         </template>
@@ -67,20 +67,20 @@
       <el-table-column label="物料" align="center" min-width="170" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.itemCode }} {{ scope.row.itemName }}</template>
       </el-table-column>
-      <el-table-column label="实检数" align="center" prop="quantityCheck" width="90" />
-      <el-table-column label="最低要求" align="center" prop="quantityMinCheck" width="90" />
-      <el-table-column label="状态" align="center" width="90">
+      <el-table-column label="实检数" align="center" prop="quantityCheck" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="最低要求" align="center" prop="quantityMinCheck" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="状态" align="center" width="90" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_qc_status" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="判定结果" align="center" width="100">
+      <el-table-column label="判定结果" align="center" width="100" :show-overflow-tooltip="true">
         <template #default="scope">
           <dict-tag :options="mes_qc_check_result" :value="scope.row.checkResult" />
         </template>
       </el-table-column>
-      <el-table-column label="检验员" align="center" prop="inspector" width="90" />
-      <el-table-column label="检验日期" align="center" prop="inspectDate" width="160" :show-overflow-tooltip="true" />
+      <el-table-column label="检验员" align="center" prop="inspector" width="90" :show-overflow-tooltip="true" />
+      <el-table-column label="检验日期" align="center" prop="inspectDate" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width" fixed="right">
         <template #default="scope">
           <el-button v-if="isEditable(scope.row)" link type="primary" icon="Edit" @click="handleEdit(scope.row)" v-hasPermi="['mes:qc:ipqc:edit']">录入检验</el-button>

@@ -6,7 +6,7 @@
       </el-col>
     </el-row>
     <el-table :data="rows" border size="small">
-      <el-table-column label="物料编码" prop="itemCode" width="130" align="center" />
+      <el-table-column label="物料编码" prop="itemCode" width="130" align="center"  :show-overflow-tooltip="true" />
       <el-table-column label="物料名称" prop="itemName" min-width="140" :show-overflow-tooltip="true" />
       <el-table-column label="规格型号" prop="specification" width="130" align="center" :show-overflow-tooltip="true" />
       <el-table-column v-if="showProcess" label="工序" width="170">

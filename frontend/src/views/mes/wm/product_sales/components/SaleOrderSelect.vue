@@ -12,10 +12,10 @@
       </el-form-item>
     </el-form>
     <el-table v-loading="loading" :data="list" size="small" border highlight-current-row @row-click="handleRow">
-      <el-table-column label="订单编码" prop="orderCode" width="150" />
+      <el-table-column label="订单编码" prop="orderCode" width="150"  :show-overflow-tooltip="true" />
       <el-table-column label="客户名称" prop="clientName" :show-overflow-tooltip="true" min-width="150" />
-      <el-table-column label="PO号" prop="clientOrderCode" width="120" />
-      <el-table-column label="业务员" prop="salesperson" width="90" />
+      <el-table-column label="PO号" prop="clientOrderCode" width="120"  :show-overflow-tooltip="true" />
+      <el-table-column label="业务员" prop="salesperson" width="90"  :show-overflow-tooltip="true" />
       <el-table-column label="状态" prop="status" width="80" align="center">
         <template #default="s">
           <el-tag size="small" :type="statusType(s.row.status)">{{ statusText(s.row.status) }}</el-tag>

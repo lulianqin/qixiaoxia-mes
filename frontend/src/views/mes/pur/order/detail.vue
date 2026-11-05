@@ -41,17 +41,17 @@
         <template #header><span>明细行（共 {{ lines.length }} 行）</span></template>
         <el-table :data="lines" size="small" border>
           <el-table-column label="序号" align="center" type="index" width="60" />
-          <el-table-column label="物料编码" align="center" prop="itemCode" width="140" />
+          <el-table-column label="物料编码" align="center" prop="itemCode" width="140"  :show-overflow-tooltip="true" />
           <el-table-column label="物料名称" align="center" prop="itemName" :show-overflow-tooltip="true" />
           <el-table-column label="规格" align="center" prop="specification" width="120" :show-overflow-tooltip="true" />
-          <el-table-column label="单位" align="center" prop="unitName" width="70" />
-          <el-table-column label="数量" align="center" prop="quantityOrdered" width="90" />
-          <el-table-column label="单价" align="center" prop="unitPrice" width="90" />
-          <el-table-column label="不含税金额" align="center" prop="amount" width="110" />
+          <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
+          <el-table-column label="数量" align="center" prop="quantityOrdered" width="90"  :show-overflow-tooltip="true" />
+          <el-table-column label="单价" align="center" prop="unitPrice" width="90"  :show-overflow-tooltip="true" />
+          <el-table-column label="不含税金额" align="center" prop="amount" width="110"  :show-overflow-tooltip="true" />
           <el-table-column label="税率" align="center" width="80">
             <template #default="s">{{ s.row.taxRate != null ? s.row.taxRate + '%' : '-' }}</template>
           </el-table-column>
-          <el-table-column label="已收量" align="center" prop="quantityReceived" width="90">
+          <el-table-column label="已收量" align="center" prop="quantityReceived" width="90" :show-overflow-tooltip="true">
             <template #default="s">{{ s.row.quantityReceived || 0 }}</template>
           </el-table-column>
           <el-table-column label="行交期" align="center" width="110">

@@ -52,7 +52,7 @@
       <el-table-column label="等级" align="center" width="100">
         <template #default="scope"><dict-tag :options="mes_qc_defect_level" :value="scope.row.defectLevel" /></template>
       </el-table-column>
-      <el-table-column label="数量" align="center" prop="defectQuantity" width="70" />
+      <el-table-column label="数量" align="center" prop="defectQuantity" width="70"  :show-overflow-tooltip="true" />
       <el-table-column label="处置方法" align="center" prop="processMethod" min-width="110" :show-overflow-tooltip="true" />
       <el-table-column label="备注" align="center" prop="remark" min-width="110" :show-overflow-tooltip="true" />
     </el-table>
