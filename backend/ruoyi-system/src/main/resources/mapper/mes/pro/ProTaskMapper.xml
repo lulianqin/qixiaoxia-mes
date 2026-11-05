@@ -154,7 +154,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             t.status = 'PRODUCING'
             and wo.status in ('PREPARE', 'PRODUCING')
-            and (t.worker_id = #{userId} or t.leader_id = #{userId})
+            <!-- 任务负责人优先；任务未设置负责人时回退工单负责人 -->
+            and (t.worker_id = #{userId} or t.leader_id = #{userId}
+                 or (t.leader_id is null and wo.owner_id = #{userId}))
         </where>
         order by t.workorder_id, t.task_id
     </select>

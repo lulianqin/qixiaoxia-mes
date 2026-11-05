@@ -148,6 +148,11 @@ public class QcIpqcServiceImpl implements IQcIpqcService
         {
             throw new ServiceException("工单不能为空");
         }
+        // 工序检必须归属具体工序：否则无法按「被检工序顺序」拦截下游报工
+        if (qcipqc.getProcessId() == null)
+        {
+            throw new ServiceException("工序不能为空");
+        }
         if (qcipqc.getItemId() == null)
         {
             throw new ServiceException("物料不能为空");

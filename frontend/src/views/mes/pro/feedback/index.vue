@@ -418,6 +418,7 @@
       <el-table v-loading="changeLoading" :data="changeList" border size="small">
         <el-table-column label="时间" align="center" prop="createTime" width="160" />
         <el-table-column label="操作人" align="center" prop="createBy" width="90" />
+        <el-table-column label="字段名" align="center" prop="fieldName" width="110" :show-overflow-tooltip="true" />
         <el-table-column label="原值" align="center" prop="oldValue" width="80" />
         <el-table-column label="新值" align="center" prop="newValue" width="80" />
         <el-table-column label="变更说明" align="center" prop="changeReason" min-width="150" :show-overflow-tooltip="true" />

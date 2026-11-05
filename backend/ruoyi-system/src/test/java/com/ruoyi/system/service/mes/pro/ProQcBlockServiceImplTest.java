@@ -17,6 +17,7 @@ import com.ruoyi.system.domain.mes.qc.QcBlockRelease;
 import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.sys.SysTodoList;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.qc.QcBlockReleaseMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.sys.SysTodoListMapper;
@@ -74,6 +75,7 @@ class ProQcBlockServiceImplTest {
     @Mock private QcIpqcMapper qcIpqcMapper;
     @Mock private QcBlockReleaseMapper blockReleaseMapper;
     @Mock private ProTaskMapper proTaskMapper;
+    @Mock private ProWorkorderMapper proWorkorderMapper;
     @Mock private SysTodoListMapper sysTodoListMapper;
     @Mock private RedisLockTemplate lockTemplate;
     @Mock private PlatformTransactionManager transactionManager;
@@ -123,6 +125,7 @@ class ProQcBlockServiceImplTest {
         ReflectionTestUtils.setField(service, "qcIpqcMapper", qcIpqcMapper);
         ReflectionTestUtils.setField(service, "blockReleaseMapper", blockReleaseMapper);
         ReflectionTestUtils.setField(service, "proTaskMapper", proTaskMapper);
+        ReflectionTestUtils.setField(service, "proWorkorderMapper", proWorkorderMapper);
         ReflectionTestUtils.setField(service, "sysTodoListMapper", sysTodoListMapper);
         ReflectionTestUtils.setField(service, "lockTemplate", lockTemplate);
 
@@ -145,7 +148,7 @@ class ProQcBlockServiceImplTest {
     @Test
     @DisplayName("1. 无检验前驱节点 → 放行(null)")
     void should_pass_when_no_prev_check_node() {
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.empty());
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of());
 
         QcBlockInfo block = service.findBlock(WORKORDER_ID, ROUTE_ID, TARGET_PROCESS_ID, TASK_ID);
 
@@ -156,7 +159,7 @@ class ProQcBlockServiceImplTest {
     @Test
     @DisplayName("2. 最新判定单 PASS → 放行")
     void should_pass_when_ipqc_pass() {
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("PASS"));
 
@@ -167,7 +170,7 @@ class ProQcBlockServiceImplTest {
     @Test
     @DisplayName("3. 最新判定单 CONCESSION 让步接收 → 放行")
     void should_pass_when_concession() {
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("CONCESSION"));
 
@@ -177,7 +180,7 @@ class ProQcBlockServiceImplTest {
     @Test
     @DisplayName("4. FAIL 且无放行记录 → 返回阻塞信息")
     void should_block_when_fail_without_release() {
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
@@ -194,7 +197,7 @@ class ProQcBlockServiceImplTest {
     @Test
     @DisplayName("5. FAIL 但已有放行记录 → 放行")
     void should_pass_when_fail_but_released() {
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(true);
@@ -205,7 +208,7 @@ class ProQcBlockServiceImplTest {
     @Test
     @DisplayName("6. 无已判定(COMPLETED)检验单 → 放行（只拦已判不合格）")
     void should_pass_when_no_completed_ipqc() {
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(null);
 
@@ -216,7 +219,7 @@ class ProQcBlockServiceImplTest {
     @DisplayName("7a. release 成功：插入放行记录(键正确)并关闭拦截待办")
     void should_release_when_blocked() {
         when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(targetTask("PRODUCING"));
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID)))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
@@ -245,7 +248,7 @@ class ProQcBlockServiceImplTest {
     @DisplayName("7b. release 无阻塞时抛「当前任务无需放行」")
     void should_throw_when_release_not_needed() {
         when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(targetTask("PRODUCING"));
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID)))
                 .thenReturn(ipqc("PASS"));
 
@@ -277,7 +280,7 @@ class ProQcBlockServiceImplTest {
         fb.setProcessId(TARGET_PROCESS_ID);
         fb.setCardId(CARD_ID);
         fb.setTaskId(TASK_ID);
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(WORKORDER_ID, CHECK_PROCESS_ID))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
@@ -416,7 +419,7 @@ class ProQcBlockServiceImplTest {
         verify(proTaskMapper, never()).selectProTaskByTaskId(anyLong());
 
         when(proTaskMapper.selectProTaskByTaskId(TASK_ID)).thenReturn(targetTask("PRODUCING"));
-        when(flow.prevCheckNode(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(ROUTE_ID, TARGET_PROCESS_ID)).thenReturn(List.of(checkNode()));
         when(qcIpqcMapper.selectLatestCompletedByProcess(eq(WORKORDER_ID), eq(CHECK_PROCESS_ID)))
                 .thenReturn(ipqc("FAIL"));
         when(blockReleaseMapper.existsByIpqcAndTask(IPQC_ID, TASK_ID)).thenReturn(false);
@@ -447,10 +450,10 @@ class ProQcBlockServiceImplTest {
 
         when(proTaskMapper.selectProTaskByTaskIds(anyCollection())).thenReturn(List.of(blocked, released));
         when(flow.nodes(ROUTE_ID)).thenReturn(nodes);
-        when(flow.prevCheckNode(anyList(), anyLong())).thenAnswer(inv -> {
+        when(flow.prevCheckNodes(anyList(), anyLong())).thenAnswer(inv -> {
             Long pid = inv.getArgument(1);
             return pid.equals(TARGET_PROCESS_ID) || pid.equals(33L)
-                    ? Optional.of(checkNode()) : Optional.empty();
+                    ? List.of(checkNode()) : List.of();
         });
         when(qcIpqcMapper.selectLatestCompletedByProcessPairs(anyList()))
                 .thenReturn(List.of(ipqc("FAIL")));
@@ -494,8 +497,8 @@ class ProQcBlockServiceImplTest {
         when(proTaskMapper.selectProTaskByTaskIds(anyCollection()))
                 .thenReturn(List.of(targetTask("PRODUCING")));
         when(flow.nodes(ROUTE_ID)).thenReturn(List.of(checkNode()));
-        when(flow.prevCheckNode(anyList(), eq(TARGET_PROCESS_ID)))
-                .thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(anyList(), eq(TARGET_PROCESS_ID)))
+                .thenReturn(List.of(checkNode()));
         // SQL 已按 ipqc_id 倒序：前面是更新的 PASS 单，应覆盖旧 FAIL
         QcIpqc pass = ipqc("PASS");
         pass.setIpqcId(IPQC_ID + 1);
@@ -515,8 +518,8 @@ class ProQcBlockServiceImplTest {
         when(proTaskMapper.selectProTaskByTaskIds(anyCollection()))
                 .thenReturn(List.of(targetTask("PRODUCING")));
         when(flow.nodes(ROUTE_ID)).thenReturn(List.of(checkNode()));
-        when(flow.prevCheckNode(anyList(), eq(TARGET_PROCESS_ID)))
-                .thenReturn(Optional.of(checkNode()));
+        when(flow.prevCheckNodes(anyList(), eq(TARGET_PROCESS_ID)))
+                .thenReturn(List.of(checkNode()));
         // 该（工单,检验工序）从未质检：空结果，loadReleaseKeys 得到 Set.of()
         when(qcIpqcMapper.selectLatestCompletedByProcessPairs(anyList()))
                 .thenReturn(List.of());

@@ -419,14 +419,17 @@ public class ProTaskServiceImpl implements IProTaskService
         Map<Long, List<ProTask>> tasksByProc = new HashMap<>();
         for (ProTask t : proTaskMapper.selectProTaskList(q))
             tasksByProc.computeIfAbsent(t.getProcessId(), k -> new ArrayList<>()).add(t);
+        // 任务未设置负责人时回退工单负责人，执行方式明细按有效负责人判定
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        Long ownerId = wo == null ? null : wo.getOwnerId();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ProRouteProcess rp : routeProcesses)
-            rows.add(buildExecRow(rp, tasksByProc.get(rp.getProcessId())));
+            rows.add(buildExecRow(rp, tasksByProc.get(rp.getProcessId()), ownerId));
         return rows;
     }
 
     /** 单道工序执行方式明细：外协→厂商（视为已落实，不校验厂内机台）；厂内→机台名或待指派；无任务→未排产 */
-    private Map<String, Object> buildExecRow(ProRouteProcess rp, List<ProTask> tasks)
+    private Map<String, Object> buildExecRow(ProRouteProcess rp, List<ProTask> tasks, Long ownerId)
     {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("processId", rp.getProcessId());
@@ -451,7 +454,7 @@ public class ProTaskServiceImpl implements IProTaskService
             row.put("execTypeName", "外协");
             row.put("resourceName", vendor.getWorkstationName() != null ? vendor.getWorkstationName() : "外协");
             row.put("assigned", true);
-            row.put("leaderAssigned", isLeaderAssigned(tasks));
+            row.put("leaderAssigned", isLeaderAssigned(tasks, ownerId));
             return row;
         }
         // 厂内工序：任一"可下发"任务未指派有效机台即待指派（与 dispatchByWorkorder 闸门口径一致）
@@ -463,21 +466,22 @@ public class ProTaskServiceImpl implements IProTaskService
         {
             row.put("resourceName", ProConstants.WS_NAME_PENDING);
             row.put("assigned", false);
-            row.put("leaderAssigned", isLeaderAssigned(tasks));
+            row.put("leaderAssigned", isLeaderAssigned(tasks, ownerId));
             return row;
         }
         // 机台名取自已指派真实机台的任务（避免取到终态/占位任务导致名称为空）
         ProTask assignedTask = tasks.stream().filter(this::isWorkstationAssigned).findFirst().orElse(tasks.get(0));
         row.put("resourceName", assignedTask.getWorkstationName() != null ? assignedTask.getWorkstationName() : "已指派机台");
         row.put("assigned", true);
-        row.put("leaderAssigned", isLeaderAssigned(tasks));
+        row.put("leaderAssigned", isLeaderAssigned(tasks, ownerId));
         return row;
     }
 
-    /** 工序级负责人落实判定：该工序下任一可下发任务无负责人即视为未落实（厂内/外协同口径） */
-    private boolean isLeaderAssigned(List<ProTask> tasks)
+    /** 工序级负责人落实判定：任务无负责人且工单无负责人时视为未落实（厂内/外协同口径） */
+    private boolean isLeaderAssigned(List<ProTask> tasks, Long ownerId)
     {
-        return tasks.stream().noneMatch(t -> TASK_DISPATCHABLE.contains(t.getStatus()) && t.getLeaderId() == null);
+        return tasks.stream().noneMatch(t -> TASK_DISPATCHABLE.contains(t.getStatus())
+                && t.getLeaderId() == null && ownerId == null);
     }
 
     @Override
@@ -490,8 +494,8 @@ public class ProTaskServiceImpl implements IProTaskService
         // 负责人闸门：与单任务下发同口径，仅厂内任务必填，缺一个整体拒绝（工单开工走此入口）
         List<String> noLeaderNames = collectMissingLeaderNames(workorderId);
         if (!noLeaderNames.isEmpty())
-            throw new ServiceException("以下工序任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再开工："
-                    + String.join("、", noLeaderNames));
+            throw new ServiceException("以下工序任务尚未指定负责人且工单未设置负责人，请先在甘特排产任务弹窗指派负责人"
+                    + "或在工单上设置工单负责人后再开工：" + String.join("、", noLeaderNames));
         proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
     }
 
@@ -500,12 +504,14 @@ public class ProTaskServiceImpl implements IProTaskService
     {
         ProTask q = new ProTask();
         q.setWorkorderId(workorderId);
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
+        Long ownerId = wo == null ? null : wo.getOwnerId();
         List<String> names = new ArrayList<>();
         for (ProTask t : proTaskMapper.selectProTaskList(q))
         {
             if (!TASK_DISPATCHABLE.contains(t.getStatus())) continue;
             if (ProConstants.WS_CODE_VENDOR.equals(t.getWorkstationCode())) continue;
-            if (t.getLeaderId() != null) continue;
+            if (t.getLeaderId() != null || ownerId != null) continue;
             String name = t.getProcessName() != null ? t.getProcessName() : ("任务#" + t.getTaskId());
             if (!names.contains(name)) names.add(name);
         }
@@ -555,8 +561,11 @@ public class ProTaskServiceImpl implements IProTaskService
     private void assertLeaderAssigned(ProTask task)
     {
         if (ProConstants.WS_CODE_VENDOR.equals(task.getWorkstationCode())) return;
-        if (task.getLeaderId() == null)
-            throw new ServiceException("该任务尚未指定负责人，请先在甘特排产任务弹窗指派负责人后再下发");
+        if (task.getLeaderId() != null) return;
+        ProWorkorder wo = task.getWorkorderId() == null ? null
+                : proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        if (wo == null || wo.getOwnerId() == null)
+            throw new ServiceException("该任务尚未指定负责人且工单未设置负责人，请先指派任务负责人或设置工单负责人后再下发");
     }
 
     @Override

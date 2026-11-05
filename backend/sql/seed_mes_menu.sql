@@ -11,7 +11,6 @@ INSERT IGNORE INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, com
 (2001, '主数据管理', 2000, 1, 'md', NULL, 0, 0, 'M', NULL, 'table', 'admin', NOW()),
 (2002, '仓库管理',   2000, 2, 'wm', NULL, 0, 0, 'M', NULL, 'tree', 'admin', NOW()),
 (2003, '生产管理',   2000, 3, 'pro', NULL, 0, 0, 'M', NULL, 'component', 'admin', NOW()),
-(2004, '质量管理',   2000, 4, 'qc', NULL, 0, 0, 'M', NULL, 'monitor', 'admin', NOW()),
 (2005, '设备管理',   2000, 5, 'dv', NULL, 0, 0, 'M', NULL, 'tool', 'admin', NOW()),
 (2006, '采购管理',   2000, 6, 'pur', NULL, 0, 0, 'M', NULL, 'shopping', 'admin', NOW()),
 (2007, '日历管理',   2000, 7, 'cal', NULL, 0, 0, 'M', NULL, 'date', 'admin', NOW()),

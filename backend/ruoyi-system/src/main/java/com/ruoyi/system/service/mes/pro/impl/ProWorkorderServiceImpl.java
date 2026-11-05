@@ -26,6 +26,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderBom;
@@ -83,6 +85,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 {
     @Autowired
     private ProWorkorderMapper qxxProWorkorderMapper;
+
+    @Autowired
+    private ISysUserService userService;
 
     @Autowired
     private IProWorkorderBomService proWorkorderBomService;
@@ -211,6 +216,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             routeProduct = proRouteProductService.selectProRouteProductByRecordId(wo.getRouteProductId());
             if (routeProduct != null)
             {
+                ProRoute route = proRouteService.selectProRouteByRouteId(routeProduct.getRouteId());
+                wo.setRouteName(route != null ? route.getRouteName() : null);
                 cachedRouteProcesses = proRouteProcessService.selectProRouteProcessByRouteId(routeProduct.getRouteId());
                 if (cachedRouteProcesses != null)
                     for (ProRouteProcess p : cachedRouteProcesses)
@@ -530,7 +537,40 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     @Override
     public List<ProWorkorder> selectProWorkorderList(ProWorkorder proWorkorder)
     {
-        return qxxProWorkorderMapper.selectProWorkorderList(proWorkorder);
+        List<ProWorkorder> list = qxxProWorkorderMapper.selectProWorkorderList(proWorkorder);
+        enrichRouteName(list);
+        return list;
+    }
+
+    /** 列表回填工艺路线名称（作产品线展示），按路线ID缓存避免重复查询 */
+    private void enrichRouteName(List<ProWorkorder> list)
+    {
+        if (list == null || list.isEmpty())
+        {
+            return;
+        }
+        Map<Long, String> routeNameCache = new HashMap<>();
+        Map<Long, Long> recordRouteCache = new HashMap<>();
+        for (ProWorkorder wo : list)
+        {
+            if (wo.getRouteProductId() == null)
+            {
+                continue;
+            }
+            Long routeId = recordRouteCache.computeIfAbsent(wo.getRouteProductId(), rid -> {
+                ProRouteProduct rp = proRouteProductService.selectProRouteProductByRecordId(rid);
+                return rp == null ? null : rp.getRouteId();
+            });
+            if (routeId == null)
+            {
+                continue;
+            }
+            String routeName = routeNameCache.computeIfAbsent(routeId, id -> {
+                ProRoute route = proRouteService.selectProRouteByRouteId(id);
+                return route == null ? null : route.getRouteName();
+            });
+            wo.setRouteName(routeName);
+        }
     }
 
     /**
@@ -652,6 +692,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (proWorkorder.getWorkorderType() == null) proWorkorder.setWorkorderType("SELF");
         if (proWorkorder.getOrderType() == null) proWorkorder.setOrderType(SalOrderType.STANDARD.getCode());
         if (proWorkorder.getOrderSource() == null) proWorkorder.setOrderSource("MANUAL");
+        fillOwnerSnapshot(proWorkorder);
         return qxxProWorkorderMapper.insertProWorkorder(proWorkorder);
     }
 
@@ -669,7 +710,13 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         ProWorkorder old = selectProWorkorderByWorkorderId(proWorkorder.getWorkorderId());
         proWorkorder.setUpdateTime(DateUtils.getNowDate());
         proWorkorder.setUpdateBy(SecurityUtils.getUsername());
+        fillOwnerSnapshot(proWorkorder);
         int rows = qxxProWorkorderMapper.updateProWorkorder(proWorkorder);
+        // 动态 update 无法把负责人置空，前端清空负责人时单独精准更新
+        if (proWorkorder.getOwnerId() == null)
+        {
+            qxxProWorkorderMapper.clearProWorkorderOwner(proWorkorder.getWorkorderId());
+        }
 
         // 非 PREPARE 状态的工单修改需记录变更（PREPARE 状态可自由修改）
         if (old != null && !"PREPARE".equals(old.getStatus()))
@@ -678,6 +725,22 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         return rows;
+    }
+
+    /** 回填工单负责人快照：负责人ID转昵称（无昵称回退登录名） */
+    private void fillOwnerSnapshot(ProWorkorder proWorkorder)
+    {
+        if (proWorkorder.getOwnerId() == null)
+        {
+            proWorkorder.setOwnerName(null);
+            return;
+        }
+        SysUser user = userService.selectUserById(proWorkorder.getOwnerId());
+        if (user == null)
+        {
+            throw new ServiceException("指定的工单负责人不存在：" + proWorkorder.getOwnerId());
+        }
+        proWorkorder.setOwnerName(user.getNickName() != null ? user.getNickName() : user.getUserName());
     }
 
     /** 记录工单变更 */

@@ -33,6 +33,10 @@ public class ProWorkorder extends BaseEntity
     @Excel(name = "产品名称") private String productName;
     @Excel(name = "产品规格") private String productSpc;
     @Excel(name = "路线产品ID") private Long routeProductId;
+    @Excel(name = "工单负责人ID") private Long ownerId;
+    @Excel(name = "工单负责人") private String ownerName;
+    /** 工艺路线名称（非DB字段，列表/详情回填，作为产品线展示） */
+    private String routeName;
     @Excel(name = "主单位编码") private String unitOfMeasure;
     @Excel(name = "主单位名称") private String unitName;
     @Excel(name = "计划生产数量") private BigDecimal quantity;
@@ -125,6 +129,12 @@ public class ProWorkorder extends BaseEntity
     public void setProductSpc(String v) { this.productSpc = v; }
     public Long getRouteProductId() { return routeProductId; }
     public void setRouteProductId(Long v) { this.routeProductId = v; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long v) { this.ownerId = v; }
+    public String getOwnerName() { return ownerName; }
+    public void setOwnerName(String v) { this.ownerName = v; }
+    public String getRouteName() { return routeName; }
+    public void setRouteName(String v) { this.routeName = v; }
     public String getUnitOfMeasure() { return unitOfMeasure; }
     public void setUnitOfMeasure(String v) { this.unitOfMeasure = v; }
     public String getUnitName() { return unitName; }

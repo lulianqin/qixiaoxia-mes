@@ -31,6 +31,8 @@
       <el-table-column label="工单名称" align="center" prop="workorderName" :show-overflow-tooltip="true"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
       <el-table-column label="来源销售订单" align="center" prop="sourceCode" width="140" :show-overflow-tooltip="true" />
       <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
+      <el-table-column label="产品线(工艺路线)" align="center" prop="routeName" min-width="140" :show-overflow-tooltip="true" />
+      <el-table-column label="工单负责人" align="center" prop="ownerName" width="110" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" />
       <el-table-column label="工序进度" align="center" min-width="300">
@@ -155,9 +157,21 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="工艺路线" prop="prorouteId">
+            <el-form-item label="产品线(工艺路线)" prop="prorouteId">
               <el-select v-model="prorouteId" placeholder="请先选择产品" style="width:100%" @change="onRouteChange">
                 <el-option v-for="r in routeOptions" :key="r.recordId" :label="(r._routeName || '路线#'+r.routeId) + ' — ' + r.itemName" :value="r.recordId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="工单负责人" prop="ownerId">
+              <el-select v-model="form.ownerId" style="width: 100%" filterable remote clearable
+                :remote-method="searchOwners" :loading="ownerLoading"
+                placeholder="未设置时任务必须单独指定负责人" :disabled="optType==='view'">
+                <el-option v-for="u in ownerOptions" :key="u.userId"
+                  :label="u.nickName || u.userName" :value="u.userId" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -419,6 +433,7 @@ import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import KitDashboard from './KitDashboard.vue'
 import WorkorderProgressDialog from './components/WorkorderProgressDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
+import { listUser } from '@/api/system/user'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
 import { openExceptionState, openExceptionByWorkorder } from '@/api/mes/pro/exception'
@@ -433,6 +448,7 @@ export default {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
       loading: true, ids: [], single: true, multiple: true, showSearch: true, total: 0,
       workorderList: [], routeOptions: [], bomList: [], paramList: [], processOptions: [], routeProcesses: [],
+      ownerOptions: [], ownerLoading: false,
       activeProcesses: [], showProcessSelector: false,
       title: '', open: false,
       bomEditOpen: false, bomEditTitle: '', bomEditForm: {},
@@ -569,11 +585,11 @@ export default {
       this.$router.push({ path: '/mes/pro/workorder_board', query: { workorderId: row.workorderId } })
     },
     cancel() { this.open=false; this.reset() },
-    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'STANDARD', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false },
+    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'STANDARD', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null, ownerId:null, ownerName:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false; this.ownerOptions=[]; this.ownerLoading=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
     resetQuery() { this.$refs.queryForm?.resetFields(); this.handleQuery() },
     handleSelectionChange(sel) { this.ids=sel.map(i=>i.workorderId); this.single=sel.length!==1; this.multiple=!sel.length },
-    handleAdd() { this.reset(); this.viewExceptionSeq++; this.open=true; this.title='新增生产工单'; this.optType='add'; this.step=1 },
+    handleAdd() { this.reset(); this.viewExceptionSeq++; this.open=true; this.title='新增生产工单'; this.optType='add'; this.step=1; this.searchOwners('') },
     // 查看：后端一次返回全部数据，前端直接展示
     handleView(row) {
       this.reset();
@@ -587,13 +603,30 @@ export default {
       this.loadDetail(row.workorderId).then(() => { this.open=true; this.title='查看生产工单'; this.optType='view' })
     },
     // 修改：后端一次返回全部数据，前端直接展示（step 由 reset 初始化为 1）
-    handleUpdate(row) { this.reset(); this.viewExceptionSeq++; const id=row.workorderId||this.ids[0]; this.loadDetail(id).then(() => { this.open=true; this.optType = this.form.status==='PREPARE' ? 'edit' : 'view'; this.title = this.optType==='edit' ? '修改生产工单' : '查看生产工单' }) },
+    handleUpdate(row) { this.reset(); this.viewExceptionSeq++; const id=row.workorderId||this.ids[0]; this.loadDetail(id).then(() => { this.open=true; this.optType = this.form.status==='PREPARE' ? 'edit' : 'view'; this.title = this.optType==='edit' ? '修改生产工单' : '查看生产工单'; this.searchOwners('') }) },
+    /** 工单负责人远程搜索（账号/手机号两路并发，按 userId 去重；保留已选回显项） */
+    searchOwners(kw) {
+      this.ownerLoading = true
+      Promise.all([
+        listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 }),
+        listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
+      ]).then(([byName, byPhone]) => {
+        const rows = [...(byName.rows || []), ...(byPhone.rows || [])]
+        const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)
+        const keep = this.ownerOptions.filter(o => !dedup.some(r => r.userId === o.userId) && o.__echo)
+        this.ownerOptions = [...keep, ...dedup.map(r => ({ ...r, __echo: false }))]
+      }).finally(() => { this.ownerLoading = false })
+    },
     // 合并查询：一次请求获取工单头+BOM+参数+路线工序+路线选项（后端已全部组装）
     loadDetail(workorderId) {
       return getWorkorderDetail(workorderId).then(r => {
         const { workorder, bomList, paramList, routeProcesses, routeOptions } = r.data
         this.form = workorder
         if (!this.form.lineAttrs) this.form.lineAttrs = {}
+        // 负责人快照回显（不必等用户接口返回）
+        if (this.form.ownerId && !this.ownerOptions.some(u => u.userId === this.form.ownerId)) {
+          this.ownerOptions = [{ userId: this.form.ownerId, userName: '', nickName: this.form.ownerName || String(this.form.ownerId), __echo: true }, ...this.ownerOptions]
+        }
         this.bomList = (bomList || []).map(b => ({ ...b, _processId: b.processId, _processName: b.processName }))
         this.paramList = paramList || []   // 后端已富化
         this.routeProcesses = routeProcesses || []

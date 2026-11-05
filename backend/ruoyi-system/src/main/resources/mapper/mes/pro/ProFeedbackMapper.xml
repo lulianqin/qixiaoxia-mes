@@ -109,8 +109,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <!-- 移动端首页「我的报工」：按报工人过滤；不传则保持原全量口径 -->
             <!-- 「全部」合并我负责任务上的报工记录：OR 条件必须括号包裹（FactoryIdInterceptor 在 WHERE 末尾追加 AND factory_id，裸 OR 会改变 AND 优先级导致跨厂泄漏） -->
             <if test="userId != null and leaderId == null"> and t.user_id = #{userId}</if>
-            <if test="userId == null and leaderId != null"> and exists (select 1 from qxx_pro_task tk where tk.task_id = t.task_id and tk.leader_id = #{leaderId} and tk.factory_id = t.factory_id)</if>
-            <if test="userId != null and leaderId != null"> and (t.user_id = #{userId} or exists (select 1 from qxx_pro_task tk where tk.task_id = t.task_id and tk.leader_id = #{leaderId} and tk.factory_id = t.factory_id))</if>
+            <if test="userId == null and leaderId != null"> and exists (select 1 from qxx_pro_task tk
+                 join qxx_pro_workorder two on two.workorder_id = tk.workorder_id and two.factory_id = tk.factory_id
+                 where tk.task_id = t.task_id and tk.factory_id = t.factory_id
+                   and (tk.leader_id = #{leaderId} or (tk.leader_id is null and two.owner_id = #{leaderId})))</if>
+            <if test="userId != null and leaderId != null"> and (t.user_id = #{userId} or exists (select 1 from qxx_pro_task tk
+                 join qxx_pro_workorder two on two.workorder_id = tk.workorder_id and two.factory_id = tk.factory_id
+                 where tk.task_id = t.task_id and tk.factory_id = t.factory_id
+                   and (tk.leader_id = #{leaderId} or (tk.leader_id is null and two.owner_id = #{leaderId}))))</if>
         </where>
         order by t.record_id desc
     </select>

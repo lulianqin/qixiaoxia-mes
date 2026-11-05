@@ -78,30 +78,40 @@ public class ProRouteFlowHelper {
                 .max(Comparator.comparing(ProRouteProcess::getOrderNum));
     }
 
-    /** 前驱中最近的检验节点（is_check='Y'），供 Task 4 质检流使用 */
+    /** 前驱中最近的检验节点（is_check='Y'），供兼容场景使用 */
     public Optional<ProRouteProcess> prevCheckNode(Long routeId, Long processId) {
-        Integer curOrder = currentOrder(routeId, processId);
-        if (curOrder == null) {
-            return Optional.empty();
-        }
-        return prevCheckNode(nodes(routeId), processId);
+        return prevCheckNodes(routeId, processId).stream().findFirst();
+    }
+
+    /** 前驱中最近的检验节点（基于预载节点列表） */
+    public Optional<ProRouteProcess> prevCheckNode(List<ProRouteProcess> nodes, Long processId) {
+        return prevCheckNodes(nodes, processId).stream().findFirst();
     }
 
     /**
-     * 前驱中最近的检验节点（基于预载节点列表，批量富化场景按路线复用）。
-     * 一期限制：并行检验前驱只取 order_num 最大的一个，即跟单硬拦一期仅保证
-     * 串行/单检验前驱路线；存在同序并行检验工序时另一节点 FAIL 不会被发现，
-     * 待二期改为「任一检验前驱 FAIL 即拦」。
+     * 前驱中全部检验节点（is_check='Y'），按 order_num 倒序（最近优先）。
+     * 跟单硬拦按「被检工序顺序」判定：任何一道前驱检验工序 FAIL 都拦截下游，
+     * 并行检验节点不再漏拦。
      */
-    public Optional<ProRouteProcess> prevCheckNode(List<ProRouteProcess> nodes, Long processId) {
+    public List<ProRouteProcess> prevCheckNodes(Long routeId, Long processId) {
+        Integer curOrder = currentOrder(routeId, processId);
+        if (curOrder == null) {
+            return List.of();
+        }
+        return prevCheckNodes(nodes(routeId), processId);
+    }
+
+    /** 前驱中全部检验节点（基于预载节点列表，按 order_num 倒序） */
+    public List<ProRouteProcess> prevCheckNodes(List<ProRouteProcess> nodes, Long processId) {
         Integer curOrder = currentOrder(nodes, processId);
         if (curOrder == null) {
-            return Optional.empty();
+            return List.of();
         }
         return nodes.stream()
                 .filter(n -> n.getOrderNum() != null && n.getOrderNum() < curOrder)
                 .filter(n -> "Y".equals(n.getIsCheck()))
-                .max(Comparator.comparing(ProRouteProcess::getOrderNum));
+                .sorted(Comparator.comparing(ProRouteProcess::getOrderNum).reversed())
+                .collect(Collectors.toList());
     }
 
     /**

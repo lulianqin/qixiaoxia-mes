@@ -15,6 +15,12 @@
       <el-form-item label="产品物料">
         <el-input :value="itemText" placeholder="选择工单后自动带入" readonly />
       </el-form-item>
+      <el-form-item label="工序" prop="processId">
+        <el-select v-model="form.processId" filterable placeholder="选择工单工艺路线中的工序" style="width: 100%"
+          :loading="processLoading" :disabled="!form.workorderId" @change="onProcessChange">
+          <el-option v-for="p in routeProcesses" :key="p.processId" :label="`${p.processCode || ''} ${p.processName || ''}`" :value="p.processId" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="检验模板" prop="templateId">
         <el-select v-model="form.templateId" filterable placeholder="选择 IPQC 检验模板" style="width: 100%" :loading="tplLoading">
           <el-option v-for="t in ipqcTemplates" :key="t.templateId" :label="`${t.templateCode} ${t.templateName || ''}`" :value="t.templateId" />
@@ -36,7 +42,7 @@ import { ref, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
 import type { QcIpqc } from '@/api/mes/qc/ipqc'
 import { addIpqc } from '@/api/mes/qc/ipqc'
-import { listAllWorkorder } from '@/api/mes/pro/workorder'
+import { listAllWorkorder, getWorkorderDetail } from '@/api/mes/pro/workorder'
 import { listTemplate, type QcTemplate } from '@/api/mes/qc/template'
 
 const { proxy } = getCurrentInstance() as any
@@ -53,7 +59,9 @@ const visible = ref(false)
 const saving = ref(false)
 const woLoading = ref(false)
 const tplLoading = ref(false)
+const processLoading = ref(false)
 const workorders = ref<any[]>([])
+const routeProcesses = ref<any[]>([])
 const templates = ref<QcTemplate[]>([])
 const formRef = ref()
 const form = ref<QcIpqc>({ ipqcType: 'TOUR_CHECK' })
@@ -61,6 +69,7 @@ const form = ref<QcIpqc>({ ipqcType: 'TOUR_CHECK' })
 const rules = {
   ipqcType: [{ required: true, message: '请选择检验类型', trigger: 'change' }],
   workorderId: [{ required: true, message: '请选择工单', trigger: 'change' }],
+  processId: [{ required: true, message: '请选择工序', trigger: 'change' }],
   templateId: [{ required: true, message: '请选择检验模板', trigger: 'change' }]
 }
 
@@ -74,6 +83,7 @@ const itemText = computed(() => {
 
 function open() {
   form.value = { ipqcType: 'TOUR_CHECK' }
+  routeProcesses.value = []
   visible.value = true
   loadWorkorders()
   loadTemplates()
@@ -106,6 +116,27 @@ function onWorkorderChange(workorderId: number) {
   form.value.itemName = w.productName
   form.value.specification = w.specification
   form.value.unitOfMeasure = w.unitOfMeasure
+  loadRouteProcesses(workorderId)
+}
+
+/** 工序检必须归属具体工序：加载工单工艺路线工序供选择 */
+function loadRouteProcesses(workorderId: number) {
+  routeProcesses.value = []
+  form.value.processId = undefined
+  form.value.processCode = undefined
+  form.value.processName = undefined
+  processLoading.value = true
+  getWorkorderDetail(workorderId).then((r: any) => {
+    routeProcesses.value = r?.data?.routeProcesses || []
+  }).catch(() => {
+    routeProcesses.value = []
+  }).finally(() => (processLoading.value = false))
+}
+
+function onProcessChange(processId: number) {
+  const p = routeProcesses.value.find(x => x.processId === processId)
+  form.value.processCode = p?.processCode
+  form.value.processName = p?.processName
 }
 
 function submit() {

@@ -67,11 +67,8 @@
       <el-table-column label="物料" align="center" min-width="170" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.itemCode }} {{ scope.row.itemName }}</template>
       </el-table-column>
-      <el-table-column label="检测数" align="center" width="130">
-        <template #default="scope">
-          <span>{{ scope.row.quantityCheck ?? '-' }} / {{ scope.row.quantityMinCheck ?? '-' }}</span>
-        </template>
-      </el-table-column>
+      <el-table-column label="实检数" align="center" prop="quantityCheck" width="90" />
+      <el-table-column label="最低要求" align="center" prop="quantityMinCheck" width="90" />
       <el-table-column label="状态" align="center" width="90">
         <template #default="scope">
           <dict-tag :options="mes_qc_status" :value="scope.row.status" />

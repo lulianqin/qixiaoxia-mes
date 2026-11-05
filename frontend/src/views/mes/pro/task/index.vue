@@ -93,7 +93,7 @@
           <span>{{ parseTime(scope.row.endTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="总时长(h)" align="center" prop="duration" width="90" />
+      <el-table-column label="总时长(分钟)" align="center" prop="duration" width="110" />
       <el-table-column label="状态" align="center" prop="status" width="110">
         <template #default="scope">
           <el-tag v-if="isQcBlocked(scope.row)" type="danger" size="small" effect="dark">不可开工</el-tag>
@@ -220,8 +220,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="总时长(h)" prop="duration">
-              <el-input-number v-model="form.duration" :min="0" :precision="2" :step="1" style="width: 100%" :disabled="optType === 'view'" placeholder="请输入" @change="calculateEndTime" />
+            <el-form-item label="总时长(分钟)" prop="duration">
+              <el-input-number v-model="form.duration" :min="0" :precision="0" :step="1" style="width: 100%" :disabled="optType === 'view'" placeholder="请输入" @change="calculateEndTime" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -490,14 +490,14 @@ function updateTaskNameHint() {
   if (itemName && qty) form.value.taskName = `${itemName}【${qty}】${unit}`
 }
 
-// ===================== 结束时间自动计算 (endTime = startTime + duration * 8h) =====================
+// ===================== 结束时间自动计算 (endTime = startTime + duration 分钟) =====================
 
 function calculateEndTime() {
   const st = form.value.startTime as string
   const dur = form.value.duration as number
   if (!st || dur == null || dur <= 0) { form.value.endTime = undefined as any; return }
   const startDate = new Date(st)
-  const endMs = startDate.getTime() + dur * 8 * 3600 * 1000
+  const endMs = startDate.getTime() + dur * 60 * 1000
   const endDate = new Date(endMs)
   const pad = (n: number) => n.toString().padStart(2, '0')
   form.value.endTime = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())} ${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:${pad(endDate.getSeconds())}`

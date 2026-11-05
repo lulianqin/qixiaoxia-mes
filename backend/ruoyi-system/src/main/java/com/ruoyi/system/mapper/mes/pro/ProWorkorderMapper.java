@@ -12,6 +12,8 @@ public interface ProWorkorderMapper {
     ProWorkorder selectProWorkorderByWorkorderCode(String code);
     int insertProWorkorder(ProWorkorder w);
     int updateProWorkorder(ProWorkorder w);
+    /** 清空工单负责人（动态 update 无法置 null，单独精准更新） */
+    int clearProWorkorderOwner(Long workorderId);
     int deleteProWorkorderByWorkorderId(Long id);
     int deleteProWorkorderByWorkorderIds(Long[] ids);
 

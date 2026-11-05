@@ -26,12 +26,14 @@ import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.qc.QcBlockInfo;
 import com.ruoyi.system.domain.mes.qc.QcBlockRelease;
 import com.ruoyi.system.domain.mes.qc.QcIpqc;
 import com.ruoyi.system.domain.mes.qc.WorkorderProcessPair;
 import com.ruoyi.system.domain.mes.sys.SysTodoList;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.qc.QcBlockReleaseMapper;
 import com.ruoyi.system.mapper.mes.qc.QcIpqcMapper;
 import com.ruoyi.system.mapper.mes.sys.SysTodoListMapper;
@@ -76,6 +78,9 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     private ProTaskMapper proTaskMapper;
 
     @Autowired
+    private ProWorkorderMapper proWorkorderMapper;
+
+    @Autowired
     private SysTodoListMapper sysTodoListMapper;
 
     @Autowired
@@ -99,7 +104,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             return null;
         }
-        return resolveBlock(workorderId, taskId, flow.prevCheckNode(routeId, processId));
+        return resolveBlock(workorderId, taskId, flow.prevCheckNodes(routeId, processId));
     }
 
     @Override
@@ -110,23 +115,34 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             return null;
         }
-        return resolveBlock(workorderId, taskId, flow.prevCheckNode(routeNodes, processId));
+        return resolveBlock(workorderId, taskId, flow.prevCheckNodes(routeNodes, processId));
     }
 
-    /** 阻塞判定主干：检验前驱节点 → 最新判定单 → FAIL 且无放行记录则拦截（工单+工序粒度，不区分流转卡） */
+    /**
+     * 阻塞判定主干：按被检工序顺序，遍历全部前驱检验节点 → 各自最新判定单 →
+     * 任一 FAIL 且该任务无放行记录则拦截（工单+工序粒度，不区分流转卡）。
+     */
     private QcBlockInfo resolveBlock(Long workorderId, Long taskId,
-                                     Optional<ProRouteProcess> checkNodeOpt)
+                                     List<ProRouteProcess> checkNodes)
     {
-        if (checkNodeOpt.isEmpty())
+        for (ProRouteProcess checkNode : checkNodes)
         {
-            return null;
+            QcBlockInfo block = resolveBlock(workorderId, taskId, checkNode);
+            if (block != null)
+            {
+                return block;
+            }
         }
-        ProRouteProcess checkNode = checkNodeOpt.get();
+        return null;
+    }
+
+    /** 单检验节点判定：无已判定单 / PASS / CONCESSION 均放行，只硬拦已判不合格 */
+    private QcBlockInfo resolveBlock(Long workorderId, Long taskId, ProRouteProcess checkNode)
+    {
         QcIpqc latest = qcIpqcMapper.selectLatestCompletedByProcess(
                 workorderId, checkNode.getProcessId());
         if (latest == null || !QcConstants.RESULT_FAIL.equals(latest.getCheckResult()))
         {
-            // 无已判定单 / PASS / CONCESSION 均放行：只硬拦已判不合格
             return null;
         }
         if (isReleased(latest.getIpqcId(), taskId))
@@ -379,9 +395,11 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
             return;  // 幂等：同 IPQC + 同任务已有 PENDING 待办
         }
         SysTodoList todo = new SysTodoList();
-        // sys_todo_list.user_id 为 NOT NULL 且无「全员待办」语义：负责人 → 派工报工人
-        // → 当前判定人兜底，保证待办总有行动责任人（硬拦不依赖待办，放行入口在报工/任务页）
-        Long assignee = task.getLeaderId() != null ? task.getLeaderId()
+        // sys_todo_list.user_id 为 NOT NULL 且无「全员待办」语义：任务负责人 →
+        // 未设置任务负责人时回退工单负责人 → 派工报工人 → 当前判定人兜底，
+        // 保证待办总有行动责任人（硬拦不依赖待办，放行入口在报工/任务页）
+        Long effectiveLeader = resolveLeaderId(task);
+        Long assignee = effectiveLeader != null ? effectiveLeader
                 : task.getWorkerId() != null ? task.getWorkerId()
                 : SecurityUtils.getUserId();
         todo.setUserId(assignee);
@@ -394,6 +412,21 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         todo.setStatus(QcConstants.TODO_STATUS_PENDING);
         todo.setCreateTime(new Date());
         sysTodoListMapper.insertSysTodoList(todo);
+    }
+
+    /** 有效负责人：任务自身负责人优先，未设置时回退工单负责人 */
+    private Long resolveLeaderId(ProTask task)
+    {
+        if (task.getLeaderId() != null)
+        {
+            return task.getLeaderId();
+        }
+        if (task.getWorkorderId() == null)
+        {
+            return null;
+        }
+        ProWorkorder workorder = proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        return workorder == null ? null : workorder.getOwnerId();
     }
 
     private String buildBlockTodoTitle(QcIpqc ipqc, ProTask task, ProRouteProcess node)
@@ -419,7 +452,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         List<Long> distinctIds = taskIds.stream().distinct().collect(java.util.stream.Collectors.toList());
         Map<Long, ProTask> taskMap = proTaskMapper.selectProTaskByTaskIds(distinctIds).stream()
                 .collect(java.util.stream.Collectors.toMap(ProTask::getTaskId, t -> t, (a, b) -> a));
-        Map<Long, ProRouteProcess> checkNodeByTask = mapCheckNodes(taskMap);
+        Map<Long, List<ProRouteProcess>> checkNodeByTask = mapCheckNodes(taskMap);
         Map<String, QcIpqc> latestIpqcByPair = loadLatestIpqcs(taskMap.values(), checkNodeByTask);
         Set<String> releaseKeys = loadReleaseKeys(latestIpqcByPair.values());
 
@@ -432,11 +465,11 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         return result;
     }
 
-    /** 批量解析每个任务的前驱检验节点（路线节点按 routeId 缓存复用） */
-    private Map<Long, ProRouteProcess> mapCheckNodes(Map<Long, ProTask> taskMap)
+    /** 批量解析每个任务的全部前驱检验节点（路线节点按 routeId 缓存复用） */
+    private Map<Long, List<ProRouteProcess>> mapCheckNodes(Map<Long, ProTask> taskMap)
     {
         Map<Long, List<ProRouteProcess>> nodesCache = new HashMap<>();
-        Map<Long, ProRouteProcess> checkNodeByTask = new HashMap<>();
+        Map<Long, List<ProRouteProcess>> checkNodesByTask = new HashMap<>();
         for (ProTask task : taskMap.values())
         {
             if (task.getRouteId() == null || task.getProcessId() == null)
@@ -444,27 +477,32 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
                 continue;
             }
             List<ProRouteProcess> nodes = nodesCache.computeIfAbsent(task.getRouteId(), flow::nodes);
-            flow.prevCheckNode(nodes, task.getProcessId())
-                    .ifPresent(node -> checkNodeByTask.put(task.getTaskId(), node));
+            List<ProRouteProcess> checkNodes = flow.prevCheckNodes(nodes, task.getProcessId());
+            if (!checkNodes.isEmpty())
+            {
+                checkNodesByTask.put(task.getTaskId(), checkNodes);
+            }
         }
-        return checkNodeByTask;
+        return checkNodesByTask;
     }
 
     /** 按全部（工单,检验工序）组批量取已判定单，每组保留 ipqc_id 最大的一张（SQL 已按 id 倒序） */
     private Map<String, QcIpqc> loadLatestIpqcs(java.util.Collection<ProTask> tasks,
-                                                Map<Long, ProRouteProcess> checkNodeByTask)
+                                                Map<Long, List<ProRouteProcess>> checkNodesByTask)
     {
         // 按 "工单:工序" 键去重后再构造批量查询入参
         Map<String, WorkorderProcessPair> pairDedup = new LinkedHashMap<>();
         for (ProTask t : tasks)
         {
-            if (t.getWorkorderId() == null || !checkNodeByTask.containsKey(t.getTaskId()))
+            if (t.getWorkorderId() == null || !checkNodesByTask.containsKey(t.getTaskId()))
             {
                 continue;
             }
-            Long checkProcessId = checkNodeByTask.get(t.getTaskId()).getProcessId();
-            pairDedup.putIfAbsent(pairKey(t.getWorkorderId(), checkProcessId),
-                    new WorkorderProcessPair(t.getWorkorderId(), checkProcessId));
+            for (ProRouteProcess node : checkNodesByTask.get(t.getTaskId()))
+            {
+                pairDedup.putIfAbsent(pairKey(t.getWorkorderId(), node.getProcessId()),
+                        new WorkorderProcessPair(t.getWorkorderId(), node.getProcessId()));
+            }
         }
         List<WorkorderProcessPair> pairs = new ArrayList<>(pairDedup.values());
         if (pairs.isEmpty())
@@ -495,23 +533,27 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     }
 
     private Map<String, Object> stateOf(Long taskId, ProTask task,
-                                        Map<Long, ProRouteProcess> checkNodeByTask,
+                                        Map<Long, List<ProRouteProcess>> checkNodesByTask,
                                         Map<String, QcIpqc> latestIpqcByPair,
                                         Set<String> releaseKeys)
     {
         Map<String, Object> state = new HashMap<>(2);
         QcBlockInfo block = null;
-        ProRouteProcess checkNode = task == null ? null : checkNodeByTask.get(taskId);
-        if (task != null && checkNode != null)
+        List<ProRouteProcess> checkNodes = task == null ? null : checkNodesByTask.get(taskId);
+        if (task != null && checkNodes != null)
         {
-            QcIpqc latest = latestIpqcByPair.get(
-                    pairKey(task.getWorkorderId(), checkNode.getProcessId()));
-            // Set.of() 不接受 contains(null)：无判定单即未放行，短路掉
-            boolean released = latest != null
-                    && releaseKeys.contains(latest.getIpqcId() + ":" + taskId);
-            if (latest != null && QcConstants.RESULT_FAIL.equals(latest.getCheckResult()) && !released)
+            for (ProRouteProcess checkNode : checkNodes)
             {
-                block = buildBlockInfo(latest, checkNode);
+                QcIpqc latest = latestIpqcByPair.get(
+                        pairKey(task.getWorkorderId(), checkNode.getProcessId()));
+                // Set.of() 不接受 contains(null)：无判定单即未放行，短路掉
+                boolean released = latest != null
+                        && releaseKeys.contains(latest.getIpqcId() + ":" + taskId);
+                if (latest != null && QcConstants.RESULT_FAIL.equals(latest.getCheckResult()) && !released)
+                {
+                    block = buildBlockInfo(latest, checkNode);
+                    break;
+                }
             }
         }
         state.put("blocked", block != null);

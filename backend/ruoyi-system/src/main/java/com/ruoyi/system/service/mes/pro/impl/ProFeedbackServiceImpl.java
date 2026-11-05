@@ -643,6 +643,16 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         proFeedback.setUpdateTime(DateUtils.getNowDate());
         proFeedback.setUpdateBy(SecurityUtils.getUsername());
         int rows = qxxProFeedbackMapper.updateProFeedback(proFeedback);
+        // 已审核报工改量：按差值回写任务已生产/合格/不合格，保证任务统计与报工一致
+        if (old != null && ProConstants.FEEDBACK_STATUS_AUDITED.equals(old.getStatus())
+                && old.getTaskId() != null) {
+            BigDecimal deltaProduced = effective(proFeedback.getQuantityFeedback(), old.getQuantityFeedback());
+            BigDecimal deltaQualified = effective(proFeedback.getQuantityQualified(), old.getQuantityQualified());
+            BigDecimal deltaUnqualified = effective(proFeedback.getQuantityUnqualified(), old.getQuantityUnqualified());
+            if (deltaProduced.signum() != 0 || deltaQualified.signum() != 0 || deltaUnqualified.signum() != 0) {
+                proTaskMapper.addQuantityProduced(old.getTaskId(), deltaProduced, deltaQualified, deltaUnqualified);
+            }
+        }
         // 上机数量修改留痕：null↔值也算差异，纯 null→null 不记（recordInputChange 内判等）
         if (old != null && proFeedback.getQuantityInput() != null) {
             feedbackChangeService.recordInputChange(proFeedback.getRecordId(), mergeChangeSnapshot(old, proFeedback),
@@ -661,6 +671,12 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             }
         }
         return rows;
+    }
+
+    /** 动态 SQL 未传字段视为不变，返回 新值-旧值 的差值 */
+    private BigDecimal effective(BigDecimal incoming, BigDecimal oldValue) {
+        BigDecimal newValue = incoming != null ? incoming : nvl(oldValue);
+        return newValue.subtract(nvl(oldValue));
     }
 
     /**
