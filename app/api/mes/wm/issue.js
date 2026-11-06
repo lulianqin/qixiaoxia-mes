@@ -1,5 +1,15 @@
 import request from '@/utils/request'
 
+// 从工单生成领料单草稿（不落库，读工单 BOM 组装头+行）
+export function buildIssueFromWorkorder(workorderId) {
+  return request({ url: '/mes/wm/issueheader/buildFromWorkorder/' + workorderId, method: 'get' })
+}
+
+// 新建领料单（头+行一次性提交，返回含 issueId）
+export function addIssue(data) {
+  return request({ url: '/mes/wm/issueheader', method: 'post', data })
+}
+
 // 领料单列表（支持按状态过滤）
 export function listIssue(query) {
   return request({ url: '/mes/wm/issueheader/list', method: 'get', params: query })

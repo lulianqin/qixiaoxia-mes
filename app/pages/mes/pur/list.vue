@@ -76,7 +76,7 @@ import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/u
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
-import { onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+import { onLoad, onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { listOrder } from '@/api/mes/pur/order'
 import { purchaseTypeText, orderStatusText, orderStatusTagType, canReceive } from '@/utils/pur.js'
 
@@ -91,7 +91,8 @@ const queryParams = reactive({
   pageSize: 10,
   orderCode: '',
   status: '',
-  statusList: null
+  statusList: null,
+  purchaseType: ''
 })
 
 const statusFilters = [
@@ -137,6 +138,7 @@ function buildQuery() {
     pageSize: queryParams.pageSize,
     orderCode: queryParams.orderCode
   }
+  if (queryParams.purchaseType) q.purchaseType = queryParams.purchaseType
   if (queryParams.statusList) {
     q.statusList = queryParams.statusList
   } else if (queryParams.status) {
@@ -166,6 +168,13 @@ function goReceipt(item) {
   }
   proxy.$tab.navigateTo('/pages/mes/pur/receipt?orderId=' + item.orderId)
 }
+
+// 从工单详情「纸张」入口进入时带 purchaseType=PAPER，仅看纸张采购单
+onLoad((options) => {
+  if (options && options.purchaseType) {
+    queryParams.purchaseType = options.purchaseType
+  }
+})
 
 // 收货返回后自动刷新列表
 onShow(() => {

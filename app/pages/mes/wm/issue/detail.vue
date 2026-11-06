@@ -65,7 +65,7 @@ function remain(line) {
 
 // 按钮显隐：根据状态
 const canIssue = computed(() => ['ALLOCATED', 'PARTIAL_ISSUED'].includes(header.value?.status))
-const canConfirm = computed(() => header.value?.status === 'APPROVED')
+const canConfirm = computed(() => ['DRAFT', 'APPROVED'].includes(header.value?.status))
 const canClose = computed(() => ['ISSUED', 'PARTIAL_ISSUED'].includes(header.value?.status))
 
 async function loadDetail() {

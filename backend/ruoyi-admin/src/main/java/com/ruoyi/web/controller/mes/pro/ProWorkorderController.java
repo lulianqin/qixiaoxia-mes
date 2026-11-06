@@ -1,5 +1,8 @@
 package com.ruoyi.web.controller.mes.pro;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -27,6 +30,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
@@ -406,31 +410,42 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
-     * 移动端首页「我的工单」：当前用户派工/负责的生产中任务所关联的工单，
-     * 每个工单携带全部工序任务（按工艺顺序，含未开工/已完成）。
+     * 移动端首页工单列表：按工单状态分页查询（待生产/生产中/已完成/全部），
+     * 并回填逾期天数（需求日期早于今天且工单未完成）。
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
-    @GetMapping("/myWorkorders")
-    public AjaxResult myWorkorders()
+    @GetMapping("/mobileList")
+    public TableDataInfo mobileList(@RequestParam(required = false) String status)
     {
-        List<ProTask> myTasks = proTaskService.selectUserActiveTaskList(getUserId());
-        Map<Long, ProWorkorder> woMap = new LinkedHashMap<>();
-        for (ProTask t : myTasks)
+        startPage();
+        ProWorkorder query = new ProWorkorder();
+        if (StringUtils.isNotEmpty(status))
         {
-            if (woMap.containsKey(t.getWorkorderId())) {
+            query.setStatus(status);
+        }
+        List<ProWorkorder> list = proWorkorderService.selectProWorkorderList(query);
+        fillOverdueDays(list);
+        return getDataTable(list);
+    }
+
+    /** 回填逾期天数：需求日期早于今天且工单处于待生产/生产中 */
+    private void fillOverdueDays(List<ProWorkorder> list)
+    {
+        LocalDate today = LocalDate.now();
+        for (ProWorkorder wo : list)
+        {
+            if (wo.getRequestDate() == null
+                    || (!"PREPARE".equals(wo.getStatus()) && !"PRODUCING".equals(wo.getStatus())))
+            {
                 continue;
             }
-            ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(t.getWorkorderId());
-            if (wo != null) {
-                woMap.put(t.getWorkorderId(), wo);
+            LocalDate due = wo.getRequestDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            long days = ChronoUnit.DAYS.between(due, today);
+            if (days > 0)
+            {
+                wo.setOverdueDays((int) days);
             }
         }
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (ProWorkorder wo : woMap.values())
-        {
-            result.add(buildWorkorderEntry(wo));
-        }
-        return success(result);
     }
 
     /**

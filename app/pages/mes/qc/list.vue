@@ -16,6 +16,12 @@
       </view>
     </view>
 
+    <!-- 从工单/工序详情进入时，过程检仅看该工单 -->
+    <view v-if="filterCode && tab === 'IPQC'" class="filter-tip">
+      <text class="filter-text">仅显示工单 {{ filterCode }} 的过程检</text>
+      <text class="filter-clear" @click="clearFilter">查看全部</text>
+    </view>
+
     <scroll-view scroll-y class="list-wrap" @scrolltolower="loadMore" refresher-enabled :refresher-triggered="refresherTriggered" @refresherrefresh="onRefresh">
       <view v-if="!list.length && !loading" class="empty">暂无待检单</view>
       <view v-for="item in list" :key="item[cfg.id]" class="card" @click="openItem(item)">
@@ -45,7 +51,7 @@
 
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import uniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
 import uniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import { listIqc, listIpqc, listOqc, listRqc, scanIqc } from '@/api/mes/qc'
@@ -64,6 +70,7 @@ const CFG = {
 }
 
 const tab = ref('IPQC')
+const filterCode = ref('')
 const cfg = computed(() => CFG[tab.value])
 // 扫码仅支持 IPQC（流转卡）与 IQC（收货单）；二维码体系不含销售/退料单据
 const canScan = computed(() => tab.value === 'IPQC' || tab.value === 'IQC')
@@ -100,6 +107,8 @@ function load() {
   // list 端点 status 仅支持精确匹配，分别查 PENDING/INSPECTING 后合并，按创建时间倒序
   const api = cfg.value.listApi
   const baseQ = { pageNum: pageNum.value, pageSize }
+  // 从工单/工序详情进入时，过程检按工单号过滤
+  if (tab.value === 'IPQC' && filterCode.value) baseQ.workorderCode = filterCode.value
   Promise.all([
     api({ ...baseQ, status: 'PENDING' }),
     api({ ...baseQ, status: 'INSPECTING' })
@@ -123,7 +132,16 @@ function loadMore() {
   load()
 }
 function onRefresh() { refresherTriggered.value = true; reset(); load() }
+onLoad((options) => {
+  filterCode.value = (options && options.workorderCode) || ''
+})
 onShow(() => { reset(); load() })
+
+function clearFilter() {
+  filterCode.value = ''
+  reset()
+  load()
+}
 
 function openItem(item) {
   proxy.$tab.navigateTo(`/pages/mes/qc/inspect?type=${tab.value}&id=${item[cfg.value.id]}`)
@@ -209,6 +227,9 @@ page { background: #f5f6f7; min-height: 100%; }
 .history-btn { display: flex; align-items: center; gap: 6rpx; font-size: 24rpx; color: #409eff;
   border: 2rpx solid #b3d8ff; background: #ecf5ff; border-radius: 24rpx; padding: 6rpx 18rpx; }
 .list-wrap { flex: 1; padding: 20rpx 24rpx 140rpx; }
+.filter-tip { display: flex; align-items: center; justify-content: space-between; padding: 12rpx 24rpx;
+  background: #ecf5ff; font-size: 24rpx; color: #409eff; }
+.filter-clear { color: #909399; text-decoration: underline; }
 .empty { text-align: center; color: #999; padding: 120rpx 0; font-size: 28rpx; }
 .card { background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 20rpx; }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx; }

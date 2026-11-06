@@ -58,7 +58,7 @@
   }, {
     "path": "pages/mine/setting/index",
     "style": {
-      "navigationBarTitleText": "应用设置"
+      "navigationBarTitleText": "安全设置"
     }
   }, {
     "path": "pages/mine/help/index",
@@ -114,6 +114,11 @@
       "enablePullDownRefresh": true
     }
   }, {
+    "path": "pages/mes/wm/issue/create",
+    "style": {
+      "navigationBarTitleText": "领料录入"
+    }
+  }, {
     "path": "pages/mes/wm/issue/detail",
     "style": {
       "navigationBarTitleText": "领料单详情"
@@ -127,6 +132,11 @@
     "path": "pages/mes/wm/issue/scan-query",
     "style": {
       "navigationBarTitleText": "扫码查库存"
+    }
+  }, {
+    "path": "pages/mes/wm/rtissue/create",
+    "style": {
+      "navigationBarTitleText": "退料录入"
     }
   }, {
     "path": "pages/mes/wm/productrecpt/list",

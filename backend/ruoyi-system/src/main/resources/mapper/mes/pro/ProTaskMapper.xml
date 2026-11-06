@@ -131,7 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 and t.leader_id = #{leaderId}
             </if>
         </where>
-        order by rp.order_num asc, t.task_id asc
+        order by t.workorder_id desc, rp.order_num asc, t.task_id asc
     </select>
 
     <!-- 移动端「我的工单」：当前用户派工/负责的生产中任务（含外协 VENDOR 与外协路线工序）。

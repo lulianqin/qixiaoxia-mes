@@ -1,30 +1,39 @@
 <template>
   <view class="work-container">
     <!-- 轮播图 -->
-    <uni-swiper-dot class="uni-swiper-dot-box" :info="data" :current="current" field="content">
-      <swiper class="swiper-box" :current="swiperDotIndex" @change="changeSwiper">
-        <swiper-item v-for="(item, index) in data" :key="index">
-          <view class="swiper-item" @click="clickBannerItem(item)">
-            <image :src="item.image" mode="aspectFill" :draggable="false" />
-          </view>
-        </swiper-item>
-      </swiper>
-    </uni-swiper-dot>
+    <view class="banner-wrap">
+      <uni-swiper-dot class="uni-swiper-dot-box" :info="data" :current="current" field="content">
+        <swiper class="swiper-box" :current="swiperDotIndex" circular autoplay @change="changeSwiper">
+          <swiper-item v-for="(item, index) in data" :key="index">
+            <view class="swiper-item" @click="clickBannerItem(item)">
+              <image :src="item.image" mode="aspectFill" :draggable="false" />
+            </view>
+          </swiper-item>
+        </swiper>
+      </uni-swiper-dot>
+    </view>
 
     <!-- 功能菜单：按角色权限过滤，无权限入口不展示 -->
-    <template v-for="group in menuGroups" :key="group.title">
-      <uni-section :title="group.title" type="line"></uni-section>
-      <view class="grid-body">
-        <uni-grid :column="4" :showBorder="false">
-          <uni-grid-item v-for="item in group.items" :key="item.key" @click="onMenuClick(item)">
-            <view class="grid-item-box">
-              <uni-icons :type="menuIcon(item)" size="30" :color="item.color || '#409eff'"></uni-icons>
-              <text class="text">{{ item.text }}</text>
-            </view>
-          </uni-grid-item>
-        </uni-grid>
+    <view v-for="(group, gi) in menuGroups" :key="group.title" class="group-card">
+      <view class="group-head">
+        <view class="group-bar" :class="'bar-' + (gi % 4)"></view>
+        <text class="group-title">{{ group.title }}</text>
+        <text class="group-count">{{ group.items.length }}</text>
       </view>
-    </template>
+      <view class="grid-body">
+        <view
+          v-for="item in group.items"
+          :key="item.key"
+          class="grid-item"
+          @click="onMenuClick(item)"
+        >
+          <view class="icon-box" :style="{ background: iconBg(item.color) }">
+            <uni-icons :type="menuIcon(item)" size="24" :color="item.color || '#409eff'"></uni-icons>
+          </view>
+          <text class="grid-text">{{ item.text }}</text>
+        </view>
+      </view>
+    </view>
 
     <view v-if="menuGroups.length === 0" class="empty-box">
       <text class="empty-text">当前账号暂无可用功能，请联系管理员分配权限</text>
@@ -37,12 +46,9 @@
   import { useUserStore } from '@/store'
   // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效，导致组件未打包）
   import UniSwiperDot from '@/uni_modules/uni-swiper-dot/components/uni-swiper-dot/uni-swiper-dot.vue'
-  import UniSection from '@/components/uni-section/uni-section.vue'
-  import UniGrid from '@/uni_modules/uni-grid/components/uni-grid/uni-grid.vue'
-  import UniGridItem from '@/uni_modules/uni-grid/components/uni-grid-item/uni-grid-item.vue'
   import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
   import { scanAndDispatch } from '@/utils/scanDispatch'
-  import { MOBILE_MENU_GROUPS, filterMenuGroups, menuIcon } from '@/utils/mobileMenu'
+  import { MOBILE_MENU_GROUPS, filterMenuGroups, menuIcon, tintColor } from '@/utils/mobileMenu'
 
   const { proxy } = getCurrentInstance()
   const userStore = useUserStore()
@@ -54,6 +60,11 @@
   const current = ref(0)
   const swiperDotIndex = ref(0)
   const data = ref([{ image: '/static/images/banner/banner01.jpg' }, { image: '/static/images/banner/banner02.jpg' }, { image: '/static/images/banner/banner03.jpg' }])
+
+  /** 主色 → 12% 透明度的浅色底，用于图标圆形背景 */
+  function iconBg(color) {
+    return tintColor(color)
+  }
 
   function clickBannerItem(item) {
     console.info(item)
@@ -79,7 +90,7 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    background-color: #fff;
+    background-color: #f4f6f9;
     min-height: 100%;
     height: auto;
   }
@@ -90,21 +101,117 @@
   }
   /* #endif */
 
-  .text {
-    text-align: center;
-    font-size: 26rpx;
-    margin-top: 10rpx;
+  .work-container {
+    padding-bottom: 32rpx;
   }
 
-  .grid-item-box {
-    flex: 1;
+  /* ---------- 轮播图 ---------- */
+  .banner-wrap {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  /* 组件根节点（uni-swiper-dot）也需撑满，避免宽屏下被媒体查询限制 */
+  .uni-swiper-dot-box {
+    display: block;
+    width: 100%;
+  }
+
+  .swiper-box {
+    width: 100%;
+    height: 280rpx;
+  }
+
+  .swiper-item {
     /* #ifndef APP-NVUE */
     display: flex;
     /* #endif */
+    width: 100%;
+    height: 280rpx;
+
+    image {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  /* ---------- 功能分组 ---------- */
+  .group-card {
+    margin: 24rpx 24rpx 0;
+    padding: 24rpx 16rpx 8rpx;
+    background: #fff;
+    border-radius: 24rpx;
+    box-shadow: 0 4rpx 16rpx rgba(60, 96, 150, 0.06);
+  }
+
+  .group-head {
+    display: flex;
+    align-items: center;
+    padding: 0 12rpx 20rpx;
+  }
+
+  .group-bar {
+    width: 6rpx;
+    height: 28rpx;
+    border-radius: 6rpx;
+    background: #409eff;
+
+    &.bar-1 { background: #67c23a; }
+    &.bar-2 { background: #e6a23c; }
+    &.bar-3 { background: #909399; }
+  }
+
+  .group-title {
+    margin-left: 14rpx;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #1f2d3d;
+  }
+
+  .group-count {
+    margin-left: 10rpx;
+    padding: 2rpx 12rpx;
+    border-radius: 20rpx;
+    font-size: 20rpx;
+    color: #8a94a6;
+    background: #f2f4f8;
+  }
+
+  .grid-body {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .grid-item {
+    width: 25%;
+    display: flex;
     flex-direction: column;
     align-items: center;
+    padding: 12rpx 0 20rpx;
+
+    &:active {
+      opacity: 0.6;
+    }
+  }
+
+  .icon-box {
+    width: 84rpx;
+    height: 84rpx;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
     justify-content: center;
-    padding: 15px 0;
+  }
+
+  .grid-text {
+    margin-top: 14rpx;
+    max-width: 100%;
+    font-size: 24rpx;
+    color: #4a5568;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .empty-box {
@@ -114,46 +221,6 @@
     .empty-text {
       font-size: 26rpx;
       color: #999;
-    }
-  }
-
-  .uni-margin-wrap {
-    width: 690rpx;
-    width: 100%;
-    ;
-  }
-
-  .swiper {
-    height: 300rpx;
-  }
-
-  .swiper-box {
-    height: 150px;
-  }
-
-  .swiper-item {
-    /* #ifndef APP-NVUE */
-    display: flex;
-    /* #endif */
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: #fff;
-    height: 300rpx;
-    line-height: 300rpx;
-  }
-
-  @media screen and (min-width: 500px) {
-    .uni-swiper-dot-box {
-      width: 400px;
-      /* #ifndef APP-NVUE */
-      margin: 0 auto;
-      /* #endif */
-      margin-top: 8px;
-    }
-
-    .image {
-      width: 100%;
     }
   }
 </style>

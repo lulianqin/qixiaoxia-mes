@@ -82,6 +82,8 @@ public class ProWorkorder extends BaseEntity
     private BigDecimal quantityProducedMin;
     /** 已入库量（非DB字段，由 Mapper 子查询填充，前端可读） */
     private BigDecimal quantityRecpt;
+    /** 逾期天数（非DB字段）：需求日期早于今天且工单未完成时为正，否则为 null */
+    private Integer overdueDays;
 
     // ---- 在制进度（非DB字段，includeProgress=true 时由 Service 批量回填） ----
     /** 完成率 0-100 */
@@ -200,6 +202,8 @@ public class ProWorkorder extends BaseEntity
     public void setQuantityProducedMin(BigDecimal v) { this.quantityProducedMin = v; }
     public BigDecimal getQuantityRecpt() { return quantityRecpt; }
     public void setQuantityRecpt(BigDecimal v) { this.quantityRecpt = v; }
+    public Integer getOverdueDays() { return overdueDays; }
+    public void setOverdueDays(Integer v) { this.overdueDays = v; }
 
     public Integer getCompletionRate() { return completionRate; }
     public void setCompletionRate(Integer v) { this.completionRate = v; }

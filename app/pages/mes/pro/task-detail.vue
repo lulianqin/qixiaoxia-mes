@@ -64,6 +64,19 @@
         </view>
       </view>
 
+      <!-- 快捷操作：直接跳转工作台对应录入页 -->
+      <view v-if="quickActions.length" class="card">
+        <view class="quick-head">快捷操作</view>
+        <view class="quick-grid">
+          <view v-for="act in quickActions" :key="act.key" class="quick-item" @click="goAction(act)">
+            <view class="quick-icon" :style="{ background: tintColor(act.color) }">
+              <uni-icons :type="act.icon" size="20" :color="act.color"></uni-icons>
+            </view>
+            <text class="quick-text">{{ act.label }}</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 时间节点 -->
       <view class="card">
         <view class="row">
@@ -120,7 +133,12 @@
   import { onLoad, onShow } from '@dcloudio/uni-app'
   import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
   import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
+  import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
   import { getProcessBoard } from '@/api/mes/pro/feedback'
+  import { useUserStore } from '@/store'
+  import { hasPermission, tintColor } from '@/utils/mobileMenu'
+
+  const userStore = useUserStore()
 
   const task = ref(null)
   const wo = ref(null)
@@ -190,6 +208,31 @@
     uni.navigateTo({
       url: '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(code) + '&taskId=' + taskId
     })
+  }
+
+  // 快捷操作：跳转工作台对应录入页（无权限的操作不展示；报工由底部主按钮承担）
+  const QUICK_ACTIONS = [
+    { key: 'qc', label: '质检', icon: 'checkmarkempty', color: '#409eff', perm: ['mes:qc:ipqc:list', 'mes:qc:iqc:list', 'mes:qc:oqc:list', 'mes:qc:rqc:list'],
+      url: () => '/pages/mes/qc/list?workorderCode=' + encodeURIComponent(workorderCode) },
+    { key: 'issue-out', label: '发料', icon: 'gift-filled', color: '#e6a23c', perm: 'mes:wm:outsource:add',
+      url: '/pages/mes/wm/outsource-issue-list' },
+    { key: 'receive', label: '收料', icon: 'download-filled', color: '#67c23a', perm: 'mes:wm:outsource:receive',
+      url: '/pages/mes/wm/outsource-recpt-list' },
+    { key: 'issue', label: '领料', icon: 'paperplane', color: '#409eff', perm: 'mes:wm:issue:add',
+      url: () => '/pages/mes/wm/issue/create?workorderId=' + (wo.value ? wo.value.workorderId : '')
+        + '&workorderCode=' + encodeURIComponent(wo.value ? wo.value.workorderCode : workorderCode) },
+    { key: 'rtissue', label: '退料', icon: 'paperplane-filled', color: '#f56c6c', perm: 'mes:wm:rtissue:add',
+      url: () => '/pages/mes/wm/rtissue/create?workorderId=' + (wo.value ? wo.value.workorderId : '')
+        + '&workorderCode=' + encodeURIComponent(wo.value ? wo.value.workorderCode : workorderCode) }
+  ]
+
+  const quickActions = computed(() =>
+    QUICK_ACTIONS.filter(act => hasPermission(userStore.permissions, act.perm))
+  )
+
+  function goAction(act) {
+    const url = typeof act.url === 'function' ? act.url() : act.url
+    uni.navigateTo({ url })
   }
 
   function load() {
@@ -351,6 +394,45 @@
     margin-top: 6rpx;
     font-size: 22rpx;
     color: #8a94a6;
+  }
+
+  .quick-head {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: #1f2d3d;
+    margin-bottom: 16rpx;
+  }
+
+  .quick-grid {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .quick-item {
+    width: 25%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8rpx 0 12rpx;
+
+    &:active {
+      opacity: 0.6;
+    }
+  }
+
+  .quick-icon {
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .quick-text {
+    margin-top: 10rpx;
+    font-size: 23rpx;
+    color: #4a5568;
   }
 
   .footer {

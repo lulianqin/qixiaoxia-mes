@@ -39,7 +39,7 @@ export const MOBILE_MENU_GROUPS = [
       { key: 'feedback-history', text: '报工历史', icon: 'list', color: '#67c23a', perm: 'mes:pro:feedback:list', path: '/pages/mes/pro/history' },
       { key: 'clock', text: '工位打卡', icon: 'staff-filled', color: '#e6a23c', perm: 'mes:pro:workrecord:clock', path: '/pages/mes/pro/clock' },
       { key: 'clock-history', text: '打卡历史', icon: 'list', color: '#f56c6c', perm: 'mes:pro:workrecord:list', path: '/pages/mes/pro/clock-history' },
-      { key: 'outsource-issue', text: '外协发料', icon: 'scissors', color: '#909399', perm: 'mes:wm:outsource:add', path: '/pages/mes/wm/outsource-issue-list' },
+      { key: 'outsource-issue', text: '外协发料', icon: 'gift-filled', color: '#909399', perm: 'mes:wm:outsource:add', path: '/pages/mes/wm/outsource-issue-list' },
       { key: 'outsource-recpt', text: '外协收料', icon: 'download', color: '#67c23a', perm: 'mes:wm:outsource:receive', path: '/pages/mes/wm/outsource-recpt-list' },
       { key: 'outsource-list', text: '外协单', icon: 'paperplane', color: '#e6a23c', perm: 'mes:wm:outsource:list', path: '/pages/mes/wm/outsource-list' }
     ]
@@ -48,7 +48,7 @@ export const MOBILE_MENU_GROUPS = [
     title: '外协任务',
     vendorOnly: true,
     items: [
-      { key: 'my-outsource', text: '我的外协任务', icon: 'scissors-filled', color: '#409eff', perm: 'mes:wm:outsource:list', path: '/pages/mes/wm/outsource-list' },
+      { key: 'my-outsource', text: '我的外协任务', icon: 'paperplane-filled', color: '#409eff', perm: 'mes:wm:outsource:list', path: '/pages/mes/wm/outsource-list' },
       { key: 'outsource-history', text: '外协历史', icon: 'list', color: '#67c23a', perm: 'mes:wm:outsource:list', path: '/pages/mes/wm/outsource-list' }
     ]
   }
@@ -80,4 +80,14 @@ export function filterMenuGroups(groups, permissions, isVendor) {
 /** 菜单项未配置 icon 时的兜底图标，保证宫格布局整齐 */
 export function menuIcon(item) {
   return (item && item.icon) || DEFAULT_ICON
+}
+
+/** 主色 → 浅色底（默认 12% 透明度），用于图标圆形背景 */
+export function tintColor(color, alpha = 0.12) {
+  const c = (color || '#409eff').replace('#', '')
+  const full = c.length === 3 ? c.split('').map(x => x + x).join('') : c
+  const r = parseInt(full.substring(0, 2), 16)
+  const g = parseInt(full.substring(2, 4), 16)
+  const b = parseInt(full.substring(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
