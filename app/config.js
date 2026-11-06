@@ -12,7 +12,7 @@ if (isProd) {
   // #endif
   // #ifndef H5
   // APP/小程序真机调试：改成运行本 dev server 的电脑局域网 IP（后端需监听 0.0.0.0 或同机反代）
-  baseUrl = 'http://192.168.1.9:8081'
+  baseUrl = 'http://192.168.1.9:8082'
   // #endif
 }
 export default {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-RuoYi-Vue backend (v3.9.2), Spring Boot 4.x + JDK 17. This is the backend for the **企小侠文化纸盒MES系统** (Qixiaoxia Cultural Paper Box MES). It provides REST APIs consumed by the `frontend/` (RuoYi-Vue3-TypeScript) and `app/` (RuoYi-App-Vue3).
+RuoYi-Vue backend (v3.9.2), Spring Boot 4.x + JDK 17. This is the backend for the **企小侠工厂MES系统** (Qixiaoxia Factory MES). It provides REST APIs consumed by the `frontend/` (RuoYi-Vue3-TypeScript) and `app/` (RuoYi-App-Vue3).
 
 **Source**: Cloned from https://gitee.com/y_project/RuoYi-Vue (master branch, Spring Boot 4.x).
 

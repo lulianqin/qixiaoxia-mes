@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-RuoYi-Vue3-TypeScript frontend (v3.9.2), the PC web frontend for the **企小侠文化纸盒MES系统** (Qixiaoxia Cultural Paper Box MES). Built with Vue 3 + TypeScript + Element Plus + Vite.
+RuoYi-Vue3-TypeScript frontend (v3.9.2), the PC web frontend for the **企小侠工厂MES系统** (Qixiaoxia Factory MES). Built with Vue 3 + TypeScript + Element Plus + Vite.
 
 **Source**: Cloned from https://gitcode.com/yangzongzhuan/RuoYi-Vue3 (typescript 分支，官方源)。
 

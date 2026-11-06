@@ -107,7 +107,7 @@
             </div>
           </template>
           <div class="body">
-            <p><strong>系统名称：</strong>企小侠文化纸盒MES系统</p>
+            <p><strong>系统名称：</strong>企小侠工厂MES系统</p>
             <p><strong>当前版本：</strong>v{{ version }}</p>
             <p><strong>运行环境：</strong>Spring Boot 4.0.3 + JDK 17</p>
             <p><strong>前端框架：</strong>Vue 3 + TypeScript + Element Plus</p>

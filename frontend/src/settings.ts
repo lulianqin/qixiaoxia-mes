@@ -67,5 +67,5 @@ export default {
   /**
    * 底部版权文本内容
    */
-  footerContent: 'Copyright © 2026 企小侠文化纸盒MES系统. All Rights Reserved.'
+  footerContent: 'Copyright © 2026 企小侠工厂MES系统. All Rights Reserved.'
 }

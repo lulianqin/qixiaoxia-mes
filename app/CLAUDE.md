@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-RuoYi-App Vue3 (v1.2.0), the mobile app for the **企小侠文化纸盒MES系统** (Qixiaoxia Cultural Paper Box MES). Built with uni-app + Vue 3 + Pinia + uni-ui. Supports H5, Android APP, iOS APP, WeChat Mini Program, Alipay Mini Program — one codebase, multi-platform.
+RuoYi-App Vue3 (v1.2.0), the mobile app for the **企小侠工厂MES系统** (Qixiaoxia Factory MES). Built with uni-app + Vue 3 + Pinia + uni-ui. Supports H5, Android APP, iOS APP, WeChat Mini Program, Alipay Mini Program — one codebase, multi-platform.
 
 **Source**: Cloned from https://gitee.com/y_project/RuoYi-App (vue3 branch).
 
