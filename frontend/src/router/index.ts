@@ -174,7 +174,7 @@ export const dynamicRoutes = [
         path: 'index/:dictId(\\d+)',
         component: () => import('@/views/system/dict/data.vue'),
         name: 'Data',
-        meta: { title: '字典数据', activeMenu: '/system/dict' }
+        meta: { title: '字典数据', activeMenu: '/mes/sys/dict' }
       }
     ]
   },

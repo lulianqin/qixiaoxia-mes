@@ -1163,17 +1163,17 @@ const version = ref<string>('3.9.2')
 
 // MES 功能模块导航
 const modules = [
-  { key: 'md', name: '基础数据', desc: '物料 · BOM · 工艺', icon: 'table', color: '#1a3c5e' },
-  { key: 'wm', name: '仓储管理', desc: '入库 · 出库 · 盘点', icon: 'tree-table', color: '#2a5a8a' },
-  { key: 'pro', name: '生产管理', desc: '工单 · 流转 · 报工', icon: 'component', color: '#30B08F' },
-  { key: 'qc', name: '质量管理', desc: '检验 · 不良品', icon: 'validCode', color: '#c9a96e' },
-  { key: 'dv', name: '设备管理', desc: '台账 · 保养 · 维修', icon: 'monitor', color: '#5a7ea0' },
-  { key: 'report', name: '报表分析', desc: '生产 · 质量 · 库存', icon: 'chart', color: '#1a3c5e' },
+  { key: 'md', name: '基础数据', desc: '物料 · BOM · 工艺', icon: 'table', color: '#1a3c5e', path: '/mes/md/item' },
+  { key: 'wm', name: '仓储管理', desc: '出入库 · 库存 · 盘点', icon: 'tree-table', color: '#2a5a8a', path: '/mes/wm/material_stock' },
+  { key: 'pro', name: '生产管理', desc: '工单 · 流转 · 报工', icon: 'component', color: '#30B08F', path: '/mes/pro/workorder' },
+  { key: 'qc', name: '质量管理', desc: '检验 · 不良品', icon: 'validCode', color: '#c9a96e', path: '/qc/qcindex' },
+  { key: 'dv', name: '设备工具管理', desc: '设备 · 工装', icon: 'monitor', color: '#5a7ea0', path: '/mes/dv/machinery' },
+  { key: 'report', name: '报表分析', desc: '生产 · 质量 · 库存', icon: 'chart', color: '#1a3c5e', path: '/mes/pro/report' },
 ]
 
 function goModule(path: string): void {
-  // 跳转到对应模块首页，需要后端先配置菜单路由
-  router.push(`/mes/${path}`).catch(() => {})
+  // 直接跳转到模块内首个业务页面，避免跳转目录级路由导致空白
+  router.push(path).catch(() => {})
 }
 </script>
 

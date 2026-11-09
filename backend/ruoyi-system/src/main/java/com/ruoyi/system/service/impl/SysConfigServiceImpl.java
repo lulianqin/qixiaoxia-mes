@@ -79,18 +79,24 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 获取验证码开关
-     * 
+     *
+     * 说明：验证码开关属于安全类配置，直接读库，不走 Redis 缓存。
+     * 本机存在其他 RuoYi 应用共用同一 Redis（相同 sys_config: 键前缀），
+     * 缓存值会被其他应用覆盖，导致已关闭的验证码被重新打开。
+     *
      * @return true开启，false关闭
      */
     @Override
     public boolean selectCaptchaEnabled()
     {
-        String captchaEnabled = selectConfigByKey("sys.account.captchaEnabled");
-        if (StringUtils.isEmpty(captchaEnabled))
+        SysConfig config = new SysConfig();
+        config.setConfigKey("sys.account.captchaEnabled");
+        SysConfig retConfig = configMapper.selectConfig(config);
+        if (StringUtils.isNull(retConfig) || StringUtils.isEmpty(retConfig.getConfigValue()))
         {
             return true;
         }
-        return Convert.toBool(captchaEnabled);
+        return Convert.toBool(retConfig.getConfigValue());
     }
 
     /**
