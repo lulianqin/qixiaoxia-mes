@@ -122,7 +122,8 @@ const loginRules = {
 
 const codeUrl = ref("")
 const loading = ref(false)
-const captchaEnabled = ref(true)
+// 默认隐藏验证码，后端 /captchaImage 返回开启时才展示，避免刷新瞬间闪现验证码框
+const captchaEnabled = ref(false)
 const register = ref(false)
 const redirect = ref<string | undefined>(undefined)
 

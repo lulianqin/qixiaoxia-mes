@@ -48,8 +48,8 @@
   const { proxy } = getCurrentInstance()
   const globalConfig = useConfigStore().config
   const codeUrl = ref("")
-  // 验证码开关
-  const captchaEnabled = ref(true)
+  // 验证码开关：默认隐藏，后端 /captchaImage 返回开启时才展示，避免刷新瞬间闪现验证码框
+  const captchaEnabled = ref(false)
   // 用户注册开关
   const register = ref(false)
   // 登录请求进行中标志：防止重复点击 + 保证 loading 只开关一次
