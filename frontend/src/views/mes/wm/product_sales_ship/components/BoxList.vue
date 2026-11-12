@@ -76,6 +76,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import { addBox, updateBox, delBox } from '@/api/mes/wm/product_sales_box'
+import { getItem } from '@/api/mes/md/item'
 import type { WmProductSalesBox, WmProductSalesLine } from '@/types'
 
 const props = defineProps<{
@@ -115,7 +116,53 @@ function onLineChange(lineId: number) {
     form.specification = line.specification
     form.unitOfMeasure = line.unitOfMeasure
     form.unitName = line.unitName
+  }
+  // 编辑已装箱记录时不覆盖用户已填内容；新增装箱时从物料档案带出默认箱规/箱尺寸
+  if (!line || form.boxId) return
+  getItem(line.itemId).then((res: any) => {
+    const item = res?.data || {}
+    // 装箱规格（如 250个/箱）→ 箱规 + 每箱数量
+    if (item.packageSpec) {
+      form.boxSpec = item.packageSpec
+      const perBox = parsePerBox(item.packageSpec)
+      if (perBox != null) form.quantity = Math.min(perBox, remainQty(line))
+    }
+    // 产品尺寸（如 254*127*330mm）→ 箱长/宽/高（销售装箱按 cm）
+    const dims = parseBoxSize(item.productSize)
+    if (dims) {
+      form.boxLength = dims.length
+      form.boxWidth = dims.width
+      form.boxHeight = dims.height
+    }
     if (form.quantity == null) form.quantity = remainQty(line)
+  }).catch(() => {
+    if (form.quantity == null) form.quantity = remainQty(line)
+  })
+}
+
+/** 从“250个/箱”中取每箱数量 */
+function parsePerBox(spec?: string): number | null {
+  if (!spec) return null
+  const m = String(spec).match(/(\d+(?:\.\d+)?)/)
+  return m ? Number(m[1]) : null
+}
+
+/** 从“254*127*330mm”中取长宽高；带 mm 自动折算为 cm（装箱字段单位为 cm） */
+function parseBoxSize(size?: string): { length: number; width: number; height: number } | null {
+  if (!size) return null
+  const text = String(size).trim()
+  const nums = text.match(/\d+(?:\.\d+)?/g)
+  if (!nums || nums.length < 3) return null
+  let [length, width, height] = nums.slice(0, 3).map(Number)
+  if (/mm/i.test(text) && !/cm/i.test(text)) {
+    length /= 10
+    width /= 10
+    height /= 10
+  }
+  return {
+    length: Number(length.toFixed(2)),
+    width: Number(width.toFixed(2)),
+    height: Number(height.toFixed(2))
   }
 }
 
