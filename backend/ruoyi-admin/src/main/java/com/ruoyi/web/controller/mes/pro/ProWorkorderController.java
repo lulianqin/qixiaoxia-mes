@@ -548,22 +548,14 @@ public class ProWorkorderController extends BaseController
         return dim(outsourceService.selectList(q));
     }
 
-    /** 领料/发料维度：列表 + 总数。
-     *  领料单可能由工单直接生成/H5 创建而不带 task_id/process_id，不能按任务硬过滤，
-     *  否则工序看板「领料」恒为 0；这里只排除明确挂到其它任务/工序的单据。 */
+    /** 领料/发料维度：列表 + 总数（工序看板严格按任务/工序关联，不显示工单级领料单） */
     private Map<String, Object> issueDim(Long workorderId, Long taskId, Long processId)
     {
         WmIssueHeader q = new WmIssueHeader();
         q.setWorkorderId(workorderId);
-        List<WmIssueHeader> list = issueHeaderService.selectWmIssueHeaderList(q);
-        if (list != null)
-        {
-            list = list.stream()
-                    .filter(h -> taskId == null || h.getTaskId() == null || taskId.equals(h.getTaskId()))
-                    .filter(h -> processId == null || h.getProcessId() == null || processId.equals(h.getProcessId()))
-                    .collect(Collectors.toList());
-        }
-        return dim(list);
+        q.setTaskId(taskId);
+        q.setProcessId(processId);
+        return dim(issueHeaderService.selectWmIssueHeaderList(q));
     }
 
     /** 收料维度：列表 + 总数 */
