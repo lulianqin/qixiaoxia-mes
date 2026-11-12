@@ -27,6 +27,9 @@ public class RedisLockTemplate {
 
     private static final long DEFAULT_WAIT_SEC = 5;
 
+    /** 抢锁超时统一文案（调用方可据此识别「并发进行中」而非业务失败） */
+    public static final String LOCK_BUSY_MESSAGE = "系统繁忙，请稍后重试";
+
     /** 默认 5s 等待 */
     public void execute(String lockKey, Runnable action) {
         execute(lockKey, DEFAULT_WAIT_SEC, action);
@@ -47,7 +50,7 @@ public class RedisLockTemplate {
         RLock lock = redissonClient.getLock(lockKey);
         try {
             if (!lock.tryLock(waitSec, TimeUnit.SECONDS)) {
-                throw new ServiceException("系统繁忙，请稍后重试");
+                throw new ServiceException(LOCK_BUSY_MESSAGE);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

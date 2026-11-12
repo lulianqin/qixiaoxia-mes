@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.pro.impl;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,11 @@ import com.ruoyi.system.service.mes.pro.IProFeedbackChangeService;
 public class ProFeedbackChangeServiceImpl implements IProFeedbackChangeService
 {
     private static final Logger log = LoggerFactory.getLogger(ProFeedbackChangeServiceImpl.class);
+
+    /** 变更字段 code → 中文名（新增变更字段时在此登记，避免前端硬编码映射） */
+    private static final Map<String, String> FIELD_LABELS = Map.of(
+        ProConstants.CHANGE_FIELD_QUANTITY_INPUT, "本次上机数量"
+    );
 
     @Autowired
     private ProFeedbackChangeMapper proFeedbackChangeMapper;
@@ -59,13 +65,27 @@ public class ProFeedbackChangeServiceImpl implements IProFeedbackChangeService
     @Override
     public List<ProFeedbackChange> selectByFeedback(Long feedbackId)
     {
-        return proFeedbackChangeMapper.selectByFeedback(feedbackId);
+        return enrichFieldLabel(proFeedbackChangeMapper.selectByFeedback(feedbackId));
     }
 
     @Override
     public List<ProFeedbackChange> selectByTask(Long taskId)
     {
-        return proFeedbackChangeMapper.selectByTask(taskId);
+        return enrichFieldLabel(proFeedbackChangeMapper.selectByTask(taskId));
+    }
+
+    /** 查询结果富化字段中文名；未知字段回退原始 code，保证不丢信息 */
+    private List<ProFeedbackChange> enrichFieldLabel(List<ProFeedbackChange> list)
+    {
+        if (list != null)
+        {
+            for (ProFeedbackChange c : list)
+            {
+                String label = FIELD_LABELS.get(c.getFieldName());
+                c.setFieldLabel(label != null ? label : c.getFieldName());
+            }
+        }
+        return list;
     }
 
     /** BigDecimal 数值语义不等（1.0 与 1.00 视为相等）；纯 null→null 不算差异 */

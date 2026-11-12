@@ -285,20 +285,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where ipqc_id = #{ipqcId}
     </update>
 
-    <!-- 跟单质检门控：工单+检验工序最新已判定单（一期不区分流转卡，与任务维度放行一致）。factory_id 由拦截器注入。 -->
+    <!-- 跟单质检门控：工单+前置工序最新「会拦下游」的已判定单（一期不区分流转卡，与任务维度放行一致）。
+         factory_id 由拦截器注入。
+         排除成品入库完工检(source=wm_product_recpt)与手工完工检(LAST_CHECK)：
+         它们只拦成品入库，不拦下游工序报工；报工确认自动生成的工序检(source=pro_card_process)仍拦下游。 -->
     <select id="selectLatestCompletedByProcess" resultMap="QcIpqcResult">
         <include refid="selectQcIpqcVo"/>
         where workorder_id = #{workorderId}
           and process_id = #{processId}
           and status = 'COMPLETED'
+          and (source_doc_type = 'pro_card_process'
+               or ((source_doc_type is null or source_doc_type = '')
+                   and (ipqc_type is null or ipqc_type != 'LAST_CHECK')))
         order by ipqc_id desc
         limit 1
     </select>
 
-    <!-- 批量锁态：多组（工单,检验工序）的已判定单一次查回，调用方分组取首条。factory_id 由拦截器注入。 -->
+    <!-- 批量锁态：多组（工单,前置工序）的已判定单一次查回，调用方分组取首条。factory_id 由拦截器注入。
+         过滤口径与 selectLatestCompletedByProcess 一致：完工检不拦下游报工。 -->
     <select id="selectLatestCompletedByProcessPairs" resultMap="QcIpqcResult">
         <include refid="selectQcIpqcVo"/>
-        where status = 'COMPLETED' and (
+        where status = 'COMPLETED'
+          and (source_doc_type = 'pro_card_process'
+               or ((source_doc_type is null or source_doc_type = '')
+                   and (ipqc_type is null or ipqc_type != 'LAST_CHECK')))
+          and (
         <foreach collection="pairs" item="pair" separator=" or ">
             (workorder_id = #{pair.workorderId} and process_id = #{pair.processId})
         </foreach>

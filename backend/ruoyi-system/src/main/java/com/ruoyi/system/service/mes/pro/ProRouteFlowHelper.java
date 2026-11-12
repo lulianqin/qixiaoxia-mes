@@ -115,6 +115,29 @@ public class ProRouteFlowHelper {
     }
 
     /**
+     * 前置全部节点（order_num 严格小于当前节点，按 order_num 倒序、最近优先）。
+     * 跟单质检门控用：检验单可能挂在任意生产工序（手工建单），不能只查 is_check='Y' 的检验节点。
+     */
+    public List<ProRouteProcess> prevNodes(Long routeId, Long processId) {
+        if (routeId == null) {
+            return List.of();
+        }
+        return prevNodes(nodes(routeId), processId);
+    }
+
+    /** 前置全部节点（基于预载节点列表，按 order_num 倒序） */
+    public List<ProRouteProcess> prevNodes(List<ProRouteProcess> nodes, Long processId) {
+        Integer curOrder = currentOrder(nodes, processId);
+        if (curOrder == null) {
+            return List.of();
+        }
+        return nodes.stream()
+                .filter(n -> n.getOrderNum() != null && n.getOrderNum() < curOrder)
+                .sorted(Comparator.comparing(ProRouteProcess::getOrderNum).reversed())
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 下一波节点：order_num 严格大于当前节点的最小序号上的全部节点
      * （同 order_num 的并行 FS 节点整波返回）；末道工序返回空列表。
      */

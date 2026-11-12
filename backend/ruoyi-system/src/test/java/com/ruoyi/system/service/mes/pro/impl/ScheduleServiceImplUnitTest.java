@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
@@ -36,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -184,6 +186,19 @@ class ScheduleServiceImplUnitTest
         ArgumentCaptor<ProTask> captor = ArgumentCaptor.forClass(ProTask.class);
         verify(taskMapper).updateProTask(captor.capture());
         assertThat(captor.getValue().getWorkstationId()).isEqualTo(202L); // 选了空闲的 ws2
+    }
+
+    @Test
+    @DisplayName("scheduleWorkOrder: 并发排产抢锁失败返回 alreadyRunning，不向前端报失败")
+    void should_return_already_running_when_lock_busy() {
+        doThrow(new ServiceException(RedisLockTemplate.LOCK_BUSY_MESSAGE))
+                .when(lockTemplate).executeWithResult(anyString(), anyLong(), any());
+
+        Map<String, Object> result = service.scheduleWorkOrder(1L);
+
+        assertThat(result).containsEntry("alreadyRunning", true);
+        assertThat(result).doesNotContainKey("error");
+        verify(workorderMapper, never()).selectProWorkorderByWorkorderId(anyLong());
     }
 
     @Test

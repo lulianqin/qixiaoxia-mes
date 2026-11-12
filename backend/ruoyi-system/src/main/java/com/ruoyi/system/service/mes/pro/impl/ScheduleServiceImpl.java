@@ -55,6 +55,9 @@ public class ScheduleServiceImpl implements IScheduleService
 
     private TransactionTemplate txTemplate;
 
+    /** 排产锁等待：短等待快速失败，避免前端 HTTP 超时（10s）与锁等待同时到点造成「假失败」 */
+    private static final long SCHEDULE_LOCK_WAIT_SECONDS = 3;
+
     @PostConstruct
     void initTx() {
         this.txTemplate = new TransactionTemplate(transactionManager);
@@ -84,9 +87,19 @@ public class ScheduleServiceImpl implements IScheduleService
                     + "或在【系统管理-参数设置】将 " + CFG_AUTO_SCHEDULE_ENABLED + " 设为 true");
             return r;
         }
-        // 先锁后事务：同工单并发排产会重复建任务，按工单加 Redis 锁串行化
-        return lockTemplate.executeWithResult("pro:schedule:" + workorderId, 10,
-                () -> txTemplate.execute(status -> doScheduleWorkOrder(workorderId)));
+        // 先锁后事务：同工单并发排产会重复建任务，按工单加 Redis 锁串行化。
+        // 锁被占用说明同工单排产正在执行，直接返回「进行中」，由前端提示刷新，不报失败。
+        try {
+            return lockTemplate.executeWithResult("pro:schedule:" + workorderId, SCHEDULE_LOCK_WAIT_SECONDS,
+                    () -> txTemplate.execute(status -> doScheduleWorkOrder(workorderId)));
+        } catch (ServiceException e) {
+            if (RedisLockTemplate.LOCK_BUSY_MESSAGE.equals(e.getMessage())) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("alreadyRunning", true);
+                return r;
+            }
+            throw e;
+        }
     }
 
     /** 读自动排产开关：仅显式 "false"（忽略大小写/空白）才停用，缺省/空/其他值一律启用（缺省安全、保持现状）。 */

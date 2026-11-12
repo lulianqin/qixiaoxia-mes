@@ -60,7 +60,13 @@ async function load() {
 async function scheduleOne(wo: any) {
   schedId.value = wo.workorderId
   try {
-    const res: any = await request({ url: `/mes/pro/gantt/schedule/${wo.workorderId}`, method: 'post' })
+    const res: any = await request({ url: `/mes/pro/gantt/schedule/${wo.workorderId}`, method: 'post', timeout: 60000 })
+    // 同工单已有排产在执行：不是失败，提示稍后刷新即可（任务由并发请求创建）
+    if (res?.data?.alreadyRunning) {
+      ElMessage.warning(`${wo.workorderCode} 正在排产中，请稍后刷新查看结果`)
+      emit('scheduled')
+      return
+    }
     const rawPending: string[] = res?.data?.pendingProcesses || []
     const pending: string[] = [...new Set(rawPending)]
     if (pending.length) {
@@ -69,8 +75,14 @@ async function scheduleOne(wo: any) {
       ElMessage.success(`${wo.workorderCode} 排产完成，已落到具体机台`)
     }
     emit('scheduled')
-  } catch { ElMessage.error('排产失败') }
-  finally { schedId.value = null }
+  } catch (e: any) {
+    if ((e?.message || '').includes('timeout')) {
+      ElMessage.warning(`${wo.workorderCode} 排产请求超时，任务可能已生成，正在刷新…`)
+      emit('scheduled')
+    } else {
+      ElMessage.error('排产失败')
+    }
+  } finally { schedId.value = null }
 }
 
 function setActive(id: number | null) { activeId.value = id }

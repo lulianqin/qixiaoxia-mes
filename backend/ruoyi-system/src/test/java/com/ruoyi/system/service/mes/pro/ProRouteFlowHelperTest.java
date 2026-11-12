@@ -99,6 +99,15 @@ class ProRouteFlowHelperTest {
     }
 
     @Test
+    @DisplayName("prevNodes: 返回全部前驱工序（含非检验节点，按序号倒序）")
+    void should_return_all_prev_nodes_in_reverse_order() {
+        when(mapper.selectProRouteProcessByRouteId(9L))
+                .thenReturn(List.of(node(1, 1, "N"), node(2, 2, "N"), node(3, 3, "Y"), node(4, 4, "N")));
+        assertThat(helper.prevNodes(9L, 4L)).extracting(ProRouteProcess::getProcessId)
+                .containsExactly(3L, 2L, 1L);
+    }
+
+    @Test
     @DisplayName("nextWave: 返回下一序号的全部并行节点（同 order_num 全含）")
     void should_return_whole_next_wave_when_parallel() {
         // 1(SS,order1), 2/3(FS 同 order2), 4(order3)；current=1 → [2,3]

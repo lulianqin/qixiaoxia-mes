@@ -22,6 +22,8 @@ public class ProFeedbackChange extends BaseEntity
     @Excel(name = "任务ID") private Long taskId;
     @Excel(name = "工单ID") private Long workorderId;
     @Excel(name = "变更字段") private String fieldName;
+    /** 变更字段中文名（查询时富化，非持久化） */
+    private String fieldLabel;
     @Excel(name = "原值") private String oldValue;
     @Excel(name = "新值") private String newValue;
     @Excel(name = "来源") private String changeSource;
@@ -39,6 +41,8 @@ public class ProFeedbackChange extends BaseEntity
     public void setWorkorderId(Long v) { this.workorderId = v; }
     public String getFieldName() { return fieldName; }
     public void setFieldName(String v) { this.fieldName = v; }
+    public String getFieldLabel() { return fieldLabel; }
+    public void setFieldLabel(String v) { this.fieldLabel = v; }
     public String getOldValue() { return oldValue; }
     public void setOldValue(String v) { this.oldValue = v; }
     public String getNewValue() { return newValue; }

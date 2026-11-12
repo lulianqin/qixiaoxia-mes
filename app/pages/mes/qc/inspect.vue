@@ -23,7 +23,7 @@
     <view v-if="form.checkResult" class="result-banner" :class="form.checkResult">
       <uni-icons :type="bannerIcon" size="22" color="#fff" />
       <text>{{ qcResultText(form.checkResult) }}</text>
-      <text v-if="form.checkResult === 'FAIL'" class="rb-sub">下游业务将被拦截</text>
+      <text v-if="form.checkResult === 'FAIL' && blockedProcesses.length" class="rb-sub">下游业务将被拦截</text>
       <text v-if="form.checkResult === 'CONCESSION'" class="rb-sub">让步接收</text>
     </view>
 

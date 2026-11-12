@@ -774,7 +774,13 @@ async function autoSchedule() {
   if (!queryParams.workorderId) return
   scheduling.value = true
   try {
-    const res: any = await request({ url: '/mes/pro/gantt/schedule/' + queryParams.workorderId, method: 'post' })
+    const res: any = await request({ url: '/mes/pro/gantt/schedule/' + queryParams.workorderId, method: 'post', timeout: 60000 })
+    // 同工单已有排产在执行：不是失败，任务由并发请求创建，刷新即可看到
+    if (res?.data?.alreadyRunning) {
+      ElMessage.warning('该工单正在排产中，请稍后刷新查看结果')
+      loadGanttData()
+      return
+    }
     const rawPending: string[] = res?.data?.pendingProcesses || []
     const pending: string[] = [...new Set(rawPending)]
     if (pending.length) {
@@ -783,8 +789,15 @@ async function autoSchedule() {
       ElMessage.success('排产计算完成，全部工序已落到具体机台')
     }
     loadGanttData()
-  } catch { ElMessage.error('排产失败') }
-  finally { scheduling.value = false }
+  } catch (e: any) {
+    // 前端超时不等于后端失败：排产事务可能已提交；刷新确认任务是否已生成
+    if ((e?.message || '').includes('timeout')) {
+      ElMessage.warning('排产请求超时，任务可能已生成，正在刷新…')
+      loadGanttData()
+    } else {
+      ElMessage.error('排产失败')
+    }
+  } finally { scheduling.value = false }
 }
 
 async function onBarMove(task: GanttTask, newStart: string, newEnd: string) {

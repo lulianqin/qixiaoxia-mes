@@ -15,7 +15,7 @@
       <view v-if="card" class="card-info">
         <view class="ci-row"><text class="muted">工单</text><text>{{ card.workorderCode }}</text></view>
         <view class="ci-row"><text class="muted">产品</text><text>{{ card.itemName }}</text></view>
-        <view class="ci-row"><text class="muted">当前工序</text><text>{{ card.currentProcessName }}</text></view>
+        <view class="ci-row"><text class="muted">当前工序</text><text>{{ form.processName || card.currentProcessName }}</text></view>
       </view>
       <view class="form-row" v-if="ipqcTemplates.length">
         <text class="label">检验模板</text>
@@ -45,7 +45,7 @@ const { proxy } = getCurrentInstance()
 const cardCodeInput = ref('')
 const card = ref(null)
 const templates = ref([])
-const form = ref({ ipqcType: 'TOUR_CHECK', templateId: null })
+const form = ref({ ipqcType: 'TOUR_CHECK', templateId: null, processId: null, processName: null })
 const submitting = ref(false)
 const cardLoading = ref(false)
 let cardQuerySeq = 0
@@ -94,6 +94,7 @@ function onCardInput() {
   form.value.itemId = null
   form.value.cardId = null
   form.value.processId = null
+  form.value.processName = null
   form.value.workstationId = null
 }
 function onScanCard() {
@@ -113,6 +114,8 @@ function onScanCard() {
     form.value.itemId = card.value.itemId
     form.value.cardId = card.value.cardId
     form.value.processId = task?.processId || card.value.currentProcessId
+    // 工序名必须与 processId 同源：优先取任务上的工序名，避免用流转卡快照名导致 ID/名称错位
+    form.value.processName = task?.processName || card.value.currentProcessName
     form.value.workstationId = task?.workstationId || null
     return true
   }).catch(() => {
@@ -143,7 +146,7 @@ async function submit() {
     cardId: form.value.cardId,
     cardCode: card.value.cardCode,
     processId: form.value.processId,
-    processName: card.value.currentProcessName,
+    processName: form.value.processName || card.value.currentProcessName,
     workstationId: form.value.workstationId,
     itemId: form.value.itemId,
     itemCode: card.value.itemCode,

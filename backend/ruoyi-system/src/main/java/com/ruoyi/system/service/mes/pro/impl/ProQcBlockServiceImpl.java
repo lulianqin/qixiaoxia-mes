@@ -104,7 +104,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             return null;
         }
-        return resolveBlock(workorderId, taskId, flow.prevCheckNodes(routeId, processId));
+        return resolveBlock(workorderId, taskId, flow.prevNodes(routeId, processId));
     }
 
     @Override
@@ -115,12 +115,12 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         {
             return null;
         }
-        return resolveBlock(workorderId, taskId, flow.prevCheckNodes(routeNodes, processId));
+        return resolveBlock(workorderId, taskId, flow.prevNodes(routeNodes, processId));
     }
 
     /**
-     * 阻塞判定主干：按被检工序顺序，遍历全部前驱检验节点 → 各自最新判定单 →
-     * 任一 FAIL 且该任务无放行记录则拦截（工单+工序粒度，不区分流转卡）。
+     * 阻塞判定主干：按工序顺序遍历全部前置工序 → 各自最新判定单 →
+     * 任一「会拦下游」的 FAIL 且该任务无放行记录则拦截（工单+工序粒度，不区分流转卡）。
      */
     private QcBlockInfo resolveBlock(Long workorderId, Long taskId,
                                      List<ProRouteProcess> checkNodes)
@@ -136,12 +136,13 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         return null;
     }
 
-    /** 单检验节点判定：无已判定单 / PASS / CONCESSION 均放行，只硬拦已判不合格 */
+    /** 单前置工序判定：无已判定单 / PASS / CONCESSION 均放行，只硬拦已判不合格且属于「会拦下游」的检验单 */
     private QcBlockInfo resolveBlock(Long workorderId, Long taskId, ProRouteProcess checkNode)
     {
         QcIpqc latest = qcIpqcMapper.selectLatestCompletedByProcess(
                 workorderId, checkNode.getProcessId());
-        if (latest == null || !QcConstants.RESULT_FAIL.equals(latest.getCheckResult()))
+        if (latest == null || !isDownstreamBlocking(latest)
+                || !QcConstants.RESULT_FAIL.equals(latest.getCheckResult()))
         {
             return null;
         }
@@ -162,6 +163,34 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
             return blockReleaseMapper.existsByIpqc(ipqcId);
         }
         return blockReleaseMapper.existsByIpqcAndTask(ipqcId, taskId);
+    }
+
+    /**
+     * 该检验单是否会拦截下游工序报工。
+     *
+     * <p>区分口径：
+     * <ul>
+     *   <li>报工确认自动生成的工序检（source=pro_card_process，类型为 LAST_CHECK）→ 拦下游；</li>
+     *   <li>成品入库完工检（source=wm_product_recpt）→ 只拦成品入库，不拦下游报工；</li>
+     *   <li>手工建单/历史数据：首检/巡检/抽检拦下游，完工检(LAST_CHECK)只拦成品入库。</li>
+     * </ul>
+     */
+    private boolean isDownstreamBlocking(QcIpqc ipqc)
+    {
+        if (ipqc == null)
+        {
+            return false;
+        }
+        String source = ipqc.getSourceDocType();
+        if (QcConstants.SOURCE_PRODUCT_RECPT.equals(source))
+        {
+            return false;
+        }
+        if (QcConstants.SOURCE_CARD_PROCESS.equals(source))
+        {
+            return true;
+        }
+        return !QcConstants.IPQC_LAST.equals(ipqc.getIpqcType());
     }
 
     private QcBlockInfo buildBlockInfo(QcIpqc ipqc, ProRouteProcess checkNode)
@@ -290,6 +319,11 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     @Override
     public List<String> onIpqcFailed(QcIpqc ipqc)
     {
+        // 完工检(LAST_CHECK，含成品入库检)只拦成品入库，不产生下游工序拦截待办/提示
+        if (!isDownstreamBlocking(ipqc))
+        {
+            return List.of();
+        }
         List<ProRouteProcess> wave = resolveNextWave(ipqc);
         if (wave.isEmpty())
         {
@@ -477,7 +511,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
                 continue;
             }
             List<ProRouteProcess> nodes = nodesCache.computeIfAbsent(task.getRouteId(), flow::nodes);
-            List<ProRouteProcess> checkNodes = flow.prevCheckNodes(nodes, task.getProcessId());
+            List<ProRouteProcess> checkNodes = flow.prevNodes(nodes, task.getProcessId());
             if (!checkNodes.isEmpty())
             {
                 checkNodesByTask.put(task.getTaskId(), checkNodes);
@@ -549,7 +583,8 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
                 // Set.of() 不接受 contains(null)：无判定单即未放行，短路掉
                 boolean released = latest != null
                         && releaseKeys.contains(latest.getIpqcId() + ":" + taskId);
-                if (latest != null && QcConstants.RESULT_FAIL.equals(latest.getCheckResult()) && !released)
+                if (latest != null && isDownstreamBlocking(latest)
+                        && QcConstants.RESULT_FAIL.equals(latest.getCheckResult()) && !released)
                 {
                     block = buildBlockInfo(latest, checkNode);
                     break;

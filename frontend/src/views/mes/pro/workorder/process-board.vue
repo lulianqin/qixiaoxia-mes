@@ -79,7 +79,7 @@
               <el-table-column label="单据编码" align="center" prop="issueCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="单据名称" align="center" prop="issueName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
-              <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
+              <el-table-column label="状态" align="center" width="90"><template #default="s"><dict-tag :options="mes_wm_issue_status" :value="s.row.status" /></template></el-table-column>
             </el-table>
           </el-collapse-item>
         </el-collapse>
@@ -94,6 +94,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getProcessBoard } from '@/api/mes/pro/workorder'
 
 const { proxy } = getCurrentInstance() as any
+const { mes_wm_issue_status } = proxy.useDict('mes_wm_issue_status')
 const route = useRoute()
 const router = useRouter()
 
