@@ -22,6 +22,8 @@
         <text v-if="task.qcBlocked" class="block-line">{{ task.qcBlockReason || '质检不合格，暂不可报工' }}</text>
       </view>
 
+      <qc-block-bar v-if="task.qcBlocked" :task="task" @released="load" />
+
       <!-- 人员 -->
       <view class="card">
         <view class="row">
@@ -134,6 +136,7 @@
   import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
   import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
   import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
+  import QcBlockBar from './components/qc-block-bar.vue'
   import { getProcessBoard } from '@/api/mes/pro/feedback'
   import { useUserStore } from '@/store'
   import { hasPermission, tintColor } from '@/utils/mobileMenu'

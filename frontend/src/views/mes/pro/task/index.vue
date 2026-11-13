@@ -102,8 +102,11 @@
       </el-table-column>
       <el-table-column fixed="right" label="操作" align="center" class-name="small-padding fixed-width" width="380">
         <template #default="scope">
-          <el-button link type="danger" icon="Unlock" @click="handleReleaseQcBlock(scope.row)" v-if="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:release']">质检放行</el-button>
-          <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
+          <el-button link type="danger" icon="Unlock" @click="handleReleaseQcBlock(scope.row)" v-if="isQcBlocked(scope.row) && canRelease(scope.row)">质检放行</el-button>
+          <el-tooltip v-else-if="isQcBlocked(scope.row)" content="仅工序负责人或工单负责人可放行" placement="top">
+            <el-button link type="info" icon="Lock" disabled>待负责人放行</el-button>
+          </el-tooltip>
+          <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" :disabled="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
           <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING' && !isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
           <el-button link type="warning" icon="CircleClose" @click="handleCancelTask(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:task:edit']">取消</el-button>
           <el-button link type="danger" icon="Warning" @click="handleReportException(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:exception:add']">报异常</el-button>
@@ -370,10 +373,13 @@ function echoUserOption(row: any, idKey: string, nameKey: string, nickKey: strin
 
 // 跟单质检锁态：list 接口不富化，列表加载后对本页 PRODUCING 任务批量查询
 const QC_STATE_BATCH = 100  // 后端单次最多 100 个任务
-const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null }>>({})
+const qcBlockMap = ref<Record<string, { blocked: boolean; reason: string | null; canRelease?: boolean }>>({})
 const qcReleaseRef = ref<InstanceType<typeof QcReleaseDialog>>()
 function isQcBlocked(row: any) {
   return !!qcBlockMap.value[String(row.taskId)]?.blocked
+}
+function canRelease(row: any) {
+  return !!qcBlockMap.value[String(row.taskId)]?.canRelease
 }
 // 外协任务完工后已生产量按计划量展示：外协产出单位（吨/卷）与任务计划单位（个）不同，
 // 收货自动推进时产量可能与计划量不同，历史数据也可能为 0
@@ -385,7 +391,8 @@ function producedDisplay(row: any) {
   return produced
 }
 function loadQcBlockStates(rows: any[]) {
-  const ids = rows.filter((r: any) => r.status === 'PRODUCING').map((r: any) => r.taskId)
+  // 待下发/待开工/生产中均可能被上游检验拦截，需展示锁态与放行入口
+  const ids = rows.filter((r: any) => ['NORMAL', 'PREPARE', 'PRODUCING'].includes(r.status)).map((r: any) => r.taskId)
   if (ids.length === 0) { qcBlockMap.value = {}; return }
   // 按 100 分批后合并，避免分页调大时超上限导致整页锁态静默丢失
   const batches: number[][] = []

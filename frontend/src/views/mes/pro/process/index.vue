@@ -53,9 +53,10 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="80" fixed="right" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="140" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:process:edit']"></el-button></el-tooltip>
+          <el-tooltip content="外协字段" placement="top"><el-button link type="warning" icon="SetUp" @click="handleOutsourceAttr(scope.row)" v-hasPermi="['mes:pro:process:attr']"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -302,6 +303,7 @@
         <el-button @click="paramOpen = false">取 消</el-button>
       </template>
     </el-dialog>
+    <outsource-attr-dialog ref="outsourceAttrRef" />
   </div>
 </template>
 
@@ -310,9 +312,11 @@ import { listProcess, getProcess, delProcess, addProcess, updateProcess } from '
 import { listProcessContentByProcessId, getProcessContent, addProcessContent, updateProcessContent, delProcessContent } from '@/api/mes/pro/processcontent'
 import { listParamTemplateByProcessId, getParamTemplate, addParamTemplate, updateParamTemplate, delParamTemplate } from '@/api/mes/pro/paramtemplate'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
+import OutsourceAttrDialog from './components/OutsourceAttrDialog.vue'
 
 export default {
   name: 'Process',
+  components: { OutsourceAttrDialog },
   data() {
     return {
       autoGenFlag: false,
@@ -446,6 +450,9 @@ export default {
         this.loadContentList(id)
         this.loadParamTemplateList(id)
       })
+    },
+    handleOutsourceAttr(row) {
+      this.$refs.outsourceAttrRef.open(row)
     },
     handleUpdate(row) {
       this.reset()

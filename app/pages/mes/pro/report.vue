@@ -134,6 +134,13 @@
             <text class="unit">{{ workorder.unitName || 'PCS' }}</text>
           </view>
         </view>
+        <view class="qty-row">
+          <text class="qty-label">待检测</text>
+          <view class="qty-input">
+            <uni-number-box v-model="form.quantityUncheck" :min="0" :max="99999999" :step="1" :width="110" />
+            <text class="unit">{{ workorder.unitName || 'PCS' }}</text>
+          </view>
+        </view>
         <view class="qty-row total-row">
           <text class="qty-label">本次报工</text>
           <text class="total-val">{{ totalQuantity }} {{ workorder.unitName || 'PCS' }}</text>
@@ -217,6 +224,8 @@ const form = reactive({
   quantityUnqualified: 0,
   quantityLaborScrap: 0,
   quantityMaterialScrap: 0,
+  quantityUncheck: 0,
+  overReason: '',
   remark: ''
 })
 const paramList = ref([])
@@ -224,12 +233,13 @@ const card = ref(null)                       // 扫码得到的流转卡
 const reportedQualifiedSum = ref(0)          // 该卡该工序已报合格数
 const pendingTaskId = ref(null)              // 待报工列表带入的 taskId，加载后自动选中
 
-// 本次报工总数 = 合格 + 不合格 + 工废 + 料废
+// 本次报工总数 = 合格 + 不合格 + 工废 + 料废 + 待检测
 const totalQuantity = computed(() => {
   return Number(form.quantityQualified || 0)
     + Number(form.quantityUnqualified || 0)
     + Number(form.quantityLaborScrap || 0)
     + Number(form.quantityMaterialScrap || 0)
+    + Number(form.quantityUncheck || 0)
 })
 
 // 报工人：优先任务派工人昵称，未派工显示当前登录人账号（store 仅持久化 userName）
@@ -329,7 +339,7 @@ function scanByCard(cardCode) {
     selectedTaskId.value = null
     selectedTask.value = null
     paramList.value = []
-    Object.assign(form, { quantityInput: null, quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
+    Object.assign(form, { quantityInput: null, quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, quantityUncheck: 0, overReason: '', remark: '' })
 
     card.value = data.card
     // 用卡的冗余字段填充 workorder 供 doSubmit 复用 + 页面展示工单信息/外协任务（字段名与 doSubmit body 一致）
@@ -414,7 +424,7 @@ function searchWorkorder() {
   selectedTaskId.value = null
   selectedTask.value = null
   paramList.value = []
-  Object.assign(form, { quantityInput: null, quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, remark: '' })
+  Object.assign(form, { quantityInput: null, quantityQualified: 0, quantityUnqualified: 0, quantityLaborScrap: 0, quantityMaterialScrap: 0, quantityUncheck: 0, overReason: '', remark: '' })
 
   getFeedbackEntry(workorderCode.value.trim()).then(res => {
     proxy.$modal.closeLoading()
@@ -555,22 +565,6 @@ async function submitReport() {
       }
     }
   }
-  // 防超报软提醒：任务流程按任务计划数量校验（超报不硬拦，由审核环节把关）
-  const st = selectedTask.value
-  if (!card.value && st && st.quantity != null) {
-    const willTotal = (Number(form.quantityQualified) || 0) + Number(st.quantityProduced || 0)
-    if (willTotal > Number(st.quantity)) {
-      try {
-        await proxy.$modal.confirm(
-          '该工序计划数量 ' + st.quantity + '，已报进度 ' + (st.quantityProduced || 0) +
-          '，本次合格后累计将超过计划数量，是否继续？',
-          '超报提醒'
-        )
-      } catch (e) {
-        return
-      }
-    }
-  }
   doSubmit()
 }
 
@@ -612,7 +606,8 @@ function doSubmit() {
       quantityUnqualified: Number(form.quantityUnqualified || 0),
       quantityLaborScrap: Number(form.quantityLaborScrap || 0),
       quantityMaterialScrap: Number(form.quantityMaterialScrap || 0),
-      quantityUncheck: 0,
+      quantityUncheck: Number(form.quantityUncheck || 0),
+      overReason: form.overReason || null,
       quantityOtherScrap: 0,
       feedbackChannel: 'APP',
       feedbackTime: null,
@@ -644,6 +639,25 @@ function doSubmit() {
     if (errMsg.indexOf('尚未领料') !== -1) {
       proxy.$modal.confirm(errMsg + '。是否前往领料？', '去领料')
         .then(() => { uni.navigateTo({ url: '/pages/mes/wm/issue/list' }) }).catch(() => {})
+      return
+    }
+    // 超报拦截：有授权权限的人员填写原因后可重新提交
+    if (errMsg.indexOf('超过任务计划数量') !== -1 || errMsg.indexOf('超报原因') !== -1) {
+      uni.showModal({
+        title: '超报授权',
+        editable: true,
+        placeholderText: '请填写超报原因（至少2字）',
+        success: (res) => {
+          if (!res.confirm) return
+          const reason = (res.content || '').trim()
+          if (reason.length < 2) {
+            proxy.$modal.msgError('请填写超报原因（至少2字）')
+            return
+          }
+          form.overReason = reason
+          doSubmit()
+        }
+      })
       return
     }
     proxy.$modal.alert(errMsg, '报工失败')

@@ -59,6 +59,15 @@ export function approveOrder(orderId) {
   })
 }
 
+// 驳回采购订单（APPROVED/ORDERED -> DRAFT，修改后重新审批）
+export function rejectOrder(orderId, rejectReason) {
+  return request({
+    url: '/mes/pur/order/' + orderId + '/reject',
+    method: 'post',
+    params: { rejectReason: rejectReason }
+  })
+}
+
 // 下达采购订单（APPROVED -> ORDERED）
 export function orderOrder(orderId) {
   return request({

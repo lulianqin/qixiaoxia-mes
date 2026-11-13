@@ -191,6 +191,7 @@
           <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
           <el-button v-if="scope.row.status === 'DRAFT'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:pur:order:approve']">审批</el-button>
           <el-button v-if="scope.row.status === 'APPROVED'" link type="warning" size="small" @click="handleOrder(scope.row)" v-hasPermi="['mes:pur:order:order']">下单</el-button>
+          <el-button v-if="['APPROVED','ORDERED'].includes(scope.row.status)" link type="warning" size="small" @click="handleReject(scope.row)" v-hasPermi="['mes:pur:order:approve']">驳回</el-button>
           <el-button v-if="['DRAFT','APPROVED','ORDERED'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:pur:order:cancel']">取消</el-button>
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="danger" size="small" @click="handleReturn(scope.row)" v-hasPermi="['mes:pur:order:return']">退货</el-button>
@@ -352,7 +353,7 @@
 </template>
 
 <script>
-import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder } from "@/api/mes/pur/order"
+import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder, rejectOrder } from "@/api/mes/pur/order"
 import { listAllOrder } from "@/api/mes/sal/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import { listAllVendor } from "@/api/mes/md/vendor"
@@ -638,6 +639,18 @@ export default {
       }).then(() => {
         this.getList()
         this.$modal.msgSuccess("审批成功")
+      }).catch(() => {})
+    },
+    /** 驳回：回到草稿，修改后重新提交审批 */
+    handleReject(row) {
+      this.$prompt('请填写驳回原因（至少2字）', '驳回采购订单', {
+        inputPattern: /\S{2,}/,
+        inputErrorMessage: '驳回原因至少 2 个字'
+      }).then(({ value }) => {
+        return rejectOrder(row.orderId, value)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess('已驳回，可修改后重新审批')
       }).catch(() => {})
     },
     /** 下单操作 */

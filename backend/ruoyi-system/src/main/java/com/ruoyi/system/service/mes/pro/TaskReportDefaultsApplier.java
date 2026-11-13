@@ -80,6 +80,7 @@ public class TaskReportDefaultsApplier {
                 task.getTaskId(), nodes);
         task.setQcBlocked(block != null);
         task.setQcBlockReason(block == null ? null : block.getReason());
+        task.setCanRelease(block != null && qcBlockService.canReleaseTask(task));
     }
 
     /**
@@ -100,5 +101,6 @@ public class TaskReportDefaultsApplier {
         // 保证前端拿到布尔而非 null
         task.setQcBlocked(block != null);
         task.setQcBlockReason(block == null ? null : block.getReason());
+        task.setCanRelease(block != null && qcBlockService.canReleaseTask(task));
     }
 }

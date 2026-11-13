@@ -81,6 +81,18 @@ public class ProFeedback extends BaseEntity
     @Excel(name = "录入人昵称") private String recordNick;
     @Excel(name = "状态") private String status;
 
+    /** 超报标识(Y/N) */
+    @Excel(name = "超报标识") private String overFlag;
+    /** 超出计划数量 */
+    @Excel(name = "超报数量") private BigDecimal overQty;
+    /** 超报原因 */
+    @Excel(name = "超报原因") private String overReason;
+    /** 超报授权人 */
+    @Excel(name = "超报授权人") private String overApprover;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "超报授权时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date overApproveTime;
+
     /** 物料消耗列表（transient，由Service层手动填充） */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<ProFeedbackConsume> consumeList;
@@ -205,6 +217,16 @@ public class ProFeedback extends BaseEntity
     public void setRecordNick(String v) { this.recordNick = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+    public String getOverFlag() { return overFlag; }
+    public void setOverFlag(String v) { this.overFlag = v; }
+    public BigDecimal getOverQty() { return overQty; }
+    public void setOverQty(BigDecimal v) { this.overQty = v; }
+    public String getOverReason() { return overReason; }
+    public void setOverReason(String v) { this.overReason = v; }
+    public String getOverApprover() { return overApprover; }
+    public void setOverApprover(String v) { this.overApprover = v; }
+    public Date getOverApproveTime() { return overApproveTime; }
+    public void setOverApproveTime(Date v) { this.overApproveTime = v; }
     public List<ProFeedbackConsume> getConsumeList() { return consumeList; }
     public void setConsumeList(List<ProFeedbackConsume> v) { this.consumeList = v; }
     public List<ProFeedbackParam> getParamList() { return paramList; }

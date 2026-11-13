@@ -70,6 +70,9 @@ public class WmIssueHeader extends BaseEntity
     private Date approveTime;
     private String cancelReason;
 
+    /** 列表查询：是否排除已作废（不落库；仅列表/导出默认 true，内部调用不设置） */
+    private Boolean excludeCanceled;
+
     /** 领料明细列表（聚合字段，不落库；用于头行一次性提交/查询返回） */
     private List<WmIssueLine> lines;
 
@@ -150,6 +153,8 @@ public class WmIssueHeader extends BaseEntity
     public void setApproveTime(Date v) { this.approveTime = v; }
     public String getCancelReason() { return cancelReason; }
     public void setCancelReason(String v) { this.cancelReason = v; }
+    public Boolean getExcludeCanceled() { return excludeCanceled; }
+    public void setExcludeCanceled(Boolean v) { this.excludeCanceled = v; }
     public List<WmIssueLine> getLines() { return lines; }
     public void setLines(List<WmIssueLine> lines) { this.lines = lines; }
     public BigDecimal getReturnableQty() { return returnableQty; }

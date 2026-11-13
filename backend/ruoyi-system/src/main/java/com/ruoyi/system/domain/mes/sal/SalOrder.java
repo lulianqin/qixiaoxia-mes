@@ -42,6 +42,10 @@ public class SalOrder extends BaseEntity
     @Excel(name = "客户PO号")
     private String clientOrderCode;
 
+    /** 生产备注（生成工单时带入工单备注） */
+    @Excel(name = "生产备注")
+    private String productionRemark;
+
     @Excel(name = "业务员")
     private String salesperson;
 
@@ -119,6 +123,8 @@ public class SalOrder extends BaseEntity
     public void setClientNick(String v) { this.clientNick = v; }
     public String getClientOrderCode() { return clientOrderCode; }
     public void setClientOrderCode(String v) { this.clientOrderCode = v; }
+    public String getProductionRemark() { return productionRemark; }
+    public void setProductionRemark(String v) { this.productionRemark = v; }
     public String getSalesperson() { return salesperson; }
     public void setSalesperson(String v) { this.salesperson = v; }
     public String getBusinessLine() { return businessLine; }

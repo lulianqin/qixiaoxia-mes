@@ -121,6 +121,16 @@ public interface IPurOrderService
     public int cancelPurOrder(Long orderId, String cancelReason);
 
     /**
+     * 驳回采购订单（APPROVED/ORDERED -> DRAFT），修改后可重新提交审批。
+     * 校验：所有行已收货数量为0。
+     *
+     * @param orderId 采购订单ID
+     * @param rejectReason 驳回原因
+     * @return 结果
+     */
+    public int rejectPurOrder(Long orderId, String rejectReason);
+
+    /**
      * 取消采购订单行（ORDERED/RECEIVING -> CANCEL）
      * 校验：已收货数量为0
      *

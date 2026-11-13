@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="clientName"       column="client_name"       />
         <result property="clientNick"       column="client_nick"       />
         <result property="clientOrderCode"  column="client_order_code" />
+        <result property="productionRemark" column="production_remark" />
         <result property="salesperson"      column="salesperson"       />
         <result property="businessLine"     column="business_line"     />
         <result property="sampleFlag"       column="sample_flag"       />
@@ -37,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSalOrderVo">
-        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
+        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
     </sql>
 
     <select id="selectSalOrderList" parameterType="SalOrder" resultMap="SalOrderResult">
@@ -91,6 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientName != null">client_name,</if>
             <if test="clientNick != null">client_nick,</if>
             <if test="clientOrderCode != null">client_order_code,</if>
+            <if test="productionRemark != null">production_remark,</if>
             <if test="salesperson != null">salesperson,</if>
             <if test="businessLine != null">business_line,</if>
             <if test="sampleFlag != null">sample_flag,</if>
@@ -118,6 +120,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientName != null">#{clientName},</if>
             <if test="clientNick != null">#{clientNick},</if>
             <if test="clientOrderCode != null">#{clientOrderCode},</if>
+            <if test="productionRemark != null">#{productionRemark},</if>
             <if test="salesperson != null">#{salesperson},</if>
             <if test="businessLine != null">#{businessLine},</if>
             <if test="sampleFlag != null">#{sampleFlag},</if>
@@ -149,6 +152,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="clientName != null">client_name = #{clientName},</if>
             <if test="clientNick != null">client_nick = #{clientNick},</if>
             <if test="clientOrderCode != null">client_order_code = #{clientOrderCode},</if>
+            <if test="productionRemark != null">production_remark = #{productionRemark},</if>
             <if test="salesperson != null">salesperson = #{salesperson},</if>
             <if test="businessLine != null">business_line = #{businessLine},</if>
             <if test="sampleFlag != null">sample_flag = #{sampleFlag},</if>

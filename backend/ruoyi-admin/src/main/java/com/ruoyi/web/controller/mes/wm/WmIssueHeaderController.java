@@ -55,7 +55,11 @@ public class WmIssueHeaderController extends BaseController
 
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:list')")
     @GetMapping("/list")
-    public TableDataInfo list(WmIssueHeader e) { startPage(); return getDataTable(wmIssueHeaderService.selectWmIssueHeaderList(e)); }
+    public TableDataInfo list(WmIssueHeader e) {
+        if (e.getExcludeCanceled() == null) e.setExcludeCanceled(true);
+        startPage();
+        return getDataTable(wmIssueHeaderService.selectWmIssueHeaderList(e));
+    }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:issue:query')")
     @GetMapping("/listAll")
@@ -65,6 +69,7 @@ public class WmIssueHeaderController extends BaseController
     @Log(title = "生产领料单", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, WmIssueHeader e) {
+        if (e.getExcludeCanceled() == null) e.setExcludeCanceled(true);
         List<WmIssueHeader> list = wmIssueHeaderService.selectWmIssueHeaderList(e);
         ExcelUtil<WmIssueHeader> util = new ExcelUtil<WmIssueHeader>(WmIssueHeader.class);
         util.exportExcel(response, list, "生产领料单数据");

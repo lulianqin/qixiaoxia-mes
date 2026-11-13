@@ -106,7 +106,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, getCurrentInstance, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { listIssueHeader, getIssueDetail, addIssueHeader, updateIssueHeader, delIssueHeader, confirmIssue, releaseAllocation, submitForApprove, approveIssue, rejectIssue, closeIssue, cancelIssue, buildFromWorkorder, batchSubmitForApprove, batchApprove, batchConfirmIssue } from '@/api/mes/wm/issueheader'
 import { addIssueLine, updateIssueLine, delIssueLine } from '@/api/mes/wm/issueline'
 import { loadBomLines } from '@/api/mes/wm/issueheader'
@@ -120,6 +120,7 @@ import IssueOutDialog from './components/IssueOutDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
+const route = useRoute()
 const { mes_wm_issue_status: issue_status } = proxy.useDict('mes_wm_issue_status')
 
 const loading = ref(true); const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const showSearch = ref(true); const total = ref(0)
@@ -139,7 +140,22 @@ const issueOutRef = ref()
 // 作废弹窗
 const cancelOpen = ref(false); const cancelReason = ref(''); const cancelTargetId = ref<number | null>(null)
 
-onMounted(() => getList())
+onMounted(async () => {
+  getList()
+  // 报工页「去领料」带入：工单/任务/工序，自动按当前工序生成领料草稿
+  const q = route.query
+  if (!q.workorderId) return
+  try {
+    const r: any = await buildFromWorkorder(Number(q.workorderId))
+    const draft = r.data || {}
+    if (q.processId && Array.isArray(draft.lines)) {
+      draft.lines = draft.lines.filter((l: any) => String(l.processId) === String(q.processId))
+    }
+    openAddDraft(draft)
+    if (q.taskId) form.taskId = Number(q.taskId)
+    if (q.processId) form.processId = Number(q.processId)
+  } catch (e) { /* 错误已由 request 拦截器提示 */ }
+})
 function getList() { loading.value = true; listIssueHeader(queryParams).then((r: any) => { dataList.value = r.rows; total.value = r.total; loading.value = false }).catch(() => { loading.value = false }) }
 function cancel() { open.value = false; reset() }
 function reset() { Object.keys(form).forEach(k => delete (form as any)[k]); form.issueType = 'PRODUCE'; lineList.value = []; activeTab.value = 'header' }

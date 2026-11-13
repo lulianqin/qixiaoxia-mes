@@ -214,6 +214,23 @@ public class PurOrderController extends BaseController
     }
 
     /**
+     * 驳回采购订单（APPROVED/ORDERED → DRAFT），修改后可重新审批
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:approve')")
+    @Log(title = "采购订单驳回", businessType = BusinessType.UPDATE)
+    @PostMapping("/{orderId}/reject")
+    public AjaxResult reject(@PathVariable Long orderId,
+                             @RequestParam(value = "rejectReason") String rejectReason)
+    {
+        try {
+            purOrderService.rejectPurOrder(orderId, rejectReason);
+            return success();
+        } catch (RuntimeException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
      * 下达采购订单（APPROVED → ORDERED）
      */
     @PreAuthorize("@ss.hasPermi('mes:pur:order:order')")

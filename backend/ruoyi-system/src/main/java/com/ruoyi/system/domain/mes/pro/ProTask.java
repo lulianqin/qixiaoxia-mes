@@ -104,6 +104,8 @@ public class ProTask extends BaseEntity
     private Boolean qcBlocked;
     /** 阻塞原因文案 */
     private String qcBlockReason;
+    /** 当前登录人是否可放行（非持久化，实时派生） */
+    private Boolean canRelease;
 
     public Long getTaskId() { return taskId; }
     public void setTaskId(Long v) { this.taskId = v; }
@@ -234,6 +236,8 @@ public class ProTask extends BaseEntity
     public void setIsOutsource(String v) { this.isOutsource = v; }
     public Boolean getQcBlocked() { return qcBlocked; }
     public void setQcBlocked(Boolean v) { this.qcBlocked = v; }
+    public Boolean getCanRelease() { return canRelease; }
+    public void setCanRelease(Boolean v) { this.canRelease = v; }
     public String getQcBlockReason() { return qcBlockReason; }
     public void setQcBlockReason(String v) { this.qcBlockReason = v; }
 

@@ -30,6 +30,7 @@
         <el-col :span="8"><el-form-item label="需求交期" prop="requestDate"><el-date-picker v-model="form.requestDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
         <el-col :span="8"><el-form-item label="订单总金额" prop="totalAmount"><el-input-number v-model="form.totalAmount" :min="0" :precision="2" style="width:100%" disabled /></el-form-item></el-col>
       </el-row>
+      <el-form-item label="生产备注" prop="productionRemark"><el-input v-model="form.productionRemark" type="textarea" :rows="2" placeholder="生成工单时带入工单备注" /></el-form-item>
       <el-form-item label="备注" prop="remark"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item>
     </el-form>
     <el-divider content-position="center">明细行</el-divider>
@@ -88,10 +89,7 @@ export default {
       dimRecalcing: false, headDimReqSeq: 0,
       rules: {
         orderCode: [{ required: true, message: '销售订单号不能为空', trigger: 'blur' }],
-        orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }],
-        clientName: [{ required: true, message: '请选择客户', trigger: 'change' }],
-        orderDate: [{ required: true, message: '订单日期不能为空', trigger: 'change' }],
-        requestDate: [{ required: true, message: '需求交期不能为空', trigger: 'change' }]
+        orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }]
       }
     }
   },
@@ -119,7 +117,7 @@ export default {
       getOrderDetail(id).then(r => { this.form = r.data; this.lineList = r.data.lines || []; this.open = true })
     },
     reset() {
-      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
+      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, productionRemark: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
       this.lineList = []; this.autoGenFlag = true; this.resetForm('form')
     },
     cancel() { this.open = false; this.reset() },

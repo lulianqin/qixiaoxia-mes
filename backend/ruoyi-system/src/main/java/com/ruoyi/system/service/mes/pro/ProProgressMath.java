@@ -43,8 +43,8 @@ public final class ProProgressMath
         {
             return 0;
         }
-        return part.multiply(BigDecimal.valueOf(100))
-                .divide(total, 0, RoundingMode.HALF_UP).intValue();
+        return Math.min(100, part.multiply(BigDecimal.valueOf(100))
+                .divide(total, 0, RoundingMode.HALF_UP).intValue());
     }
 
     /**

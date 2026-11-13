@@ -183,6 +183,12 @@
       <!-- Step 2: 工序明细（按工序分组显示BOM + 参数） -->
       <div v-show="step===2 || optType==='view'" v-if="form.workorderId || optType==='add'">
         <el-alert title="从工艺路线加载，可按工单调整物料或参数" type="info" :closable="false" show-icon style="margin-bottom:12px" />
+        <el-row class="mb8" v-if="optType!=='view'" :gutter="10">
+          <el-col :span="12">
+            <span style="margin-right:8px;font-size:13px">BOM调整原因</span>
+            <el-input v-model="form.bomChangeReason" size="small" style="width:calc(100% - 100px)" placeholder="修改 BOM 数量时必填，用于变更留痕" />
+          </el-col>
+        </el-row>
 
         <el-empty v-if="processGroupList.length===0" description="暂无工序数据，请先选择工艺路线" :image-size="80" />
 
@@ -442,7 +448,7 @@ export default {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
       loading: true, ids: [], single: true, multiple: true, showSearch: true, total: 0,
-      workorderList: [], routeOptions: [], bomList: [], paramList: [], processOptions: [], routeProcesses: [],
+      workorderList: [], routeOptions: [], bomList: [], paramList: [], processOptions: [], routeProcesses: [], bomBaseline: {},
       ownerOptions: [], ownerLoading: false,
       activeProcesses: [], showProcessSelector: false,
       title: '', open: false,
@@ -623,6 +629,9 @@ export default {
           this.ownerOptions = [{ userId: this.form.ownerId, userName: '', nickName: this.form.ownerName || String(this.form.ownerId), __echo: true }, ...this.ownerOptions]
         }
         this.bomList = (bomList || []).map(b => ({ ...b, _processId: b.processId, _processName: b.processName }))
+        // BOM 基线快照：编辑保存时用于判断是否发生数量调整
+        this.bomBaseline = {}
+        this.bomList.forEach(b => { this.bomBaseline[(b.processId || 0) + ':' + b.itemId] = Number(b.quantity || 0) })
         this.paramList = paramList || []   // 后端已富化
         this.routeProcesses = routeProcesses || []
         this.routeOptions = routeOptions || []
@@ -785,6 +794,11 @@ export default {
       }
     },
     submitForm() {
+      // 编辑态：BOM 数量变化必须填写调整原因
+      if (this.optType === 'edit' && this.isBomChanged() && !(this.form.bomChangeReason || '').trim()) {
+        this.$modal.msgWarning('BOM 数量已调整，请填写 BOM 调整原因')
+        return
+      }
       // 两次请求：① 后端偏离检测 → ② 弹窗确认 → ③ 提交
       if (this.optType === 'add' || this.optType === 'edit') {
         const payload = this.buildPayload()
@@ -813,6 +827,13 @@ export default {
       this.doSubmitForm()
     },
     /** 构建向后端提交的 payload（BOM + params 标准化） */
+    isBomChanged() {
+      const base = this.bomBaseline || {}
+      return this.bomList.some(b => {
+        const key = (b.processId || b._processId || 0) + ':' + b.itemId
+        return base[key] !== undefined && Number(base[key]) !== Number(b.quantity || 0)
+      })
+    },
     buildPayload() {
       return {
         workorder: { ...this.form, routeProductId: this.prorouteId || this.form.routeProductId },

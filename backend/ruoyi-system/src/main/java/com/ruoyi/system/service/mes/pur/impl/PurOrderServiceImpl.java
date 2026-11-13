@@ -5,11 +5,14 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.core.redis.RedisLockTemplate;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
@@ -38,6 +41,12 @@ public class PurOrderServiceImpl implements IPurOrderService
 
     @Autowired
     private AutoCodeGenerator autoCodeGenerator;
+
+    @Autowired
+    private RedisLockTemplate lockTemplate;
+
+    @Autowired
+    private PlatformTransactionManager txManager;
 
     /**
      * 查询采购订单头
@@ -350,6 +359,61 @@ public class PurOrderServiceImpl implements IPurOrderService
                 line.setUpdateBy(SecurityUtils.getUsername());
                 purOrderLineService.updatePurOrderLine(line);
             }
+        }
+        return result;
+    }
+
+    /**
+     * 驳回采购订单：已审批/已下单且未收货 → 回到草稿，修改后可重新提交审批。
+     */
+    @Override
+    public int rejectPurOrder(Long orderId, String rejectReason)
+    {
+        String reason = rejectReason == null ? "" : rejectReason.trim();
+        if (reason.length() < 2) {
+            throw new ServiceException("请填写驳回原因（至少2字）");
+        }
+        return lockTemplate.executeWithResult("pur:order:reject:" + orderId, 5,
+                () -> new TransactionTemplate(txManager).execute(status -> doReject(orderId, reason)));
+    }
+
+    private int doReject(Long orderId, String reason)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) {
+            throw new ServiceException("采购订单不存在");
+        }
+        if (!PurOrderStatus.APPROVED.is(order.getStatus())
+                && !PurOrderStatus.ORDERED.is(order.getStatus())) {
+            throw new ServiceException("只有已审批/已下单的采购订单才能驳回，当前状态：" + order.getStatus());
+        }
+        PurOrderLine queryLine = new PurOrderLine();
+        queryLine.setOrderId(orderId);
+        List<PurOrderLine> lines = purOrderLineService.selectPurOrderLineList(queryLine);
+        for (PurOrderLine line : lines) {
+            if (PurOrderStatus.CANCEL.is(line.getStatus())) {
+                continue;
+            }
+            BigDecimal received = line.getQuantityReceived() != null ? line.getQuantityReceived() : BigDecimal.ZERO;
+            if (received.compareTo(BigDecimal.ZERO) > 0) {
+                throw new ServiceException("物料行(" + line.getItemName() + ")已有收货记录，不能驳回");
+            }
+        }
+        order.setStatus(PurOrderStatus.DRAFT.getCode());
+        order.setRejectReason(reason);
+        order.setRejectBy(SecurityUtils.getUsername());
+        order.setRejectTime(DateUtils.getNowDate());
+        order.setUpdateTime(DateUtils.getNowDate());
+        order.setUpdateBy(SecurityUtils.getUsername());
+        int result = purOrderMapper.rejectReset(order);
+        for (PurOrderLine line : lines) {
+            if (PurOrderStatus.CANCEL.is(line.getStatus())) {
+                continue;
+            }
+            line.setStatus(PurOrderStatus.DRAFT.getCode());
+            line.setUpdateTime(DateUtils.getNowDate());
+            line.setUpdateBy(SecurityUtils.getUsername());
+            purOrderLineService.updatePurOrderLine(line);
         }
         return result;
     }

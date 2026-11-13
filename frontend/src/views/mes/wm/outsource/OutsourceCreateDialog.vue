@@ -65,6 +65,25 @@
             <span>{{ row.unitName || row.unitOfMeasure || '-' }}</span>
           </template>
         </el-table-column>
+        <el-table-column v-for="attr in attrSchema" :key="attr.attrCode" :label="attr.attrName + (attr.attrUnit ? '(' + attr.attrUnit + ')' : '')" align="center" width="140">
+          <template #default="{ row }">
+            <el-select v-if="attr.attrType === 'SELECT'" v-model="row._attrs[attr.attrCode]" size="small" clearable style="width:100%">
+              <el-option v-for="opt in parseOptions(attr.optionsJson)" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+            <el-input-number v-else-if="attr.attrType === 'NUMBER'" v-model="row._attrs[attr.attrCode]" :controls="false" size="small" style="width:100%" />
+            <el-switch v-else-if="attr.attrType === 'BOOL'" v-model="row._attrs[attr.attrCode]" />
+            <el-date-picker v-else-if="attr.attrType === 'DATE'" v-model="row._attrs[attr.attrCode]" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" />
+            <el-input v-else v-model="row._attrs[attr.attrCode]" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="单价" align="center" width="120">
+          <template #default="{ row }">
+            <el-input-number v-model="row.unitPrice" :min="0" :precision="4" :controls="false" size="small" style="width:100%" @change="recalcAmount(row)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" align="center" width="120">
+          <template #default="{ row }"><span>{{ money(row.amount) }}</span></template>
+        </el-table-column>
         <el-table-column label="仓库" align="center" min-width="140">
           <template #default="{ row }">
             <el-input v-model="row.warehouseName" placeholder="点击右侧选择" readonly size="small">
@@ -100,6 +119,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import { createOutsource } from '@/api/mes/wm/outsource'
+import { getOutsourceProcessAttr } from '@/api/mes/wm/outsourceProcessAttr'
 import { getOutsourceInfo } from '@/api/mes/pro/workorder'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { listProcard } from '@/api/mes/pro/procard'
@@ -134,8 +154,25 @@ const form = reactive<any>({
 
 const canSubmit = computed(() => {
   return form.vendorId != null && form.issueLines.length > 0
-    && form.issueLines.every((l: any) => l.itemId && l.quantity > 0 && l.warehouseId)
+    && form.issueLines.every((l: any) => l.itemId && l.quantity > 0 && l.warehouseId && attrReady(l))
 })
+// 外协工序字段模板：选择工序后按模板动态渲染明细列（分切保留原逻辑）
+const attrSchema = ref<any[]>([])
+function parseOptions(json?: string) {
+  if (!json) return []
+  try { const arr = JSON.parse(json); return Array.isArray(arr) ? arr : [] } catch { return [] }
+}
+function attrReady(line: any) {
+  return (attrSchema.value || []).every((a: any) =>
+    a.required !== '1' || (line._attrs && String(line._attrs[a.attrCode] ?? '').trim() !== ''))
+}
+function recalcAmount(line: any) {
+  line.amount = line.unitPrice != null && line.quantity != null
+    ? Number((Number(line.quantity) * Number(line.unitPrice)).toFixed(2)) : null
+}
+function money(v: any) {
+  return v == null || v === '' ? '-' : Number(v).toFixed(2)
+}
 
 async function open() {
   visible.value = true
@@ -155,6 +192,7 @@ function resetForm() {
     processId: null, processCode: '', processName: '',
     issueLines: []
   })
+  attrSchema.value = []
   cardOptions.value = []
   processOptions.value = []
   outsourceInfo.value = null
@@ -218,6 +256,7 @@ function onProcessChange(processId: number) {
     }
     // 选工序时自动派生来源类型：分切工序→SLITTING，其余→GENERIC（后端 resolveSourceType 为权威）
     form.sourceType = p.processCode === 'SLITTING' ? 'SLITTING' : 'GENERIC'
+    attrSchema.value = []
     // 发料明细默认填充：该工序 BOM 发料行；无 BOM 时不强制，可手动添加或发产品本身
     form.issueLines = (p.bomLines || []).map((b: any) => ({
       itemId: b.itemId, itemCode: b.itemCode, itemName: b.itemName,
@@ -225,8 +264,12 @@ function onProcessChange(processId: number) {
       quantity: Number(b.quantity || 0),
       unitOfMeasure: b.unitOfMeasure || null, unitName: b.unitName || null,
       batchId: null, batchCode: null,
-      warehouseId: null, warehouseCode: '', warehouseName: ''
+      warehouseId: null, warehouseCode: '', warehouseName: '',
+      unitPrice: null, amount: null, _attrs: {}
     }))
+    if (form.sourceType !== 'SLITTING') {
+      getOutsourceProcessAttr(p.processId).then((r: any) => { attrSchema.value = r.data || [] }).catch(() => { attrSchema.value = [] })
+    }
   } else {
     form.processId = null
     form.processCode = ''
@@ -245,7 +288,8 @@ function addProductLine() {
     quantity: Number(info.productQuantity || 0),
     unitOfMeasure: info.productUnitOfMeasure || null, unitName: info.productUnitName || null,
     batchId: null, batchCode: null,
-    warehouseId: null, warehouseCode: '', warehouseName: ''
+    warehouseId: null, warehouseCode: '', warehouseName: '',
+    unitPrice: null, amount: null, _attrs: {}
   })
 }
 
@@ -273,7 +317,7 @@ function onWarehouseSelected(row: any) {
 }
 
 function addLine() {
-  form.issueLines.push({ itemId: null, itemCode: '', itemName: '', quantity: 0, unitOfMeasure: null, unitName: null, batchId: null, warehouseId: null, warehouseCode: '', warehouseName: '' })
+  form.issueLines.push({ itemId: null, itemCode: '', itemName: '', quantity: 0, unitOfMeasure: null, unitName: null, batchId: null, warehouseId: null, warehouseCode: '', warehouseName: '', unitPrice: null, amount: null, _attrs: {} })
 }
 
 function removeLine(idx: number) {
@@ -283,9 +327,18 @@ function removeLine(idx: number) {
 async function submit() {
   if (!form.vendorId) { proxy.$modal.msgWarning('请选择外协厂商'); return }
   if (form.issueLines.length === 0) { proxy.$modal.msgWarning('请添加发料物料'); return }
+  if (!form.issueLines.every(attrReady)) { proxy.$modal.msgWarning('请填写外协工序的必填工艺字段'); return }
   submitting.value = true
   try {
-    await createOutsource(form)
+    const payload = {
+      ...form,
+      issueLines: form.issueLines.map((l: any) => {
+        const { _attrs, ...rest } = l
+        recalcAmount(rest)
+        return { ...rest, extAttrs: JSON.stringify(_attrs || {}) }
+      })
+    }
+    await createOutsource(payload)
     proxy.$modal.msgSuccess('外协发货成功')
     visible.value = false
     emit('success')

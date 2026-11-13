@@ -219,7 +219,7 @@ export default {
       const head = this.twOrderInfo || {}
       this.twForm.productSize = line.productSize || ''; this.twForm.ropeSpec = line.ropeSpec || ''; this.twForm.printingReq = line.printingReq || ''; this.twForm.packageReq = line.packageReq || ''
       this.twForm.clientOrderCode = line.clientOrderCode || head.clientOrderCode || ''
-      this.twForm.remark = head.remark || ''
+      this.twForm.remark = head.productionRemark || head.remark || ''
       this.twBomList = []; this.twParamList = []; this.twRouteProcesses = []
       this.twProductId = line.productId; this.twProductCode = line.productCode || ''; this.twProductName = line.productName || ''
       this.twRouteOptions = []

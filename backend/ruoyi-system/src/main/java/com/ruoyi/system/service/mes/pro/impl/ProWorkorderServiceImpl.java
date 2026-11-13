@@ -51,6 +51,7 @@ import com.ruoyi.system.service.mes.wm.IWmIssueLineService;
 import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderChange;
 import com.ruoyi.system.service.mes.pro.IProWorkorderChangeService;
+import com.ruoyi.system.service.mes.pro.IProQcBlockService;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderParam;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
@@ -100,6 +101,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
     @Autowired
     private IProWorkorderChangeService proWorkorderChangeService;
+
+    @Autowired
+    private IProQcBlockService qcBlockService;
 
     @Autowired
     private IProRouteProductService proRouteProductService;
@@ -800,6 +804,41 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         proWorkorderChangeService.insertProWorkorderChange(change);
     }
 
+    /** BOM 调整前快照：processId:itemId -> 单位用量 */
+    private Map<String, BigDecimal> snapshotBomQty(Long workorderId)
+    {
+        Map<String, BigDecimal> map = new HashMap<>();
+        List<ProWorkorderBom> list = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
+        if (list == null) return map;
+        for (ProWorkorderBom bom : list)
+        {
+            map.put(bomKey(bom), bom.getQuantity());
+        }
+        return map;
+    }
+
+    /** 对比保存后的 BOM，数量变化逐行写入工单变更记录 */
+    private void recordBomChanges(Long workorderId, Map<String, BigDecimal> oldMap, String reason)
+    {
+        List<ProWorkorderBom> newList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
+        if (newList == null) return;
+        String changeReason = (reason == null || reason.trim().isEmpty()) ? "工单编辑调整BOM" : reason.trim();
+        for (ProWorkorderBom bom : newList)
+        {
+            BigDecimal oldQty = oldMap.get(bomKey(bom));
+            BigDecimal newQty = bom.getQuantity();
+            if (oldQty == null || newQty == null || oldQty.compareTo(newQty) == 0) continue;
+            createChange(workorderId, "BOM", bom.getItemCode(),
+                    oldQty.stripTrailingZeros().toPlainString(),
+                    newQty.stripTrailingZeros().toPlainString(), changeReason);
+        }
+    }
+
+    private String bomKey(ProWorkorderBom bom)
+    {
+        return (bom.getProcessId() == null ? "0" : bom.getProcessId()) + ":" + bom.getItemId();
+    }
+
     /**
      * 批量删除生产工单
      *
@@ -842,6 +881,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (!"PREPARE".equals(wo.getStatus())) {
             throw new ServiceException("只有待生产状态的工单才能开工，当前状态：" + wo.getStatus());
         }
+        // 质检闸门：任一待下发任务上游检验不合格且未放行时阻止工单开工
+        qcBlockService.assertWorkorderStartable(workorderId);
         wo.setStatus("PRODUCING");
         wo.setUpdateTime(DateUtils.getNowDate());
         wo.setUpdateBy(SecurityUtils.getUsername());
@@ -2118,8 +2159,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         updateProWorkorder(workorder);
 
         // 2. 全量替换BOM：先删后插（自动合并产品BOM + 计算用量方式/损耗/基准单位）
+        Map<String, BigDecimal> oldBomQty = snapshotBomQty(workorderId);
         proWorkorderBomService.deleteProWorkorderBomByWorkorderId(workorderId);
         saveWorkorderBomRows(workorder, bomList);
+        recordBomChanges(workorderId, oldBomQty, workorder.getBomChangeReason());
 
         // 3. 工序参数 upsert
         if (paramList != null && !paramList.isEmpty())

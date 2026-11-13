@@ -30,6 +30,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="closeReason"    column="close_reason"    />
         <result property="closeTime"    column="close_time"    />
         <result property="closeBy"    column="close_by"    />
+        <result property="rejectReason"    column="reject_reason"    />
+        <result property="rejectBy"    column="reject_by"    />
+        <result property="rejectTime"    column="reject_time"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -50,7 +53,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             (SELECT COALESCE(SUM(l.quantity_received * l.unit_price), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id) AS received_amount,
             (SELECT COALESCE(SUM(l.quantity_ordered), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id AND l.status = 'CANCEL') AS cancelled_quantity,
             (SELECT COALESCE(SUM(l.amount), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id AND l.status = 'CANCEL') AS cancelled_amount,
-            o.total_amount, o.currency, o.source_order_code, o.workorder_id, o.workorder_code, o.status, o.cancel_reason, o.cancel_time, o.cancel_by, o.close_reason, o.close_time, o.close_by, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
+            o.total_amount, o.currency, o.source_order_code, o.workorder_id, o.workorder_code, o.status, o.cancel_reason, o.cancel_time, o.cancel_by, o.close_reason, o.close_time, o.close_by, o.reject_reason, o.reject_by, o.reject_time, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
     </sql>
 
     <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderVOResult">
@@ -113,6 +116,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="closeReason != null">close_reason,</if>
             <if test="closeTime != null">close_time,</if>
             <if test="closeBy != null">close_by,</if>
+            <if test="rejectReason != null">reject_reason,</if>
+            <if test="rejectBy != null">reject_by,</if>
+            <if test="rejectTime != null">reject_time,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -147,6 +153,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="createTime != null">#{createTime},</if>         </trim>
     </insert>
 
+    <update id="rejectReset" parameterType="PurOrder">
+        update qxx_pur_order
+           set status = 'DRAFT',
+               order_date = null,
+               approver = null,
+               reject_reason = #{rejectReason},
+               reject_by = #{rejectBy},
+               reject_time = #{rejectTime},
+               update_by = #{updateBy},
+               update_time = #{updateTime}
+         where order_id = #{orderId}
+    </update>
+
     <update id="updatePurOrder" parameterType="PurOrder">
         update qxx_pur_order
         <trim prefix="SET" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">order_code = #{orderCode},</if>
@@ -172,6 +191,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="closeReason != null">close_reason = #{closeReason},</if>
             <if test="closeTime != null">close_time = #{closeTime},</if>
             <if test="closeBy != null">close_by = #{closeBy},</if>
+            <if test="rejectReason != null">reject_reason = #{rejectReason},</if>
+            <if test="rejectBy != null">reject_by = #{rejectBy},</if>
+            <if test="rejectTime != null">reject_time = #{rejectTime},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>

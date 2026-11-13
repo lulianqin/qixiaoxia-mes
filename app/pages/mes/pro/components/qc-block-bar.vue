@@ -38,6 +38,8 @@ export default {
       return this.task.qcBlockReason || '上道检验工序判定不合格，本工序暂不可报工，请联系质检或有权限人员放行'
     },
     canRelease() {
+      // 后端按「工序负责人/工单负责人/admin」实时计算；旧接口未返回时回退到权限串
+      if (this.task.canRelease != null) return this.task.canRelease === true
       return this.$auth.hasPermi('mes:pro:task:release')
     }
   },

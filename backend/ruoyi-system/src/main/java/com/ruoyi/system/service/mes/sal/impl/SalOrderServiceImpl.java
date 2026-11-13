@@ -1,6 +1,7 @@
 package com.ruoyi.system.service.mes.sal.impl;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -319,7 +320,36 @@ public class SalOrderServiceImpl implements ISalOrderService
         if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())) {
             throw new ServiceException("仅待接单订单可接单");
         }
+        validateAcceptable(order);
         return updateStatus(orderId, SalOrderStatus.CONFIRMED.getCode());
+    }
+
+    /**
+     * 接单前校验表头与明细必填项，汇总后一次性提示。
+     */
+    private void validateAcceptable(SalOrder order)
+    {
+        List<String> missing = new ArrayList<>();
+        if (StringUtils.isEmpty(order.getOrderName())) missing.add("表头-订单名称");
+        if (order.getClientId() == null) missing.add("表头-客户");
+        if (order.getOrderDate() == null) missing.add("表头-订单日期");
+        if (order.getRequestDate() == null) missing.add("表头-需求交期");
+        List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(order.getOrderId());
+        if (lines == null || lines.isEmpty()) {
+            missing.add("明细-至少一条订单明细");
+        } else {
+            for (SalOrderLine line : lines) {
+                String prefix = "明细第" + (line.getLineNo() == null ? "?" : line.getLineNo()) + "行";
+                if (line.getProductId() == null) missing.add(prefix + "-产品");
+                if (StringUtils.isEmpty(line.getProductName())) missing.add(prefix + "-产品名称");
+                if (StringUtils.isEmpty(line.getUnitOfMeasure())) missing.add(prefix + "-单位");
+                if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
+                    missing.add(prefix + "-数量");
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new ServiceException("接单失败，缺少必填项：" + String.join("；", missing));
+        }
     }
 
     @Override
@@ -427,7 +457,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setSkuCode(req.getSkuCode());
         wo.setSkuName(req.getSkuName());
         wo.setStatus("PREPARE"); // ProConstants 工单初态
-        wo.setRemark(req.getRemark());
+        wo.setRemark(req.getRemark() != null ? req.getRemark() : order.getProductionRemark());
         return wo;
     }
 

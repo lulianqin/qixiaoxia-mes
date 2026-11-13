@@ -35,6 +35,7 @@
             <span style="font-weight:bold;color:#f56c6c">{{ order.totalAmount ?? '-' }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="付款方式">{{ order.paymentMethod || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="生产备注" :span="2">{{ order.productionRemark || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ order.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
       </el-card>

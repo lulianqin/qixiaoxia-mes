@@ -919,6 +919,31 @@ function submitForm() {
           proxy.$modal.msgSuccess('新增成功')
           open.value = false
           getList()
+        }).catch((e: any) => {
+          const msg = e?.message || e?.msg || ''
+          if (msg.includes('尚未领料')) {
+            proxy.$modal.confirm('该工序尚未领料，是否前往领料？').then(() => {
+              router.push({ path: '/mes/wm/issue', query: {
+                workorderId: form.workorderId,
+                taskId: form.taskId,
+                processId: form.processId,
+                autoCreate: '1'
+              } })
+            }).catch(() => {})
+            return
+          }
+          if (msg.includes('超过任务计划数量') || msg.includes('超报原因')) {
+            proxy.$prompt('累计报工已超过任务计划量，请填写超报原因', '超报授权', {
+              inputPattern: /\S{2,}/,
+              inputErrorMessage: '超报原因至少 2 个字'
+            }).then(({ value }: any) => {
+              addFeedback({ ...submitData, overReason: value }).then(() => {
+                proxy.$modal.msgSuccess('新增成功')
+                open.value = false
+                getList()
+              })
+            }).catch(() => {})
+          }
         })
       }
     }

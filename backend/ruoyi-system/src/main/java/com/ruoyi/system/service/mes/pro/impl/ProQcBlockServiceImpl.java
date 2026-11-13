@@ -204,6 +204,87 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     }
 
     @Override
+    public void assertTaskDispatchable(ProTask task)
+    {
+        if (task == null)
+        {
+            return;
+        }
+        QcBlockInfo block = findBlock(task.getWorkorderId(), task.getRouteId(),
+                task.getProcessId(), task.getTaskId());
+        if (block != null)
+        {
+            throw new ServiceException("上道检验工序不合格，工序「" + task.getProcessName()
+                    + "」暂不可下发/开工，请联系工序负责人或工单负责人放行");
+        }
+    }
+
+    @Override
+    public void assertWorkorderStartable(Long workorderId)
+    {
+        if (workorderId == null)
+        {
+            return;
+        }
+        ProTask query = new ProTask();
+        query.setWorkorderId(workorderId);
+        List<ProTask> tasks = proTaskMapper.selectProTaskList(query);
+        if (tasks == null || tasks.isEmpty())
+        {
+            return;
+        }
+        Set<String> blockedNames = new LinkedHashSet<>();
+        for (ProTask task : tasks)
+        {
+            if (!ProConstants.TASK_STATUS_NORMAL.equals(task.getStatus())
+                    && !ProConstants.TASK_STATUS_PREPARE.equals(task.getStatus()))
+            {
+                continue;
+            }
+            if (findBlock(task.getWorkorderId(), task.getRouteId(), task.getProcessId(), task.getTaskId()) != null)
+            {
+                blockedNames.add(task.getProcessName());
+            }
+        }
+        if (!blockedNames.isEmpty())
+        {
+            throw new ServiceException("质检拦截：工序「" + String.join("、", blockedNames)
+                    + "」上游检验不合格，请先在任务列表放行后再开工");
+        }
+    }
+
+    /** 放行身份：工序任务负责人、工单负责人，或超级管理员 */
+    private boolean canRelease(ProTask task, ProWorkorder workorder)
+    {
+        if (task == null)
+        {
+            return false;
+        }
+        if (SecurityUtils.isAdmin())
+        {
+            return true;
+        }
+        Long userId = SecurityUtils.getUserId();
+        if (task.getLeaderId() != null && task.getLeaderId().equals(userId))
+        {
+            return true;
+        }
+        return workorder != null && workorder.getOwnerId() != null
+                && workorder.getOwnerId().equals(userId);
+    }
+
+    @Override
+    public boolean canReleaseTask(ProTask task)
+    {
+        if (task == null || task.getWorkorderId() == null)
+        {
+            return false;
+        }
+        ProWorkorder workorder = proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        return canRelease(task, workorder);
+    }
+
+    @Override
     public void assertReportable(ProFeedback feedback)
     {
         // 与领料门控同口径：仅厂内自制报工受跟单质检门控，外协报工不拦
@@ -242,6 +323,11 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         if (task == null)
         {
             throw new ServiceException("任务不存在或已被删除");
+        }
+        ProWorkorder workorder = proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        if (!canRelease(task, workorder))
+        {
+            throw new ServiceException("仅工序负责人或工单负责人可放行");
         }
         // 放行以任务维度定位（任务不挂具体流转卡；一条放行对该工单该工序各卡生效）
         QcBlockInfo block = findBlock(task.getWorkorderId(), task.getRouteId(),
@@ -489,12 +575,23 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         Map<Long, List<ProRouteProcess>> checkNodeByTask = mapCheckNodes(taskMap);
         Map<String, QcIpqc> latestIpqcByPair = loadLatestIpqcs(taskMap.values(), checkNodeByTask);
         Set<String> releaseKeys = loadReleaseKeys(latestIpqcByPair.values());
+        // 预载工单负责人，用于计算当前用户是否可放行
+        Map<Long, ProWorkorder> workorderMap = new HashMap<>();
+        for (ProTask task : taskMap.values())
+        {
+            if (task.getWorkorderId() != null && !workorderMap.containsKey(task.getWorkorderId()))
+            {
+                workorderMap.put(task.getWorkorderId(),
+                        proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId()));
+            }
+        }
 
         Map<String, Map<String, Object>> result = new LinkedHashMap<>();
         for (Long taskId : taskIds)
         {
             result.put(String.valueOf(taskId),
-                    stateOf(taskId, taskMap.get(taskId), checkNodeByTask, latestIpqcByPair, releaseKeys));
+                    stateOf(taskId, taskMap.get(taskId), checkNodeByTask, latestIpqcByPair, releaseKeys,
+                            workorderMap.get(taskMap.get(taskId) == null ? null : taskMap.get(taskId).getWorkorderId())));
         }
         return result;
     }
@@ -569,7 +666,8 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
     private Map<String, Object> stateOf(Long taskId, ProTask task,
                                         Map<Long, List<ProRouteProcess>> checkNodesByTask,
                                         Map<String, QcIpqc> latestIpqcByPair,
-                                        Set<String> releaseKeys)
+                                        Set<String> releaseKeys,
+                                        ProWorkorder workorder)
     {
         Map<String, Object> state = new HashMap<>(2);
         QcBlockInfo block = null;
@@ -593,6 +691,7 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         }
         state.put("blocked", block != null);
         state.put("reason", block == null ? null : block.getReason());
+        state.put("canRelease", block != null && canRelease(task, workorder));
         return state;
     }
 

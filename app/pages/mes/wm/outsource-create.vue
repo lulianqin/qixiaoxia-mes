@@ -84,6 +84,23 @@
                 <input class="qty-input" type="digit" v-model="line.quantity" />
                 <text class="unit">{{ line.unitName || '吨' }}</text>
               </view>
+              <view v-for="attr in formOf(p).attrSchema" :key="attr.attrCode" class="line-row">
+                <text class="line-label">{{ attr.attrName }}{{ attr.required === '1' ? ' *' : '' }}</text>
+                <picker v-if="attr.attrType === 'SELECT'" :range="attrOptions(attr)" @change="onAttrPick(line, attr, $event)">
+                  <text :class="line._attrs[attr.attrCode] ? 'value' : 'placeholder'">{{ line._attrs[attr.attrCode] || '请选择' }}</text>
+                </picker>
+                <input v-else class="qty-input" :type="attr.attrType === 'NUMBER' ? 'digit' : 'text'" v-model="line._attrs[attr.attrCode]" />
+                <text class="unit" v-if="attr.attrUnit">{{ attr.attrUnit }}</text>
+              </view>
+              <view class="line-row">
+                <text class="line-label">单价</text>
+                <input class="qty-input" type="digit" v-model="line.unitPrice" @input="recalcAmount(line)" />
+                <text class="unit">元</text>
+              </view>
+              <view class="line-row" v-if="line.amount != null">
+                <text class="line-label">金额</text>
+                <text class="value">{{ Number(line.amount).toFixed(2) }} 元</text>
+              </view>
               <view class="line-row line-del">
                 <text class="del-btn" @click="removeLine(p, idx)">删除此行</text>
               </view>
@@ -155,7 +172,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { getWorkorderOutsourceInfo } from '@/api/mes/pro/workorder'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { listItem } from '@/api/mes/md/item'
-import { createOutsource } from '@/api/mes/wm/outsource'
+import { createOutsource, getOutsourceProcessAttr } from '@/api/mes/wm/outsource'
 import { availableBatches } from '@/api/mes/wm/issue'
 import { listAllWarehouse } from '@/api/mes/wm/warehouse'
 
@@ -189,6 +206,22 @@ function statusTagType(s) {
 }
 
 function formOf(p) { return forms[p.processId] }
+
+function attrOptions(attr) {
+  if (!attr.optionsJson) return []
+  try { const arr = JSON.parse(attr.optionsJson); return Array.isArray(arr) ? arr : [] } catch (e) { return [] }
+}
+function onAttrPick(line, attr, e) {
+  const opts = attrOptions(attr)
+  line._attrs[attr.attrCode] = opts[e.detail.value]
+}
+function recalcAmount(line) {
+  line.amount = line.unitPrice != null && line.unitPrice !== '' && Number(line.quantity) > 0
+    ? Number((Number(line.quantity) * Number(line.unitPrice)).toFixed(2)) : null
+}
+function attrReady(line, schema) {
+  return (schema || []).every(a => a.required !== '1' || String(line._attrs[a.attrCode] ?? '').trim() !== '')
+}
 
 function handleScan() {
   // #ifdef APP-PLUS || H5
@@ -231,17 +264,24 @@ async function searchWorkorder() {
 }
 
 async function initForm(p) {
+  const isSlitting = p.processCode === 'SLITTING'
   const f = reactive({
     vendorId: p.vendorId || null, vendorCode: p.vendorCode || '', vendorName: p.vendorName || '',
-    remark: '', submitting: false,
+    remark: '', submitting: false, attrSchema: [],
     issueLines: (p.bomLines || []).map(b => ({
       itemId: b.itemId, itemCode: b.itemCode, itemName: b.itemName, specification: b.specification || '',
       quantity: b.quantity, unitOfMeasure: b.unitOfMeasure || 'TON', unitName: b.unitName || '吨',
       batchId: 0, warehouseId: null, warehouseCode: '', warehouseName: '', batchCode: '',
-      quantityAvailable: null
+      quantityAvailable: null, unitPrice: null, amount: null, _attrs: {}
     }))
   })
   forms[p.processId] = f
+  if (!isSlitting) {
+    try {
+      const sres = await getOutsourceProcessAttr(p.processId)
+      f.attrSchema = sres.data || []
+    } catch (e) { f.attrSchema = [] }
+  }
   // FIFO 预填仓库/批次
   await Promise.all(f.issueLines.map(async (line) => {
     try {
@@ -264,7 +304,7 @@ function toggleProcess(p) {
 function canSubmit(p) {
   const f = formOf(p)
   if (!f || !f.vendorId) return false
-  return f.issueLines.length > 0 && f.issueLines.every(l => l.warehouseId != null && Number(l.quantity) > 0)
+  return f.issueLines.length > 0 && f.issueLines.every(l => l.warehouseId != null && Number(l.quantity) > 0 && attrReady(l, f.attrSchema))
 }
 
 function openVendorPicker(p) { pickerProcess.value = p; vendorPopup.value.open() }
@@ -311,7 +351,7 @@ function addProductLine(p) {
     quantity: info.value.productQuantity != null ? Number(info.value.productQuantity) : 0,
     unitOfMeasure: info.value.productUnitOfMeasure || 'TON', unitName: info.value.productUnitName || '吨',
     batchId: 0, warehouseId: null, warehouseCode: '', warehouseName: '', batchCode: '',
-    quantityAvailable: null
+    quantityAvailable: null, unitPrice: null, amount: null, _attrs: {}
   })
 }
 
@@ -334,7 +374,7 @@ function pickItem(it) {
       quantity: 0,
       unitOfMeasure: it.unitOfMeasure || 'TON', unitName: it.unitName || '吨',
       batchId: 0, warehouseId: null, warehouseCode: '', warehouseName: '', batchCode: '',
-      quantityAvailable: null
+      quantityAvailable: null, unitPrice: null, amount: null, _attrs: {}
     })
   }
   itemPopup.value.close()
@@ -370,7 +410,11 @@ async function submit(p) {
       sourceType: p.processCode === 'SLITTING' ? 'SLITTING' : 'GENERIC',
       remark: f.remark,
       // <input type="digit"> 的 v-model 产出字符串，后端/BigDecimal 反序列化需显式转数字
-      issueLines: f.issueLines.map(l => ({ ...l, quantity: Number(l.quantity) }))
+      issueLines: f.issueLines.map(l => {
+        const { _attrs, ...rest } = l
+        recalcAmount(rest)
+        return { ...rest, quantity: Number(rest.quantity), extAttrs: JSON.stringify(_attrs || {}) }
+      })
     })
     proxy.$modal.msgSuccess('已发料 ' + f.issueLines.length + ' 行')
     // 本地把该工序置为已发料，避免整页 info=null 重渲染闪烁

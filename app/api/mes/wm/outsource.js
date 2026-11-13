@@ -15,6 +15,11 @@ export function createOutsource(data) {
   return request({ url: '/mes/wm/outsource/create', method: 'post', data: data })
 }
 
+// 工序外协字段模板（按工序动态渲染明细字段）
+export function getOutsourceProcessAttr(processId) {
+  return request({ url: '/mes/wm/outsource/processAttr/' + processId, method: 'get' })
+}
+
 // 厂商签收（ISSUED → VENDOR_RCVD，厂商操作，无请求体）
 export function vendorReceiveOutsource(orderId) {
   return request({ url: '/mes/wm/outsource/' + orderId + '/vendorReceive', method: 'post' })

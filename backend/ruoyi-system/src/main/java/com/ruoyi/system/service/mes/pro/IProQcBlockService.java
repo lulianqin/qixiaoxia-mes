@@ -33,6 +33,15 @@ public interface IProQcBlockService
     /** 报工提交硬门控：命中阻塞抛 {@link com.ruoyi.common.exception.ServiceException} */
     void assertReportable(ProFeedback feedback);
 
+    /** 工序任务下发/开工硬门控：命中阻塞抛异常 */
+    void assertTaskDispatchable(com.ruoyi.system.domain.mes.pro.ProTask task);
+
+    /** 工单开工硬门控：任一待下发任务命中阻塞则阻止开工并列出工序 */
+    void assertWorkorderStartable(Long workorderId);
+
+    /** 当前登录人是否可放行该任务（工序负责人/工单负责人/admin） */
+    boolean canReleaseTask(com.ruoyi.system.domain.mes.pro.ProTask task);
+
     /**
      * 授权放行：校验理由 → 任务维度加锁 → 锁内事务（定位阻塞 → 插放行记录 → 关闭拦截待办）。
      */

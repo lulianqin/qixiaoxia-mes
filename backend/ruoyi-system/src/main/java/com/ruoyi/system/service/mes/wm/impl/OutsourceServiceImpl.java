@@ -32,10 +32,13 @@ import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.system.domain.mes.wm.OutsourceRequest;
 import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
@@ -50,6 +53,7 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
+import com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessAttrMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
@@ -112,6 +116,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Autowired private ProFeedbackMapper feedbackMapper;
     @Autowired private ProWorkorderMapper workorderMapper;
     @Autowired private ProRouteProcessMapper routeProcessMapper;
+    @Autowired private WmOutsourceProcessAttrMapper processAttrMapper;
     @Autowired private ProCardMapper cardMapper;
     @Autowired private ProMaterialTraceMapper traceMapper;
     @Autowired private ProTaskMapper proTaskMapper;
@@ -176,6 +181,54 @@ public class OutsourceServiceImpl implements IOutsourceService
             if (line.getItemId() == null) throw new ServiceException("发料行物料不能为空");
             if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
                 throw new ServiceException("发料数量必须大于0");
+        }
+        validateProcessAttrs(req);
+    }
+
+    /**
+     * 工序动态字段校验与金额计算：非分切工序按工序模板校验必填属性，
+     * 金额为空时按 数量*单价 计算。分切保留原有子卷/规格逻辑，不强制模板。
+     */
+    private void validateProcessAttrs(OutsourceRequest req)
+    {
+        if (req.getProcessId() == null) return;
+        String sourceType = resolveSourceType(req.getSourceType(), req.getProcessCode());
+        if (SOURCE_TYPE_SLITTING.equals(sourceType)) return;
+        List<WmOutsourceProcessAttr> schema = processAttrMapper.selectByProcessId(
+                SecurityUtils.getFactoryId(), req.getProcessId());
+        if (schema == null || schema.isEmpty()) return;
+        for (WmOutsourceIssueLine line : req.getIssueLines())
+        {
+            JSONObject attrs = parseExtAttrs(line.getExtAttrs());
+            for (WmOutsourceProcessAttr attr : schema)
+            {
+                Object v = attrs.get(attr.getAttrCode());
+                if ("1".equals(attr.getRequired())
+                        && (v == null || String.valueOf(v).trim().isEmpty()))
+                {
+                    throw new ServiceException("工序「" + req.getProcessName() + "」的「"
+                            + attr.getAttrName() + "」不能为空");
+                }
+            }
+            line.setExtAttrs(attrs.isEmpty() ? null : attrs.toJSONString());
+            if (line.getAmount() == null && line.getUnitPrice() != null)
+            {
+                line.setAmount(line.getQuantity().multiply(line.getUnitPrice())
+                        .setScale(2, java.math.RoundingMode.HALF_UP));
+            }
+        }
+    }
+
+    private JSONObject parseExtAttrs(String extAttrs)
+    {
+        if (extAttrs == null || extAttrs.trim().isEmpty()) return new JSONObject();
+        try
+        {
+            return JSON.parseObject(extAttrs);
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("工艺明细格式不正确");
         }
     }
 

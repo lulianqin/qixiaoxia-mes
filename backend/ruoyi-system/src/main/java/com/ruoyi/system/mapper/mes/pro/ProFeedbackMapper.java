@@ -44,6 +44,9 @@ public interface ProFeedbackMapper {
     BigDecimal sumQuantityFeedback(@Param("workorderId") Long workorderId,
                                    @Param("processId") Long processId);
 
+    /** 统计某任务全部报工（含待审核）的报工数量合计，用于超报校验 */
+    BigDecimal sumQuantityFeedbackByTaskId(@Param("taskId") Long taskId);
+
     /** 批量查询有 PREPARE（待审核）报工的 taskId 列表 */
     List<Long> selectPendingTaskIds(@Param("taskIds") Collection<Long> taskIds);
 

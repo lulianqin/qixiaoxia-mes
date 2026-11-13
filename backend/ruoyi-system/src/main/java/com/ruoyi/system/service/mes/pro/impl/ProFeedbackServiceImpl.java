@@ -306,6 +306,8 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         }
         // 下发闸门：厂内报工仅允许「生产中」任务，未下发/暂停/终态不可报（外协收货走独立回写入口）
         assertTaskProducing(proFeedback, task);
+        // 超报闸门：累计报工超过计划量默认硬拦，持授权权限者填原因后放行并留痕
+        checkOverReport(proFeedback, task);
         // 自动关联流转卡：用户没传 cardId 时，按工单查活跃卡取第一张
         if (proFeedback.getCardId() == null && proFeedback.getWorkorderId() != null) {
             proFeedback.setCardId(resolveActiveCardId(proFeedback.getWorkorderId()));
@@ -346,6 +348,35 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             throw new ServiceException("任务「" + task.getTaskCode() + "」未下发或不处于生产中（当前状态："
                     + taskStatusLabel(task.getStatus()) + "），不能报工");
         }
+    }
+
+    /**
+     * 超报校验：累计报工（含待审核）超过任务计划量时，默认拒绝；
+     * 持有 mes:pro:feedback:overreport 权限且填写原因的人员可授权提交并留痕。
+     */
+    private void checkOverReport(ProFeedback fb, ProTask task) {
+        if (task == null || task.getQuantity() == null || fb.getQuantityFeedback() == null) {
+            return;
+        }
+        BigDecimal existing = qxxProFeedbackMapper.sumQuantityFeedbackByTaskId(task.getTaskId());
+        BigDecimal total = (existing == null ? BigDecimal.ZERO : existing).add(fb.getQuantityFeedback());
+        if (total.compareTo(task.getQuantity()) <= 0) {
+            return;
+        }
+        if (!SecurityUtils.hasPermi("mes:pro:feedback:overreport")) {
+            throw new ServiceException("累计报工 " + total.stripTrailingZeros().toPlainString()
+                    + " 超过任务计划数量 " + task.getQuantity().stripTrailingZeros().toPlainString()
+                    + "，需生产主管授权超报");
+        }
+        String reason = fb.getOverReason() == null ? "" : fb.getOverReason().trim();
+        if (reason.length() < 2) {
+            throw new ServiceException("累计报工超过任务计划数量，请填写超报原因（至少2字）");
+        }
+        fb.setOverFlag("Y");
+        fb.setOverQty(total.subtract(task.getQuantity()));
+        fb.setOverReason(reason);
+        fb.setOverApprover(SecurityUtils.getUsername());
+        fb.setOverApproveTime(DateUtils.getNowDate());
     }
 
     private String taskStatusLabel(String status) {

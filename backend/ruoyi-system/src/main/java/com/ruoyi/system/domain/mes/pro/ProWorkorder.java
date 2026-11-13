@@ -71,6 +71,8 @@ public class ProWorkorder extends BaseEntity
 
     /** SKU变体创建标志（非DB字段，仅API传输用） */
     private Boolean createSkuVariant;
+    /** BOM调整原因（非DB字段，仅编辑工单时传参用） */
+    private String bomChangeReason;
     /** SKU变体编码（createSkuVariant=true时必填） */
     private String skuCode;
     /** SKU变体名称（createSkuVariant=true时必填） */
@@ -192,6 +194,8 @@ public class ProWorkorder extends BaseEntity
 
     public Boolean getCreateSkuVariant() { return createSkuVariant; }
     public void setCreateSkuVariant(Boolean v) { this.createSkuVariant = v; }
+    public String getBomChangeReason() { return bomChangeReason; }
+    public void setBomChangeReason(String v) { this.bomChangeReason = v; }
     public String getSkuCode() { return skuCode; }
     public void setSkuCode(String v) { this.skuCode = v; }
     public String getSkuName() { return skuName; }

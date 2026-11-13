@@ -30,6 +30,12 @@ public class WmOutsourceIssueLine extends BaseEntity
     private String sourceRefType;
     /** 来源对象ID（如 roll_id） */
     private Long sourceRefId;
+    /** 工艺明细扩展属性(JSON扁平结构) */
+    private String extAttrs;
+    /** 单价 */
+    private BigDecimal unitPrice;
+    /** 金额=数量*单价 */
+    private BigDecimal amount;
 
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
@@ -65,4 +71,10 @@ public class WmOutsourceIssueLine extends BaseEntity
     public void setSourceRefType(String v) { this.sourceRefType = v; }
     public Long getSourceRefId() { return sourceRefId; }
     public void setSourceRefId(Long v) { this.sourceRefId = v; }
+    public String getExtAttrs() { return extAttrs; }
+    public void setExtAttrs(String v) { this.extAttrs = v; }
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal v) { this.unitPrice = v; }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal v) { this.amount = v; }
 }

@@ -32,6 +32,7 @@ import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
 import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.service.mes.pro.IProExceptionBlockService;
+import com.ruoyi.system.service.mes.pro.IProQcBlockService;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.system.service.mes.pro.TaskReportDefaultsApplier;
 
@@ -73,6 +74,9 @@ public class ProTaskServiceImpl implements IProTaskService
 
     @Autowired
     private IProExceptionBlockService proExceptionBlockService;
+
+    @Autowired
+    private IProQcBlockService qcBlockService;
 
     @Override
     public ProTask selectProTaskByTaskId(Long taskId)
@@ -371,6 +375,8 @@ public class ProTaskServiceImpl implements IProTaskService
         // 负责人闸门：下发即推进到生产中，负责人是质检拦截等待办的第一责任人（厂内必填；
         // 外协 VENDOR 任务在甘特上没有指派内部负责人的入口，放行，质检待办按报工人/判定人兜底）
         assertLeaderAssigned(task);
+        // 质检闸门：上游检验不合格且未放行时禁止下发/开工
+        qcBlockService.assertTaskDispatchable(task);
         task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
@@ -496,6 +502,8 @@ public class ProTaskServiceImpl implements IProTaskService
         if (!noLeaderNames.isEmpty())
             throw new ServiceException("以下工序任务尚未指定负责人且工单未设置负责人，请先在甘特排产任务弹窗指派负责人"
                     + "或在工单上设置工单负责人后再开工：" + String.join("、", noLeaderNames));
+        // 质检闸门：任一待下发任务上游检验不合格且未放行，整单拒绝开工
+        qcBlockService.assertWorkorderStartable(workorderId);
         proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
     }
 

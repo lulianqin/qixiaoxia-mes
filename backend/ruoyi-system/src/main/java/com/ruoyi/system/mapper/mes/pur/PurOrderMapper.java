@@ -45,6 +45,9 @@ public interface PurOrderMapper
      */
     public int updatePurOrder(PurOrder purOrder);
 
+    /** 驳回重置：状态回草稿并清空下单日期/审批人（null 需显式写入） */
+    public int rejectReset(PurOrder purOrder);
+
     /**
      * 删除采购订单头
      * 

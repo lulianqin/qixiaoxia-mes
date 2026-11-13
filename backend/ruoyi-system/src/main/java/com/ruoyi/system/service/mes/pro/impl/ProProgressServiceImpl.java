@@ -63,13 +63,37 @@ public class ProProgressServiceImpl implements IProProgressService
         WorkorderProgressVO vo = new WorkorderProgressVO();
         BeanUtils.copyProperties(wo, vo);
         fillTimes(wo.getWorkorderId(), vo);
-        vo.setCompletionRate(percent(wo.getQuantityProduced(), wo.getQuantity()));
+        List<ProcessProgressRowVO> processes = buildProcessRows(workorderId);
+        vo.setCompletionRate(averageCompletion(processes));
         int warnDays = cfgInt(ProConstants.CFG_WARN_DAYS, 2);
         vo.setDelayLevel(DelayLevelEvaluator.evaluateWorkorder(
                 wo.getRequestDate(), wo.getFinishDate(), wo.getStatus(), warnDays, new Date()));
-        vo.setProcesses(buildProcessRows(workorderId));
+        vo.setProcesses(processes);
         vo.setCards(buildCards(workorderId));
         return vo;
+    }
+
+    /**
+     * 工单进度 = 下属工序任务进度等权平均（已完成任务 100%，异常任务照常计入，取消任务不计）。
+     */
+    private Integer averageCompletion(List<ProcessProgressRowVO> processes)
+    {
+        if (processes == null || processes.isEmpty())
+        {
+            return 0;
+        }
+        int sum = 0;
+        int count = 0;
+        for (ProcessProgressRowVO row : processes)
+        {
+            if (ProConstants.TASK_STATUS_CANCEL.equals(row.getStatus()))
+            {
+                continue;
+            }
+            sum += row.getCompletionRate() == null ? 0 : row.getCompletionRate();
+            count++;
+        }
+        return count == 0 ? 0 : (int) Math.round(sum * 1.0 / count);
     }
 
     private void fillTimes(Long workorderId, WorkorderProgressVO vo)
@@ -218,7 +242,7 @@ public class ProProgressServiceImpl implements IProProgressService
         {
             return 0;
         }
-        return part.multiply(BigDecimal.valueOf(100))
-                .divide(total, 0, RoundingMode.HALF_UP).intValue();
+        return Math.min(100, part.multiply(BigDecimal.valueOf(100))
+                .divide(total, 0, RoundingMode.HALF_UP).intValue());
     }
 }

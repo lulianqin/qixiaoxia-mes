@@ -117,6 +117,13 @@ public class PurOrder extends BaseEntity
     /** 关闭人 */
     private String closeBy;
 
+    /** 驳回原因 */
+    private String rejectReason;
+    /** 驳回人 */
+    private String rejectBy;
+    /** 驳回时间 */
+    private Date rejectTime;
+
     public void setOrderId(Long orderId) 
     {
         this.orderId = orderId;
@@ -376,6 +383,13 @@ public class PurOrder extends BaseEntity
     {
         return closeBy;
     }
+
+    public String getRejectReason() { return rejectReason; }
+    public void setRejectReason(String v) { this.rejectReason = v; }
+    public String getRejectBy() { return rejectBy; }
+    public void setRejectBy(String v) { this.rejectBy = v; }
+    public Date getRejectTime() { return rejectTime; }
+    public void setRejectTime(Date v) { this.rejectTime = v; }
 
     @Override
     public String toString() {

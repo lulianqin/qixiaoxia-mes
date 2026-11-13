@@ -193,8 +193,8 @@ public class ProTaskController extends BaseController
 
     /**
      * 质检不合格拦截授权放行：留痕 + 关闭拦截待办（理由至少 2 个字符）
+     * 放行身份由服务校验：工序负责人、工单负责人或 admin
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:task:release')")
     @Log(title = "质检拦截放行", businessType = BusinessType.UPDATE)
     @PutMapping("/releaseQcBlock/{taskId}")
     public AjaxResult releaseQcBlock(@PathVariable("taskId") Long taskId,
