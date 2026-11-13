@@ -7,6 +7,13 @@ description: 生产环境发布 - 本机构建前端/app -> 服务器拉代码/�
 发布流程：本机构建前端 -> 服务器拉代码 -> 编译后端 -> 重启 -> 上传前端 -> 重载 Nginx
 （移动端 app H5 单独打包部署，见步骤 5；仅当 `app/` 有变更时才需要）
 
+## Git 远端（重要）
+
+- **主发布仓库**：`git@github.com:lulianqin/qixiaoxia-mes.git`
+- 本机与服务器的 `origin` 均指向该仓库；服务器 `/var/www/qixiaoxia-mes` 已切换完成
+- `wenhua-huang/qixiaoxia-mes` 仅作为本机 `upstream` 同步来源，**禁止 push**
+- 服务器拉码统一使用：`cd /var/www/qixiaoxia-mes && git pull --ff-only origin main`
+
 ## 前置条件
 
 - 本机可 SSH 连接服务器（已配置 SSH 密钥免密登录：`ssh qxx`）
@@ -25,7 +32,7 @@ cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend && npx vite build
 
 ```bash
 ssh qxx << 'EOF'
-cd /var/www/qixiaoxia-mes && git pull origin main
+cd /var/www/qixiaoxia-mes && git pull --ff-only origin main
 
 # 编译（必须用 JDK 17）- Flyway 在应用启动时自动执行 db/migration/*.sql，无需手动跑 SQL
 export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86_64
