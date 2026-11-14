@@ -87,6 +87,7 @@
             <if test="workorderCode != null and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
             <if test="processId != null"> and process_id = #{processId}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="pendingOnly != null and pendingOnly"> and status in ('ISSUED', 'VENDOR_RCVD', 'PROCESSING')</if>
             <if test="statusList != null and statusList.size() > 0">
                 and status in
                 <foreach collection="statusList" item="s" open="(" separator="," close=")">#{s}</foreach>

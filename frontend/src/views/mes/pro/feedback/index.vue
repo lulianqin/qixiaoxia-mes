@@ -414,7 +414,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, getCurrentInstance } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { Warning } from '@element-plus/icons-vue'
 import { listFeedback, getFeedback, addFeedback, updateFeedback, delFeedback, confirmFeedback, auditFeedback, batchConfirmFeedback, batchAuditFeedback, getConsumeDefaults, getFeedbackChanges, getInputDefault, getQualifiedDefault } from '@/api/mes/pro/feedback'
 import { getTask } from '@/api/mes/pro/task'
@@ -427,6 +427,7 @@ import workorderSelect from '@/components/workorderSelect/single.vue'
 
 const { proxy } = getCurrentInstance() as any
 const router = useRouter()
+const route = useRoute()
 
 // 检验状态标签（聚合自关联工序检 IPQC）
 const QC_TAG: Record<string, { type: string; text: string }> = {
@@ -607,6 +608,7 @@ function handleQuery() {
 
 function resetQuery() {
   proxy.resetForm('queryFormRef')
+  queryParams.status = null
   handleQuery()
 }
 
@@ -1001,5 +1003,8 @@ function handleExport() {
 }
 
 // ==================== 初始化 ====================
+// 首页待办跳转：按状态过滤
+const q = route.query
+if (q.status) queryParams.status = q.status
 getList()
 </script>

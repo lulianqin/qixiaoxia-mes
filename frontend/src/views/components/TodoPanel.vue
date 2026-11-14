@@ -1,146 +1,256 @@
 <template>
-  <el-card class="todo-panel" shadow="hover">
+  <el-card class="todo-panel" shadow="never">
     <template #header>
       <div class="todo-header">
-        <span class="todo-title">
-          我的待办
-          <el-tag v-if="pendingCount > 0" type="danger" size="small" round>{{ pendingCount }}</el-tag>
-        </span>
-        <el-button link type="primary" size="small" @click="router.push('/mes/sys/todolist')">
-          查看全部<el-icon class="el-icon--right"><ArrowRight /></el-icon>
-        </el-button>
+        <span class="todo-title">我的待办</span>
+        <div class="todo-summary">
+          <span class="summary-text">共 <b>{{ summary.total }}</b> 项待处理</span>
+          <el-button link type="primary" size="small" @click="goAll">
+            查看全部<el-icon class="el-icon--right"><ArrowRight /></el-icon>
+          </el-button>
+        </div>
       </div>
     </template>
 
-    <el-tabs v-model="activeTab" class="todo-tabs" @tab-change="loadTodos">
-      <el-tab-pane name="PENDING">
-        <template #label>待处理<span v-if="pendingCount" class="tab-count">{{ pendingCount }}</span></template>
-      </el-tab-pane>
-      <el-tab-pane label="已完成" name="COMPLETED" />
-    </el-tabs>
-
-    <el-table :data="todos" v-loading="loading" size="small" :max-height="300" empty-text="暂无待办">
-      <el-table-column label="待办事项" min-width="220" show-overflow-tooltip>
-        <template #default="{ row }">
-          <el-link type="primary" :underline="false" @click="goTodo(row)">{{ row.todoTitle }}</el-link>
-        </template>
-      </el-table-column>
-      <el-table-column label="类型" width="72" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="typeTag(row.todoType)">{{ typeLabel(row.todoType) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="优先级" width="64" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="priorityTag(row.priority)" effect="plain">{{ priorityLabel(row.priority) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="来源单据" width="150" prop="sourceDocCode" show-overflow-tooltip />
-      <el-table-column label="创建时间" width="150" prop="createTime" />
-      <el-table-column label="操作" width="72" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button v-if="row.status !== 'COMPLETED'" link type="primary" size="small" @click="goTodo(row)">去处理</el-button>
-          <span v-else class="text-muted">—</span>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div v-loading="loading" class="todo-cards">
+      <div v-for="card in cards" :key="card.key" class="todo-card" @click="goCard(card)">
+        <div class="card-head">
+          <span class="card-icon" :style="{ color: card.color, background: card.bg }">
+            <AppIcon :icon-class="card.icon" :size="16" />
+          </span>
+          <span class="card-label">{{ card.label }}</span>
+        </div>
+        <div class="card-count">{{ card.count }}</div>
+        <div class="card-foot">
+          <span class="card-desc">{{ card.desc }}</span>
+          <el-icon class="card-arrow"><ArrowRight /></el-icon>
+        </div>
+      </div>
+    </div>
   </el-card>
 </template>
 
 <script setup lang="ts" name="TodoPanel">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight } from '@element-plus/icons-vue'
-import { listTodoList, countByStatus } from '@/api/mes/sys/todolist'
-import useUserStore from '@/store/modules/user'
-import type { SysTodoList } from '@/types/api/mes/sys/todolist'
+import { getHomeTodoSummary } from '@/api/mes/sys/todolist'
+import type { HomeTodoSummary } from '@/types'
+
+interface TodoCard {
+  key: keyof Omit<HomeTodoSummary, 'total'>
+  label: string
+  desc: string
+  icon: string
+  color: string
+  bg: string
+  path: string
+  query: Record<string, string>
+  count: number
+}
 
 const router = useRouter()
-const userStore = useUserStore()
-
-const todos = ref<SysTodoList[]>([])
 const loading = ref(false)
-const activeTab = ref<'PENDING' | 'COMPLETED'>('PENDING')
-const pendingCount = ref(0)
+const summary = ref<HomeTodoSummary>({
+  approval: 0,
+  production: 0,
+  quality: 0,
+  purchase: 0,
+  outsource: 0,
+  total: 0
+})
 
-/** QC 检验类型 → 首页路由（待办 sourceDocType 即 IQC/IPQC/OQC/RQC） */
-const QC_ROUTE: Record<string, string> = {
-  IQC: '/qc/qciqc',
-  IPQC: '/qc/qcipqc',
-  OQC: '/qc/qcoqc',
-  RQC: '/qc/qcrqc'
-}
+const cards = computed<TodoCard[]>(() => [
+  {
+    key: 'approval',
+    label: '审批',
+    desc: '待审批采购单',
+    icon: 'checkbox',
+    color: '#1a3c5e',
+    bg: '#eef3f8',
+    path: '/mes/pur/order',
+    query: { status: 'DRAFT' },
+    count: summary.value.approval
+  },
+  {
+    key: 'production',
+    label: '生产',
+    desc: '报工待审核',
+    icon: 'component',
+    color: '#30b08f',
+    bg: '#eaf7f3',
+    path: '/mes/pro/feedback',
+    query: { status: 'PREPARE' },
+    count: summary.value.production
+  },
+  {
+    key: 'quality',
+    label: '质检',
+    desc: '过程质检',
+    icon: 'validCode',
+    color: '#c9a96e',
+    bg: '#faf6ee',
+    path: '/qc/qcipqc',
+    query: { status: 'PENDING' },
+    count: summary.value.quality
+  },
+  {
+    key: 'purchase',
+    label: '采购/仓库',
+    desc: '待发料',
+    icon: 'tree-table',
+    color: '#2a5a8a',
+    bg: '#eef4fa',
+    path: '/mes/wm/issue',
+    query: { pending: '1' },
+    count: summary.value.purchase
+  },
+  {
+    key: 'outsource',
+    label: '外协代录',
+    desc: '外协代录',
+    icon: 'shopping',
+    color: '#8a6d3b',
+    bg: '#f7f3ea',
+    path: '/mes/wm/outsource',
+    query: { pending: '1' },
+    count: summary.value.outsource
+  }
+])
 
-const TYPE_LABEL: Record<string, string> = {
-  QC_CHECK: '质检', APPROVAL: '审批', DV_CHECK: '设备点检',
-  MAINTEN: '保养', REPAIR: '维修', OTHER: '其他'
-}
-const TYPE_TAG: Record<string, string> = {
-  QC_CHECK: 'success', APPROVAL: 'warning', DV_CHECK: 'info',
-  MAINTEN: '', REPAIR: 'danger', OTHER: 'info'
-}
-const PRIORITY_LABEL: Record<string, string> = { URGENT: '紧急', HIGH: '高', NORMAL: '普通', LOW: '低' }
-const PRIORITY_TAG: Record<string, string> = { URGENT: 'danger', HIGH: 'warning', NORMAL: 'info', LOW: '' }
-
-const typeLabel = (t?: string) => (t && TYPE_LABEL[t]) || t || '其他'
-const typeTag = (t?: string) => (t && TYPE_TAG[t]) || 'info'
-const priorityLabel = (p?: string) => (p && PRIORITY_LABEL[p]) || p || '普通'
-const priorityTag = (p?: string) => (p && PRIORITY_TAG[p]) || 'info'
-
-async function loadTodos() {
+async function loadSummary() {
   loading.value = true
   try {
-    const res = await listTodoList({
-      userId: userStore.id as number,
-      status: activeTab.value,
-      pageNum: 1,
-      pageSize: 10
-    })
-    todos.value = res.rows || []
+    const res = await getHomeTodoSummary()
+    summary.value = { ...summary.value, ...(res.data || {}) }
   } finally {
     loading.value = false
   }
 }
 
-async function loadCount() {
-  try {
-    const res = await countByStatus()
-    const c = res.data || {}
-    pendingCount.value = (c.PENDING || 0) + (c.PROCESSING || 0)
-  } catch { /* 徽章非关键，失败静默 */ }
+function goCard(card: TodoCard) {
+  router.push({ path: card.path, query: card.query }).catch(() => {})
 }
 
-/** 点击待办：QC 类跳对应检验列表并自动打开单据；其余跳待办管理页 */
-function goTodo(row: SysTodoList) {
-  const qcType = row.sourceDocType
-  if (qcType && QC_ROUTE[qcType] && row.sourceDocId) {
-    router.push({
-      path: QC_ROUTE[qcType],
-      query: {
-        openId: String(row.sourceDocId),
-        ...(row.status === 'COMPLETED' ? { ro: '1' } : {})
-      }
-    })
-  } else {
-    router.push('/mes/sys/todolist')
-  }
+function goAll() {
+  router.push('/mes/sys/todolist').catch(() => {})
 }
 
-onMounted(() => {
-  loadTodos()
-  loadCount()
-})
+onMounted(loadSummary)
 </script>
 
 <style scoped>
-.todo-panel { margin-bottom: 0; }
-.todo-header { display: flex; align-items: center; justify-content: space-between; }
-.todo-title { font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
-.todo-tabs :deep(.el-tabs__header) { margin-bottom: 10px; }
-.tab-count {
-  display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 4px;
-  font-size: 11px; line-height: 16px; color: #fff; background: #f56c6c;
-  border-radius: 8px; text-align: center;
+.todo-panel {
+  margin-bottom: 16px;
 }
-.text-muted { color: #c0c4cc; }
+
+.todo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.todo-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.todo-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+.summary-text b {
+  color: #303133;
+  font-weight: 600;
+}
+
+.todo-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.todo-card {
+  padding: 12px 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.todo-card:hover {
+  border-color: #0cd7bd;
+  box-shadow: 0 4px 16px rgba(12, 215, 189, 0.15);
+  transform: translateY(-2px);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.card-count {
+  margin: 8px 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #303133;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.card-desc {
+  font-size: 11px;
+  color: #909399;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-arrow {
+  flex: none;
+  color: #c0c4cc;
+  font-size: 12px;
+}
+
+@media (max-width: 1200px) {
+  .todo-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .todo-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 </style>

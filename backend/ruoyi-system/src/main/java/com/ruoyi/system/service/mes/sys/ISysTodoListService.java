@@ -18,4 +18,12 @@ public interface ISysTodoListService
     public java.util.List<java.util.Map<String, Object>> countByStatus(Long userId);
     public int deleteSysTodoListByTodoIds(Long[] todoIds);
     public int deleteSysTodoListByTodoId(Long todoId);
+
+    /**
+     * 首页「我的待办」汇总：审批/生产/质检/采购仓库/外协代录 5 类待处理数量（当前工厂范围）。
+     *
+     * @param factoryId 当前工厂ID
+     * @return 各类数量及总数
+     */
+    public java.util.Map<String, Object> homeSummary(Long factoryId);
 }

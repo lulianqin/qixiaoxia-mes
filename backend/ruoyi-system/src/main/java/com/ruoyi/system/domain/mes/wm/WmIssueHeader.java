@@ -73,6 +73,9 @@ public class WmIssueHeader extends BaseEntity
     /** 列表查询：是否排除已作废（不落库；仅列表/导出默认 true，内部调用不设置） */
     private Boolean excludeCanceled;
 
+    /** 首页待办：只看待发料（PENDING/APPROVED/ALLOCATED，不落库） */
+    private Boolean pendingOnly;
+
     /** 领料明细列表（聚合字段，不落库；用于头行一次性提交/查询返回） */
     private List<WmIssueLine> lines;
 
@@ -147,6 +150,9 @@ public class WmIssueHeader extends BaseEntity
     public void setVersion(Integer v) { this.version = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public Boolean getPendingOnly() { return pendingOnly; }
+    public void setPendingOnly(Boolean v) { this.pendingOnly = v; }
     public String getApproveBy() { return approveBy; }
     public void setApproveBy(String v) { this.approveBy = v; }
     public Date getApproveTime() { return approveTime; }

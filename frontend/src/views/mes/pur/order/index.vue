@@ -60,7 +60,13 @@
           clearable
           @keyup.enter="handleQuery"
         />
-      </el-form-item>      <el-form-item label="关联客户订单" prop="sourceOrderCode">
+      </el-form-item>
+      <el-form-item label="状态" prop="status">
+        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width:140px">
+          <el-option v-for="d in mes_order_status" :key="d.value" :label="d.label" :value="d.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="关联客户订单" prop="sourceOrderCode">
         <el-input
           v-model="queryParams.sourceOrderCode"
           placeholder="请输入关联客户订单号(如PO#ORD66003MT)"
@@ -409,6 +415,7 @@ export default {
         currency: null,
         
         approver: null,
+        purchaser: null,
         totalQuantity: null,
         totalAmount: null,
         sourceOrderCode: null,
@@ -442,6 +449,9 @@ export default {
     }
   },
   created() {
+    // 首页待办跳转：按状态过滤
+    const q = this.$route.query
+    if (q.status) this.queryParams.status = q.status
     this.loadUserOptions()
     this.loadSalOrderOptions()
     this.loadVendorOptions()
@@ -528,6 +538,7 @@ export default {
     /** 重置按钮操作 */
     resetQuery() {
       this.resetForm("queryForm")
+      this.queryParams.status = null
       this.handleQuery()
     },
     // 多选框选中数据

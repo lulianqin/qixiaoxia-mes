@@ -100,6 +100,16 @@ public class SysTodoListController extends BaseController
     }
 
     /**
+     * 首页「我的待办」汇总：审批/生产/质检/采购仓库/外协代录 5 类待处理数量（当前工厂范围）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:sys:todolist:list')")
+    @GetMapping("/homeSummary")
+    public AjaxResult homeSummary()
+    {
+        return AjaxResult.success(sysTodoListService.homeSummary(SecurityUtils.getFactoryId()));
+    }
+
+    /**
      * 按状态统计当前用户待办数量
      */
     @PreAuthorize("@ss.hasPermi('mes:sys:todolist:list')")

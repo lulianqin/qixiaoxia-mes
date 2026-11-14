@@ -18,6 +18,9 @@
           <el-option v-for="d in mes_outsource_type" :key="d.value" :label="d.label" :value="d.value" />
         </el-select>
       </el-form-item>
+      <el-form-item label="范围">
+        <el-checkbox v-model="pendingOnly" @change="onPendingOnlyChange">只看待代录</el-checkbox>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
@@ -136,7 +139,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { listOutsource, getOutsource, executeOutsource, batchExecuteOutsource, receiveOutsource, batchReceiveOutsource, delOutsource, vendorReceiveOutsource, completeOutsource, shipOutsource } from '@/api/mes/wm/outsource'
 import OutsourceCreateDialog from './OutsourceCreateDialog.vue'
 import OutsourceAgentResultDialog from './OutsourceAgentResultDialog.vue'
@@ -172,6 +175,7 @@ interface OutsourceQuery {
   vendorName: string
   status: string
   sourceType: string
+  pendingOnly: boolean
 }
 
 const { proxy } = getCurrentInstance() as any
@@ -194,8 +198,15 @@ const receivableRows = computed(() => selectedRows.value.filter(r => canReceive(
 
 const queryParams = reactive<OutsourceQuery>({
   pageNum: 1, pageSize: 10,
-  orderCode: '', vendorName: '', status: '', sourceType: ''
+  orderCode: '', vendorName: '', status: '', sourceType: '', pendingOnly: false
 })
+// 首页待办：只看待代录
+const pendingOnly = ref(false)
+const route = useRoute()
+function onPendingOnlyChange(val: boolean) {
+  queryParams.pendingOnly = val
+  handleQuery()
+}
 
 function getList() {
   loading.value = true
@@ -206,7 +217,12 @@ function getList() {
 }
 
 function handleQuery() { queryParams.pageNum = 1; getList() }
-function resetQuery() { queryFormRef.value?.resetFields(); handleQuery() }
+function resetQuery() {
+  queryFormRef.value?.resetFields()
+  pendingOnly.value = false
+  queryParams.pendingOnly = false
+  handleQuery()
+}
 function handleCreate() { createDialogRef.value?.open() }
 
 async function handleDetail(row: OutsourceOrderRow) {
@@ -340,5 +356,12 @@ async function handleBatchReceive() {
   }
 }
 
-onMounted(() => getList())
+onMounted(() => {
+  // 首页待办跳转：只看待代录
+  if (route.query.pending === '1') {
+    pendingOnly.value = true
+    queryParams.pendingOnly = true
+  }
+  getList()
+})
 </script>

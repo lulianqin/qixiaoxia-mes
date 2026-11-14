@@ -8,6 +8,9 @@
           <el-option v-for="d in issue_status" :key="d.value" :label="d.label" :value="d.value" />
         </el-select>
       </el-form-item>
+      <el-form-item label="范围">
+        <el-checkbox v-model="pendingOnly" @change="onPendingOnlyChange">只看待发料</el-checkbox>
+      </el-form-item>
       <el-form-item><el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button><el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
@@ -128,7 +131,13 @@ const title = ref(''); const open = ref(false); const optType = ref(''); const a
 const dataList = ref<any[]>([]); const lineList = ref<any[]>([])
 const cardOptions = ref<any[]>([])
 const form = reactive<any>({ issueType: 'PRODUCE' })
-const queryParams = reactive<any>({ pageNum: 1, pageSize: 10, issueCode: null, workorderName: null, status: null })
+const queryParams = reactive<any>({ pageNum: 1, pageSize: 10, issueCode: null, workorderName: null, status: null, pendingOnly: false })
+// 首页待办：只看待发料
+const pendingOnly = ref(false)
+function onPendingOnlyChange(val: boolean) {
+  queryParams.pendingOnly = val
+  handleQuery()
+}
 const rules = { issueName: [{ required: true, message: '名称不能为空' }], workorderId: [{ required: true, message: '工单不能为空' }], warehouseId: [{ required: true, message: '仓库不能为空' }] }
 const TERMINAL = ['CLOSED', 'CANCELED']
 const isTerminal = (s: string) => TERMINAL.includes(s)
@@ -141,6 +150,11 @@ const issueOutRef = ref()
 const cancelOpen = ref(false); const cancelReason = ref(''); const cancelTargetId = ref<number | null>(null)
 
 onMounted(async () => {
+  // 首页待办跳转：只看待发料
+  if (route.query.pending === '1') {
+    pendingOnly.value = true
+    queryParams.pendingOnly = true
+  }
   getList()
   // 报工页「去领料」带入：工单/任务/工序，自动按当前工序生成领料草稿
   const q = route.query
@@ -160,7 +174,12 @@ function getList() { loading.value = true; listIssueHeader(queryParams).then((r:
 function cancel() { open.value = false; reset() }
 function reset() { Object.keys(form).forEach(k => delete (form as any)[k]); form.issueType = 'PRODUCE'; lineList.value = []; activeTab.value = 'header' }
 function handleQuery() { queryParams.pageNum = 1; getList() }
-function resetQuery() { Object.keys(queryParams).forEach(k => { if (k !== 'pageNum' && k !== 'pageSize') (queryParams as any)[k] = null }); handleQuery() }
+function resetQuery() {
+  Object.keys(queryParams).forEach(k => { if (k !== 'pageNum' && k !== 'pageSize') (queryParams as any)[k] = null })
+  queryParams.pendingOnly = false
+  pendingOnly.value = false
+  handleQuery()
+}
 function handleSelectionChange(sel: any[]) { ids.value = sel.map(i => i.issueId); single.value = sel.length !== 1; multiple.value = !sel.length }
 // 从工单生成：打开工单选择器（固定状态过滤 PREPARE/PRODUCING）
 function handleFromWorkorder() { genWoSelectRef.value?.open() }

@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { TodoListQueryParams, SysTodoList, AjaxResult, TableDataInfo } from '@/types'
+import type { TodoListQueryParams, SysTodoList, AjaxResult, TableDataInfo, HomeTodoSummary } from '@/types'
 
 // 查询待办列表
 export function listTodoList(query: TodoListQueryParams): Promise<TableDataInfo<SysTodoList[]>> {
@@ -34,4 +34,9 @@ export function handleTodo(todoId: number, data: SysTodoList): Promise<AjaxResul
 // 按状态统计待办数量
 export function countByStatus(): Promise<AjaxResult<Record<string, number>>> {
   return request({ url: '/mes/sys/todolist/countByStatus', method: 'get' })
+}
+
+// 首页我的待办汇总（审批/生产/质检/采购仓库/外协代录）
+export function getHomeTodoSummary(): Promise<AjaxResult<HomeTodoSummary>> {
+  return request({ url: '/mes/sys/todolist/homeSummary', method: 'get' })
 }

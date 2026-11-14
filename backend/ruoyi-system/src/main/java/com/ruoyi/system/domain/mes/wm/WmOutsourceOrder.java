@@ -45,6 +45,8 @@ public class WmOutsourceOrder extends BaseEntity
     /** 多状态查询（IN 条件），与 status 互斥使用；非持久字段 */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<String> statusList;
+    /** 首页待办：只看待代录（ISSUED/VENDOR_RCVD/PROCESSING，不落库） */
+    private Boolean pendingOnly;
     private Long feedbackId;
     /** 首条来料检验单ID（source_doc_type=wm_outsource_order），多物料多张单时仅首张回填 */
     private Long iqcId;
@@ -115,6 +117,8 @@ public class WmOutsourceOrder extends BaseEntity
     public void setStatus(String v) { this.status = v; }
     public List<String> getStatusList() { return statusList; }
     public void setStatusList(List<String> v) { this.statusList = v; }
+    public Boolean getPendingOnly() { return pendingOnly; }
+    public void setPendingOnly(Boolean v) { this.pendingOnly = v; }
     public Long getFeedbackId() { return feedbackId; }
     public void setFeedbackId(Long v) { this.feedbackId = v; }
     public Long getIqcId() { return iqcId; }

@@ -139,6 +139,7 @@ function resetQuery() {
   proxy.resetForm('queryRef')
   queryParams.value.sourceDocType = keepType
   queryParams.value.sourceDocId = keepId
+  queryParams.value.status = null
   handleQuery()
 }
 function handleSelectionChange(selection: QcIpqc[]) {
@@ -172,6 +173,8 @@ function handleExport() {
 }
 
 onMounted(() => {
+  // 首页待办跳转：按状态过滤
+  if (route.query.status) queryParams.value.status = route.query.status
   // 入库单页"检验状态"tag 跳转：携带 sourceDocId 自动过滤
   const sid = route.query.sourceDocId as string
   if (sid) {

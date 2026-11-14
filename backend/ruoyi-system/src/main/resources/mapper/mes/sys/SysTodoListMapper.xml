@@ -153,6 +153,43 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         group by status
     </select>
 
+    <!-- ========== 首页我的待办：按业务待处理状态统计（当前工厂范围） ========== -->
+
+    <!-- 审批：全部待审批采购单（与采购订单列表 status 筛选一致） -->
+    <select id="countHomePendingPurOrder" resultType="int">
+        select count(1) from qxx_pur_order
+        where factory_id = #{factoryId}
+          and status = 'DRAFT'
+    </select>
+
+    <!-- 生产：全部待审核报工（与报工列表 status 筛选一致） -->
+    <select id="countHomePendingFeedback" resultType="int">
+        select count(1) from qxx_pro_feedback
+        where factory_id = #{factoryId}
+          and status = 'PREPARE'
+    </select>
+
+    <!-- 质检：全部待检验过程检验单（与过程检验列表 status 筛选一致） -->
+    <select id="countHomePendingIpqc" resultType="int">
+        select count(1) from qxx_qc_ipqc
+        where factory_id = #{factoryId}
+          and status = 'PENDING'
+    </select>
+
+    <!-- 采购/仓库：全部待发料领料单（与库存发料列表 pendingOnly 筛选一致） -->
+    <select id="countHomePendingIssue" resultType="int">
+        select count(1) from qxx_wm_issue_header
+        where factory_id = #{factoryId}
+          and status in ('PENDING', 'APPROVED', 'ALLOCATED')
+    </select>
+
+    <!-- 外协代录：全部待签收/待录结果/补录外协单（与外协列表 pendingOnly 筛选一致） -->
+    <select id="countHomePendingOutsource" resultType="int">
+        select count(1) from qxx_wm_outsource_order
+        where factory_id = #{factoryId}
+          and status in ('ISSUED', 'VENDOR_RCVD', 'PROCESSING')
+    </select>
+
     <delete id="deleteSysTodoListByTodoId" parameterType="Long">
         delete from sys_todo_list where todo_id = #{todoId}
     </delete>

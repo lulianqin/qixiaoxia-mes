@@ -21,6 +21,23 @@ public interface SysTodoListMapper
     public int deleteSysTodoListByTodoId(Long todoId);
     public int deleteSysTodoListByTodoIds(Long[] todoIds);
 
+    // ========== 首页我的待办：按业务待处理状态统计（当前工厂范围） ==========
+
+    /** 审批-待审批采购单 */
+    public int countHomePendingPurOrder(@Param("factoryId") Long factoryId);
+
+    /** 生产-待审核报工 */
+    public int countHomePendingFeedback(@Param("factoryId") Long factoryId);
+
+    /** 质检-待检验过程检验单 */
+    public int countHomePendingIpqc(@Param("factoryId") Long factoryId);
+
+    /** 采购/仓库-待发料领料单 */
+    public int countHomePendingIssue(@Param("factoryId") Long factoryId);
+
+    /** 外协代录-待签收/待录结果/补录的外协单 */
+    public int countHomePendingOutsource(@Param("factoryId") Long factoryId);
+
     /**
      * 按业务来源查待处理（PENDING/PROCESSING）待办（质检判定完成后回写用）
      *

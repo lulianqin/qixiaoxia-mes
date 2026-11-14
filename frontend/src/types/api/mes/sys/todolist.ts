@@ -45,3 +45,19 @@ export interface SysTodoList extends BaseEntity {
   /** 处理结果/意见 */
   handleResult?: string;
 }
+
+/** 首页我的待办汇总数量 */
+export interface HomeTodoSummary {
+  /** 审批 */
+  approval: number;
+  /** 生产 */
+  production: number;
+  /** 质检 */
+  quality: number;
+  /** 采购/仓库 */
+  purchase: number;
+  /** 外协代录 */
+  outsource: number;
+  /** 合计 */
+  total: number;
+}

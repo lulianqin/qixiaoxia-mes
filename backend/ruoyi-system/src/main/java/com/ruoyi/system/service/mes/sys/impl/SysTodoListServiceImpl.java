@@ -59,4 +59,22 @@ public class SysTodoListServiceImpl implements ISysTodoListService
     public int deleteSysTodoListByTodoId(Long todoId) {
         return sysTodoListMapper.deleteSysTodoListByTodoId(todoId);
     }
+
+    @Override
+    public java.util.Map<String, Object> homeSummary(Long factoryId) {
+        int approval = sysTodoListMapper.countHomePendingPurOrder(factoryId);
+        int production = sysTodoListMapper.countHomePendingFeedback(factoryId);
+        int quality = sysTodoListMapper.countHomePendingIpqc(factoryId);
+        int purchase = sysTodoListMapper.countHomePendingIssue(factoryId);
+        int outsource = sysTodoListMapper.countHomePendingOutsource(factoryId);
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("approval", approval);
+        result.put("production", production);
+        result.put("quality", quality);
+        result.put("purchase", purchase);
+        result.put("outsource", outsource);
+        result.put("total", approval + production + quality + purchase + outsource);
+        return result;
+    }
 }
