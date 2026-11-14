@@ -39,6 +39,12 @@ public interface IProWorkorderService
      */
     public void enrichProgress(List<ProWorkorder> list);
 
+    /** 移动端首页：工单数量（按状态筛选，status 为空=全部） */
+    public int countMobileWorkorders(String status);
+
+    /** 移动端首页：待办任务数量（未完工任务数，按工单状态筛选） */
+    public int countMobilePendingTasks(String status);
+
     /**
      * 查询所有生产工单
      *

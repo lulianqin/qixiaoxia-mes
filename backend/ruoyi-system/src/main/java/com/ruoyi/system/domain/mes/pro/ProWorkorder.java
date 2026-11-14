@@ -94,6 +94,18 @@ public class ProWorkorder extends BaseEntity
     private String currentStage;
     /** 当前工序名（按路线顺序第一道仍有剩余数量的工序）；终态/未排产为 null */
     private String currentProcessName;
+    /** 移动端首页：当前工单剩余待处理工序数（非DB字段） */
+    private Integer pendingTaskCount;
+    /** 移动端首页：当前工序任务ID（非DB字段） */
+    private Long currentTaskId;
+    /** 移动端首页：当前工序可操作按钮标识（非DB字段） */
+    private String actionKey;
+    /** 移动端首页：当前工序可操作按钮文字（非DB字段） */
+    private String actionLabel;
+    /** 移动端首页：当前工序可操作按钮所需权限（非DB字段） */
+    private String actionPerm;
+    /** 移动端首页：当前工序关联的外协单ID（非DB字段） */
+    private Long actionOutsourceOrderId;
     /** 计划完工时间（未终态任务 MAX(end_time)） */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date planEndTime;
@@ -215,6 +227,18 @@ public class ProWorkorder extends BaseEntity
     public void setCurrentStage(String v) { this.currentStage = v; }
     public String getCurrentProcessName() { return currentProcessName; }
     public void setCurrentProcessName(String v) { this.currentProcessName = v; }
+    public Integer getPendingTaskCount() { return pendingTaskCount; }
+    public void setPendingTaskCount(Integer v) { this.pendingTaskCount = v; }
+    public Long getCurrentTaskId() { return currentTaskId; }
+    public void setCurrentTaskId(Long v) { this.currentTaskId = v; }
+    public String getActionKey() { return actionKey; }
+    public void setActionKey(String v) { this.actionKey = v; }
+    public String getActionLabel() { return actionLabel; }
+    public void setActionLabel(String v) { this.actionLabel = v; }
+    public String getActionPerm() { return actionPerm; }
+    public void setActionPerm(String v) { this.actionPerm = v; }
+    public Long getActionOutsourceOrderId() { return actionOutsourceOrderId; }
+    public void setActionOutsourceOrderId(Long v) { this.actionOutsourceOrderId = v; }
     public Date getPlanEndTime() { return planEndTime; }
     public void setPlanEndTime(Date v) { this.planEndTime = v; }
     public Date getEstimatedEndTime() { return estimatedEndTime; }

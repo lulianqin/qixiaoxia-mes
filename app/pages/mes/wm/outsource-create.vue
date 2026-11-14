@@ -109,7 +109,7 @@
 
           <view class="line-actions">
             <button class="cu-btn sm" @click="openItemPicker(p)">添加物料</button>
-            <button v-if="info.productId" class="cu-btn bg-blue sm" @click="addProductLine(p)">发产品本身（{{ info.productName }}）</button>
+            <button v-if="info.productId" class="cu-btn bg-blue sm" @click="addProductLine(p)">发产品本身</button>
           </view>
 
           <button class="cu-btn bg-blue lg footer-submit" :disabled="!canSubmit(p) || formOf(p).submitting" @click="submit(p)">
@@ -486,7 +486,7 @@ page { background-color: #f5f6f7; min-height: 100%; }
 .popup-scroll { max-height: 60vh; }
 .popup-search { display: flex; align-items: center; gap: 16rpx; padding: 16rpx 24rpx; border-bottom: 1px solid #f0f0f0; }
 .line-actions { display: flex; gap: 16rpx; padding: 16rpx 0 0; }
-.line-actions .cu-btn { flex: 1; }
+.line-actions .cu-btn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .del-btn { color: #f56c6c; font-size: 26rpx; padding: 8rpx 0; }
 .line-del { justify-content: flex-end; }
 .popup-item { display: flex; justify-content: space-between; align-items: center; padding: 24rpx; border-bottom: 1px solid #f5f5f5; }

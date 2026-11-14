@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.mes.pro;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
@@ -425,7 +427,140 @@ public class ProWorkorderController extends BaseController
         }
         List<ProWorkorder> list = proWorkorderService.selectProWorkorderList(query);
         fillOverdueDays(list);
+        proWorkorderService.enrichProgress(list);
+        enrichMobileActions(list);
         return getDataTable(list);
+    }
+
+    /** 移动端首页顶部汇总：工单数量 + 待办任务数量（当前筛选状态内） */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @GetMapping("/mobileSummary")
+    public AjaxResult mobileSummary(@RequestParam(required = false) String status)
+    {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("workorderCount", proWorkorderService.countMobileWorkorders(status));
+        data.put("pendingTaskCount", proWorkorderService.countMobilePendingTasks(status));
+        return success(data);
+    }
+
+    /**
+     * 移动端首页卡片补充：当前工序、剩余待处理工序数、当前工序可操作按钮。
+     * 按钮只返回权限标识，前端按当前登录人权限决定是否展示。
+     */
+    private void enrichMobileActions(List<ProWorkorder> list)
+    {
+        if (list == null || list.isEmpty())
+        {
+            return;
+        }
+        Long userId = SecurityUtils.getUserId();
+        boolean admin = SecurityUtils.isAdmin();
+        for (ProWorkorder wo : list)
+        {
+            // 已完工/已取消/已关闭的工单不再提供操作（避免展示点不动的报工/开工）
+            if (ProConstants.WORKORDER_STATUS_COMPLETED.equals(wo.getStatus())
+                    || ProConstants.WORKORDER_STATUS_CANCEL.equals(wo.getStatus())
+                    || "CLOSED".equals(wo.getStatus()))
+            {
+                wo.setPendingTaskCount(0);
+                wo.setActionKey(null);
+                wo.setActionLabel(null);
+                wo.setActionPerm(null);
+                wo.setActionOutsourceOrderId(null);
+                wo.setCurrentTaskId(null);
+                continue;
+            }
+            ProTask q = new ProTask();
+            q.setWorkorderId(wo.getWorkorderId());
+            List<ProTask> tasks = proTaskService.selectProTaskList(q);
+            List<ProTask> sorted = sortAndMarkTasks(tasks, tasks);
+            List<ProTask> remaining = sorted.stream()
+                    .filter(t -> !ProConstants.TASK_STATUS_COMPLETED.equals(t.getStatus())
+                            && !ProConstants.TASK_STATUS_CANCEL.equals(t.getStatus()))
+                    .filter(t -> remainingQty(t).signum() > 0)
+                    .collect(Collectors.toList());
+            wo.setPendingTaskCount(remaining.size());
+            wo.setActionKey(null);
+            wo.setActionLabel(null);
+            wo.setActionPerm(null);
+            wo.setActionOutsourceOrderId(null);
+            wo.setCurrentTaskId(null);
+            if (remaining.isEmpty())
+            {
+                continue;
+            }
+            ProTask current = remaining.get(0);
+            wo.setCurrentTaskId(current.getTaskId());
+            if ("1".equals(current.getIsOutsource()))
+            {
+                fillOutsourceAction(wo, current);
+            }
+            else if (ProConstants.TASK_STATUS_PRODUCING.equals(current.getStatus()))
+            {
+                // 仅生产中任务可报工
+                wo.setActionKey("report");
+                wo.setActionLabel("报工");
+                wo.setActionPerm("mes:pro:feedback:add");
+            }
+            else if (current.getLeaderId() != null
+                    && current.getWorkstationId() != null && current.getWorkstationId() > 0
+                    && (admin || userId.equals(current.getLeaderId())
+                        || (wo.getOwnerId() != null && userId.equals(wo.getOwnerId()))))
+            {
+                // 未开工：工单负责人/当前工序负责人可开工（负责人/机台未指派时下发会失败，不展示）
+                setAction(wo, "start", "开工", null);
+            }
+        }
+    }
+
+    /** 外协当前工序 → 移动端主操作按钮（按外协单状态） */
+    private void fillOutsourceAction(ProWorkorder wo, ProTask task)
+    {
+        WmOutsourceOrder q = new WmOutsourceOrder();
+        q.setWorkorderId(wo.getWorkorderId());
+        q.setProcessId(task.getProcessId());
+        List<WmOutsourceOrder> orders = outsourceService.selectList(q);
+        WmOutsourceOrder order = orders.stream()
+                .filter(o -> !"RECEIVED".equals(o.getStatus()) && !"CLOSED".equals(o.getStatus()))
+                .max(Comparator.comparing(WmOutsourceOrder::getOrderId))
+                .orElse(null);
+        if (order == null)
+        {
+            return;
+        }
+        wo.setActionOutsourceOrderId(order.getOrderId());
+        String status = order.getStatus();
+        if ("DRAFT".equals(status))
+        {
+            setAction(wo, "outsource_execute", "执行发料", "mes:wm:outsource:execute");
+        }
+        else if ("VENDOR_RCVD".equals(status) || "PROCESSING".equals(status))
+        {
+            setAction(wo, "outsource_result", "加工登记", "mes:wm:outsource:agentOps");
+        }
+        else if ("FINISHED".equals(status))
+        {
+            setAction(wo, "outsource_ship", "发货回厂", "mes:wm:outsource:agentOps");
+        }
+        else if ("SHIPPED".equals(status))
+        {
+            setAction(wo, "outsource_receive", "外协收货登记", "mes:wm:outsource:receive");
+        }
+    }
+
+    private void setAction(ProWorkorder wo, String key, String label, String perm)
+    {
+        wo.setActionKey(key);
+        wo.setActionLabel(label);
+        wo.setActionPerm(perm);
+    }
+
+    /** 任务剩余数量 = 计划 - 已产（最小 0） */
+    private BigDecimal remainingQty(ProTask task)
+    {
+        BigDecimal planned = task.getQuantity() == null ? BigDecimal.ZERO : task.getQuantity();
+        BigDecimal produced = task.getQuantityProduced() == null ? BigDecimal.ZERO : task.getQuantityProduced();
+        return planned.subtract(produced).max(BigDecimal.ZERO);
     }
 
     /** 回填逾期天数：需求日期早于今天且工单处于待生产/生产中 */

@@ -45,6 +45,11 @@ export function getMobileWorkorders(query) {
   return request({ url: '/mes/pro/workorder/mobileList', method: 'get', params: query })
 }
 
+// 移动端首页顶部汇总：工单数量 + 待办任务数量
+export function getMobileHomeSummary(query) {
+  return request({ url: '/mes/pro/workorder/mobileSummary', method: 'get', params: query })
+}
+
 // 工单全部工序任务（工单详情/工序详情页用）
 export function getWorkorderTasks(workorderCode) {
   return request({ url: '/mes/pro/workorder/workorderTasks/' + encodeURIComponent(workorderCode), method: 'get' })

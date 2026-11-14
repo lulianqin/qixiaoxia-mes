@@ -2,6 +2,7 @@ package com.ruoyi.system.mapper.mes.pro;
 
 import java.util.List;
 import java.math.BigDecimal;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressRow;
 import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep;
@@ -9,6 +10,10 @@ import com.ruoyi.system.domain.mes.pro.vo.ProTaskProgressStep;
 public interface ProWorkorderMapper {
     ProWorkorder selectProWorkorderByWorkorderId(Long id);
     List<ProWorkorder> selectProWorkorderList(ProWorkorder w);
+
+    int countMobileWorkorders(@Param("status") String status);
+
+    int countMobilePendingTasks(@Param("status") String status);
     ProWorkorder selectProWorkorderByWorkorderCode(String code);
     int insertProWorkorder(ProWorkorder w);
     int updateProWorkorder(ProWorkorder w);

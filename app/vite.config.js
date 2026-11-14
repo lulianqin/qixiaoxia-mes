@@ -29,9 +29,10 @@ export default defineConfig({
     host: true,
     port: Number(process.env.VITE_PORT) || 9090,
     proxy: {
-      // H5 dev 态 config.baseUrl='/dev-api'，由这里转发到本机后端 8082
+      // H5 dev 态 config.baseUrl='/dev-api'，由这里转发到本机后端 8081
+      // 用 127.0.0.1 而不是 localhost：Node 可能优先解析到 IPv6 ::1，后端只监听 IPv4 时会 ECONNREFUSED
       '/dev-api': {
-        target: process.env.VITE_API_TARGET || 'http://localhost:8082',
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8081',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/dev-api/, '')
       },

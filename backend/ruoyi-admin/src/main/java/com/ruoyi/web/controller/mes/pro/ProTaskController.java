@@ -21,6 +21,8 @@ import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -36,11 +38,40 @@ public class ProTaskController extends BaseController
     @Autowired
     private IProTaskService proTaskService;
 
+    @Autowired
+    private com.ruoyi.system.service.mes.pro.IProWorkorderService proWorkorderService;
+
     @Autowired(required = false)
     private com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator autoCodeGenerator;
 
     @Autowired
     private com.ruoyi.system.service.mes.pro.IProQcBlockService qcBlockService;
+
+    /**
+     * 移动端开工：仅工单负责人/当前工序负责人（或管理员）可操作。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @Log(title = "移动端开工", businessType = BusinessType.UPDATE)
+    @PutMapping("/mobileStart/{taskId}")
+    public AjaxResult mobileStart(@PathVariable Long taskId)
+    {
+        ProTask task = proTaskService.selectProTaskByTaskId(taskId);
+        if (task == null)
+        {
+            return error("任务不存在");
+        }
+        Long userId = SecurityUtils.getUserId();
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        boolean allowed = SecurityUtils.isAdmin()
+                || userId.equals(task.getLeaderId())
+                || (wo != null && userId.equals(wo.getOwnerId()));
+        if (!allowed)
+        {
+            return error("仅工单负责人或当前工序负责人可开工");
+        }
+        proTaskService.dispatchTask(taskId);
+        return success();
+    }
 
     @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
     @GetMapping("/list")

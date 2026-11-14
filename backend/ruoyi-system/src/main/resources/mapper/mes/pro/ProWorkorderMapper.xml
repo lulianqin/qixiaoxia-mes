@@ -84,6 +84,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by workorder_id desc
     </select>
 
+    <!-- 移动端首页：当前筛选状态内的工单数量 -->
+    <select id="countMobileWorkorders" resultType="int">
+        select count(1) from qxx_pro_workorder
+        <where>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+
+    <!-- 移动端首页：当前筛选状态内的待办任务数（未完工且仍有剩余数量） -->
+    <select id="countMobilePendingTasks" resultType="int">
+        select count(1)
+        from qxx_pro_task t
+        join qxx_pro_workorder w
+          on w.workorder_id = t.workorder_id
+         and w.factory_id = t.factory_id
+        where t.status not in ('COMPLETED', 'CANCEL')
+          and ifnull(t.quantity_produced, 0) &lt; ifnull(t.quantity, 0)
+          and w.status not in ('COMPLETED', 'CANCEL', 'CLOSED')
+          <if test="status != null and status != ''"> and w.status = #{status}</if>
+    </select>
+
     <select id="selectProWorkorderByWorkorderId" parameterType="Long" resultMap="ProWorkorderResult">
         <include refid="selectProWorkorderVo"/>
         where workorder_id = #{workorderId}

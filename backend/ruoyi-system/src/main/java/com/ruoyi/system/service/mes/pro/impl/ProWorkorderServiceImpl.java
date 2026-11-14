@@ -617,6 +617,18 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
     }
 
+    @Override
+    public int countMobileWorkorders(String status)
+    {
+        return qxxProWorkorderMapper.countMobileWorkorders(status);
+    }
+
+    @Override
+    public int countMobilePendingTasks(String status)
+    {
+        return qxxProWorkorderMapper.countMobilePendingTasks(status);
+    }
+
     private void fillOneProgress(ProWorkorder wo, List<ProTaskProgressRow> tasks,
             boolean hasScheduledTasks, Date now, Long factoryId)
     {

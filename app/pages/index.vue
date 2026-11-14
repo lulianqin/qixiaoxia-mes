@@ -5,7 +5,7 @@
       <view class="header-row">
         <view class="header-text">
           <text class="hello">你好，{{ userName || '同事' }}</text>
-          <text class="hello-sub">生产工单</text>
+          <text class="hello-sub">{{ summary.workorderCount }} 张工单 · {{ summary.pendingTaskCount }} 项任务</text>
         </view>
         <view class="work-entry" @click="goWorkbench">工作台 ›</view>
       </view>
@@ -47,10 +47,15 @@
               <text class="wo-code">{{ wo.workorderCode }}</text>
               <uni-tag :type="woStatusTagType(wo.status)" :text="woStatusText(wo.status)" size="small" />
             </view>
-            <text class="go-text">详情 ›</text>
+            <text class="pending-text">{{ wo.pendingTaskCount || 0 }} 项待处理</text>
           </view>
 
           <text class="wo-product">{{ wo.productName || wo.workorderName || '-' }}</text>
+
+          <view class="process-row">
+            <text class="process-label">当前工序</text>
+            <text class="process-name">{{ processNameText(wo) }}</text>
+          </view>
 
           <view class="meta-row">
             <text class="meta-item">负责人：{{ wo.ownerName || '未指定' }}</text>
@@ -66,6 +71,19 @@
             </view>
             <text class="due-text" :class="overdueClass(wo)">{{ overdueText(wo) }}</text>
           </view>
+
+          <view class="action-row">
+            <view
+              v-if="visibleAction(wo)"
+              class="action-btn"
+              :class="'action-' + wo.actionKey"
+              @click.stop="goAction(wo)"
+            >
+              {{ wo.actionLabel }}
+            </view>
+            <view v-else class="action-placeholder"></view>
+            <text class="go-text" @click.stop="goWorkorderDetail(wo)">查看任务 ›</text>
+          </view>
         </view>
 
         <uni-load-more :status="finished ? 'noMore' : 'more'" />
@@ -79,7 +97,8 @@
   import { onShow } from '@dcloudio/uni-app'
   import UniLoadMore from '@/uni_modules/uni-load-more/components/uni-load-more/uni-load-more.vue'
   import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
-  import { getMobileWorkorders } from '@/api/mes/pro/feedback'
+  import { getMobileWorkorders, getMobileHomeSummary } from '@/api/mes/pro/feedback'
+  import { startTask } from '@/api/mes/pro/task'
   import { hasPermission } from '@/utils/mobileMenu'
   import { useUserStore } from '@/store'
 
@@ -103,6 +122,7 @@
   const userName = computed(() => userStore.name)
   const activeTab = ref('')
   const list = ref([])
+  const summary = ref({ workorderCount: 0, pendingTaskCount: 0 })
   const loading = ref(false)
   const refreshing = ref(false)
   const finished = ref(false)
@@ -131,6 +151,12 @@
 
   function woStatusTagType(status) {
     return WO_STATUS_TAG_MAP[status] || 'default'
+  }
+
+  /** 当前工序：已完成工单显示"已完成"，未排产显示"未排产" */
+  function processNameText(wo) {
+    if (wo.currentProcessName) return wo.currentProcessName
+    return wo.status === 'COMPLETED' ? '已完成' : '未排产'
   }
 
   /** yyyy-MM-dd HH:mm:ss → yyyy-MM-dd */
@@ -182,11 +208,13 @@
     activeTab.value = key
     list.value = []
     finished.value = false
+    loadSummary()
     loadData(true)
   }
 
   function onRefresh() {
     refreshing.value = true
+    loadSummary()
     loadData(true)
   }
 
@@ -196,9 +224,58 @@
     loadData(false)
   }
 
+  /** 顶部汇总：当前 tab 的工单数 + 待办任务数 */
+  function loadSummary() {
+    const params = {}
+    if (currentTab.value && currentTab.value.status) {
+      params.status = currentTab.value.status
+    }
+    getMobileHomeSummary(params).then(res => {
+      summary.value = res.data || { workorderCount: 0, pendingTaskCount: 0 }
+    }).catch(() => {
+      summary.value = { workorderCount: 0, pendingTaskCount: 0 }
+    })
+  }
+
   /** 工单卡片 → 工单详情页 */
   function goWorkorderDetail(wo) {
     proxy.$tab.navigateTo('/pages/mes/pro/workorder-detail?workorderId=' + wo.workorderId)
+  }
+
+  /** 当前工序按钮是否展示（按登录人权限过滤） */
+  function visibleAction(wo) {
+    return !!wo.actionKey && hasPermission(userStore.permissions, wo.actionPerm)
+  }
+
+  /** 当前工序主操作 → 对应录入页 */
+  function goAction(wo) {
+    if (wo.actionKey === 'start') {
+      uni.showModal({
+        title: '确认开工',
+        content: '确认开始工序「' + (wo.currentProcessName || '') + '」？',
+        success: res => {
+          if (!res.confirm) return
+          startTask(wo.currentTaskId).then(() => {
+            proxy.$modal.msgSuccess('已开工')
+            loadSummary()
+            loadData(true)
+          }).catch(() => {})
+        }
+      })
+      return
+    }
+    let url = ''
+    if (wo.actionKey === 'report') {
+      url = '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(wo.workorderCode || '')
+      if (wo.currentTaskId) url += '&taskId=' + wo.currentTaskId
+    } else if (wo.actionKey === 'outsource_execute') {
+      url = '/pages/mes/wm/outsource-execute?orderId=' + wo.actionOutsourceOrderId
+    } else if (wo.actionKey === 'outsource_result' || wo.actionKey === 'outsource_ship') {
+      url = '/pages/mes/wm/outsource-result?orderId=' + wo.actionOutsourceOrderId
+    } else if (wo.actionKey === 'outsource_receive') {
+      url = '/pages/mes/wm/outsource-receive?orderId=' + wo.actionOutsourceOrderId
+    }
+    if (url) proxy.$tab.navigateTo(url)
   }
 
   function goWorkbench() {
@@ -209,6 +286,7 @@
     if (!activeTab.value) {
       activeTab.value = (tabs.value[0] && tabs.value[0].key) || ''
     }
+    loadSummary()
     loadData(true)
   })
 </script>
@@ -349,12 +427,37 @@
 
   .wo-product {
     display: block;
-    font-size: 26rpx;
-    color: #5c6773;
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #1f2d3d;
     margin-bottom: 14rpx;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .pending-text {
+    font-size: 24rpx;
+    color: #e6a23c;
+    flex-shrink: 0;
+  }
+
+  .process-row {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    margin-bottom: 12rpx;
+  }
+
+  .process-label {
+    font-size: 24rpx;
+    color: #8a94a6;
+  }
+
+  .process-name {
+    font-size: 26rpx;
+    color: #3c96f3;
+    font-weight: 600;
   }
 
   .meta-row {
@@ -420,5 +523,48 @@
     color: #3c96f3;
     font-weight: 600;
     flex-shrink: 0;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18rpx;
+    padding-top: 18rpx;
+    border-top: 1rpx solid #f2f4f7;
+  }
+
+  .action-btn {
+    padding: 10rpx 24rpx;
+    border-radius: 8rpx;
+    font-size: 24rpx;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .action-report {
+    color: #3c96f3;
+    background: #eaf3ff;
+  }
+
+  .action-start {
+    color: #67c23a;
+    background: #f0f9eb;
+  }
+
+  .action-outsource_execute,
+  .action-outsource_result,
+  .action-outsource_ship {
+    color: #e6a23c;
+    background: #fdf6ec;
+  }
+
+  .action-outsource_receive {
+    color: #67c23a;
+    background: #f0f9eb;
+  }
+
+  .action-placeholder {
+    width: 1rpx;
   }
 </style>
