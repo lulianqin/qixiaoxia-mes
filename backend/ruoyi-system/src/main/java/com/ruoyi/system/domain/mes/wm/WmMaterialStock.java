@@ -104,6 +104,12 @@ public class WmMaterialStock extends BaseEntity
     @Excel(name = "供应商名称")
     private String vendorName;
 
+    @Excel(name = "客户ID")
+    private Long clientId;
+
+    @Excel(name = "客户名称")
+    private String clientName;
+
     @Excel(name = "生产工单ID")
     private Long workorderId;
 
@@ -124,6 +130,27 @@ public class WmMaterialStock extends BaseEntity
 
     @Excel(name = "是否启用")
     private String enableFlag;
+
+    @Excel(name = "盘点日期")
+    private Date stocktakeDate;
+
+    // ---- 以下为展示/查询字段，取自物料档案（非库存表字段）----
+    /** 物料分类ID（查询参数） */
+    private Long itemTypeId;
+
+    /** 物料分类编码 */
+    private String itemTypeCode;
+
+    /** 物料分类名称 */
+    @Excel(name = "物料分类")
+    private String itemTypeName;
+
+    /** 装箱规格（物料档案） */
+    @Excel(name = "装箱规格")
+    private String packageSpec;
+
+    /** 物料分类扩展属性（门幅/克重/材质等，物料档案） */
+    private java.util.Map<String, Object> itemExtAttrs;
 
     public Long getMaterialStockId() { return materialStockId; }
     public void setMaterialStockId(Long v) { this.materialStockId = v; }
@@ -212,6 +239,12 @@ public class WmMaterialStock extends BaseEntity
     public String getVendorName() { return vendorName; }
     public void setVendorName(String v) { this.vendorName = v; }
 
+    public Long getClientId() { return clientId; }
+    public void setClientId(Long v) { this.clientId = v; }
+
+    public String getClientName() { return clientName; }
+    public void setClientName(String v) { this.clientName = v; }
+
     public Long getWorkorderId() { return workorderId; }
     public void setWorkorderId(Long v) { this.workorderId = v; }
 
@@ -232,6 +265,24 @@ public class WmMaterialStock extends BaseEntity
 
     public String getEnableFlag() { return enableFlag; }
     public void setEnableFlag(String v) { this.enableFlag = v; }
+
+    public Date getStocktakeDate() { return stocktakeDate; }
+    public void setStocktakeDate(Date v) { this.stocktakeDate = v; }
+
+    public Long getItemTypeId() { return itemTypeId; }
+    public void setItemTypeId(Long v) { this.itemTypeId = v; }
+
+    public String getItemTypeCode() { return itemTypeCode; }
+    public void setItemTypeCode(String v) { this.itemTypeCode = v; }
+
+    public String getItemTypeName() { return itemTypeName; }
+    public void setItemTypeName(String v) { this.itemTypeName = v; }
+
+    public String getPackageSpec() { return packageSpec; }
+    public void setPackageSpec(String v) { this.packageSpec = v; }
+
+    public java.util.Map<String, Object> getItemExtAttrs() { return itemExtAttrs; }
+    public void setItemExtAttrs(java.util.Map<String, Object> v) { this.itemExtAttrs = v; }
 
     @Override
     public String toString() {

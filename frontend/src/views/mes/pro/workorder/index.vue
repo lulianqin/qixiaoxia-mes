@@ -10,7 +10,7 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="workorderList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="workorderList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="工单编码" align="center" prop="workorderCode" width="130">
         <template #default="scope">
@@ -81,11 +81,14 @@
           <el-tooltip content="取消" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="danger" icon="Close" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
           <el-tooltip content="进度" placement="top"><el-button link type="primary" icon="DataLine" @click="handleProgress(scope.row)"></el-button></el-tooltip>
           <el-tooltip content="看板" placement="top"><el-button link type="warning" icon="Odometer" @click="goWorkorderBoard(scope.row)"></el-button></el-tooltip>
+          <el-tooltip content="生成流转单" placement="top"><el-button link type="success" icon="Tickets" @click="handleFlowSheet(scope.row)" v-hasPermi="['mes:pro:workorder:flowSheet']"></el-button></el-tooltip>
           <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize" @pagination="getList" />
+
+    <FlowSheetDialog v-model="flowSheetOpen" :workorder-id="flowSheetWorkorderId" @success="getList" />
 
     <!-- 新增/编辑弹窗 — 2 Step 向导 -->
     <el-dialog :title="title" v-model="open" width="1000px" append-to-body @close="cancel">
@@ -173,11 +176,17 @@
         </el-row>
         <el-row><el-col :span="12"><el-form-item label="计划数量" prop="quantity"><el-input-number v-model="form.quantity" :min="1" style="width:100%" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="需求日期" prop="requestDate"><el-date-picker v-model="form.requestDate" type="date" value-format="YYYY-MM-DD HH:mm:ss" placeholder="请选择" style="width:100%" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="12"><el-form-item label="客户订单号"><el-input v-model="form.clientOrderCode" placeholder="客户PO号" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="订单类型"><el-select v-model="form.orderType" style="width:100%" :disabled="optType==='view'"><el-option v-for="d in salOrderTypeOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" /></el-select></el-form-item></el-col></el-row>
-        <el-row><el-col :span="12"><el-form-item label="产品尺寸"><el-input v-model="form.productSize" placeholder="如254*127*330mm" :disabled="optType==='view'" /></el-form-item></el-col><el-col :span="12"><el-form-item label="绳料规格"><el-input v-model="form.ropeSpec" placeholder="纸袋专用" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+        <el-row><el-col :span="12"><el-form-item label="产品尺寸"><el-input v-model="form.productSize" placeholder="如254*127*330mm" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="24"><el-form-item label="印刷要求"><el-input v-model="form.printingReq" placeholder="如1色满版黑印刷" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
         <el-row><el-col :span="24"><el-form-item label="包装要求"><el-input v-model="form.packageReq" placeholder="如250个/箱,贴唛头" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
-        <el-divider content-position="left">扩展属性（分类驱动）</el-divider>
-        <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.lineAttrs" :readonly="optType==='view'" />
+        <el-row><el-col :span="24"><el-form-item label="发货要求"><el-input v-model="form.shippingReq" placeholder="如分批发货、指定物流" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+        <el-row><el-col :span="24"><el-form-item label="工艺流程"><el-input v-model="form.processFlow" type="textarea" :rows="2" placeholder="如 印刷→覆膜→制袋→检验" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+        <el-row><el-col :span="24"><el-form-item label="产品图片"><image-upload v-model="form.productImage" :limit="1" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+        <el-row><el-col :span="24"><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" :disabled="optType==='view'" /></el-form-item></el-col></el-row>
+        <el-divider content-position="left">产品属性（分类驱动）</el-divider>
+        <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.lineAttrs" :readonly="optType==='view'" scope="PRODUCT" />
+        <el-divider content-position="left">生产属性（流转单）</el-divider>
+        <ExtAttrForm :schema="effAttrSchema" v-model="form.lineAttrs" :readonly="optType==='view'" scope="PRODUCTION" />
       </el-form>
 
       <!-- Step 2: 工序明细（按工序分组显示BOM + 参数） -->
@@ -433,6 +442,7 @@ import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import KitDashboard from './KitDashboard.vue'
 import WorkorderProgressDialog from './components/WorkorderProgressDialog.vue'
+import FlowSheetDialog from './FlowSheetDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listUser } from '@/api/system/user'
 import { getItem } from '@/api/mes/md/item'
@@ -443,7 +453,7 @@ import { getDicts } from '@/api/system/dict/data'
 
 export default {
   name: 'Workorder',
-  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard, WorkorderProgressDialog },
+  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard, WorkorderProgressDialog, FlowSheetDialog },
   data() {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
@@ -457,6 +467,8 @@ export default {
       kitDashboardOpen: false, kitWorkorderId: null,
       // 工单进度弹窗
       progressOpen: false, progressWorkorderId: null,
+      // 生产流转单
+      flowSheetOpen: false, flowSheetWorkorderId: null,
       // 开工检查流程
       startCheckOpen: false, startCheckWorkorderId: null, startCheckWorkorderName: '',
       startCheckSteps: [
@@ -586,7 +598,7 @@ export default {
       this.$router.push({ path: '/mes/pro/workorder_board', query: { workorderId: row.workorderId } })
     },
     cancel() { this.open=false; this.reset() },
-    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'STANDARD', productSize:null, ropeSpec:null, printingReq:null, packageReq:null, lineAttrs:{}, requestDate:null, remark:null, ownerId:null, ownerName:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false; this.ownerOptions=[]; this.ownerLoading=false },
+    reset() { this.form={ workorderId:null, workorderCode:null, workorderName:null, workorderType:'SELF', orderSource:'MANUAL', productId:null, productCode:null, productName:null, productSpc:null, unitOfMeasure:'PCS', unitName:'个', quantity:1, status:'PREPARE', clientOrderCode:null, orderType:'STANDARD', productSize:null, printingReq:null, packageReq:null, shippingReq:null, processFlow:null, productImage:null, lineAttrs:{}, requestDate:null, remark:null, ownerId:null, ownerName:null }; this.effAttrSchema=[]; this.autoGenFlag=false; this.step=1; this.prorouteId=null; this.bomList=[]; this.paramList=[]; this.routeProcesses=[]; this.routeOptions=[]; this.showProcessSelector=false; this.ownerOptions=[]; this.ownerLoading=false },
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
     resetQuery() { this.$refs.queryForm?.resetFields(); this.handleQuery() },
     handleSelectionChange(sel) { this.ids=sel.map(i=>i.workorderId); this.single=sel.length!==1; this.multiple=!sel.length },
@@ -663,6 +675,8 @@ export default {
     onProductSelected(row) {
       this.form.productId=row.itemId; this.form.productCode=row.itemCode; this.form.productName=row.itemName
       this.form.productSpc=row.specification; this.form.unitOfMeasure=row.unitOfMeasure; this.form.unitName=row.unitName
+      // 产品主图作为流转单产品图片兜底
+      if (!this.form.productImage && row.imageUrl) this.form.productImage = row.imageUrl
       this.prorouteId=null; this.routeOptions=[]
       // 按所选产品的分类拉取扩展属性 schema
       this.loadEffSchemaByProduct(row.itemId)
@@ -909,6 +923,11 @@ export default {
     handleProgress(row) {
       this.progressWorkorderId = row.workorderId
       this.progressOpen = true
+    },
+    // 生成生产流转单
+    handleFlowSheet(row) {
+      this.flowSheetWorkorderId = row.workorderId
+      this.flowSheetOpen = true
     },
     // 开工 — 打开分步检查弹窗
     handleStart(row) {

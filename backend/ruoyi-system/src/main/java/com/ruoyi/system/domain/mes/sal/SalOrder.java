@@ -61,8 +61,43 @@ public class SalOrder extends BaseEntity
     @Excel(name = "是否包装", readConverterExp = "Y=是,N=否")
     private String packageFlag;
 
-    @Excel(name = "订单来源", readConverterExp = "1=直接新增,2=CRM系统")
+    @Excel(name = "订单来源", readConverterExp = "1=直接新增,2=CRM系统,3=ERP系统")
     private Integer source;
+
+    /** 来源系统: MANUAL/CRM/ERP */
+    private String sourceSystem;
+
+    /** ERP 采购单ID */
+    private String externalOrderId;
+
+    /** ERP 采购单号（幂等键） */
+    @Excel(name = "ERP单号")
+    private String externalOrderNo;
+
+    /** 外部单据版本，重发递增 */
+    private Integer externalVersion;
+
+    /** 外部接单状态: PENDING/ACCEPTED/REJECTED */
+    private String acceptStatus;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "接单时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date acceptTime;
+
+    /** 打回原因 */
+    @Excel(name = "打回原因")
+    private String rejectReason;
+
+    private String rejectBy;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date rejectTime;
+
+    /** 回写ERP状态: PENDING/SUCCESS/FAILED */
+    private String syncStatus;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date syncTime;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "订单日期", width = 30, dateFormat = "yyyy-MM-dd")
@@ -137,6 +172,28 @@ public class SalOrder extends BaseEntity
     public void setPackageFlag(String v) { this.packageFlag = v; }
     public Integer getSource() { return source; }
     public void setSource(Integer v) { this.source = v; }
+    public String getSourceSystem() { return sourceSystem; }
+    public void setSourceSystem(String v) { this.sourceSystem = v; }
+    public String getExternalOrderId() { return externalOrderId; }
+    public void setExternalOrderId(String v) { this.externalOrderId = v; }
+    public String getExternalOrderNo() { return externalOrderNo; }
+    public void setExternalOrderNo(String v) { this.externalOrderNo = v; }
+    public Integer getExternalVersion() { return externalVersion; }
+    public void setExternalVersion(Integer v) { this.externalVersion = v; }
+    public String getAcceptStatus() { return acceptStatus; }
+    public void setAcceptStatus(String v) { this.acceptStatus = v; }
+    public Date getAcceptTime() { return acceptTime; }
+    public void setAcceptTime(Date v) { this.acceptTime = v; }
+    public String getRejectReason() { return rejectReason; }
+    public void setRejectReason(String v) { this.rejectReason = v; }
+    public String getRejectBy() { return rejectBy; }
+    public void setRejectBy(String v) { this.rejectBy = v; }
+    public Date getRejectTime() { return rejectTime; }
+    public void setRejectTime(Date v) { this.rejectTime = v; }
+    public String getSyncStatus() { return syncStatus; }
+    public void setSyncStatus(String v) { this.syncStatus = v; }
+    public Date getSyncTime() { return syncTime; }
+    public void setSyncTime(Date v) { this.syncTime = v; }
     public Date getOrderDate() { return orderDate; }
     public void setOrderDate(Date v) { this.orderDate = v; }
     public Date getRequestDate() { return requestDate; }

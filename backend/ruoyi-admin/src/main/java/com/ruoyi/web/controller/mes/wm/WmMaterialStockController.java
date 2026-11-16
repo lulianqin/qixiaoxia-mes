@@ -13,6 +13,8 @@ import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import com.ruoyi.system.service.mes.wm.IWmStockImportService;
 
 /**
  * 库存记录表Controller（factory_id 由 FactoryIdInterceptor 自动注入）
@@ -26,6 +28,9 @@ public class WmMaterialStockController extends BaseController
 {
     @Autowired
     private IWmMaterialStockService wmMaterialStockService;
+
+    @Autowired
+    private IWmStockImportService wmStockImportService;
 
     @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:list')")
     @GetMapping("/list")
@@ -97,6 +102,53 @@ public class WmMaterialStockController extends BaseController
     public AjaxResult edit(@RequestBody WmMaterialStock entity)
     {
         return toAjax(wmMaterialStockService.updateWmMaterialStock(entity));
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:import')")
+    @Log(title = "库存Excel导入", businessType = BusinessType.IMPORT)
+    @PostMapping("/import")
+    public AjaxResult importData(@RequestParam("file") MultipartFile file,
+                                 @RequestParam("itemTypeId") Long itemTypeId,
+                                 @RequestParam("warehouseId") Long warehouseId,
+                                 @RequestParam(value = "vendorId", required = false) Long vendorId,
+                                 @RequestParam(value = "clientId", required = false) Long clientId) throws Exception
+    {
+        if (file == null || file.isEmpty()) return error("请上传 Excel 文件");
+        return AjaxResult.success(wmStockImportService.importExcel(
+                file.getInputStream(), file.getOriginalFilename(), itemTypeId, warehouseId, vendorId, clientId));
+    }
+
+    /** 导入模板下载：type=RAW 物料类模板，其它为成品模板 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:import')")
+    @GetMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response,
+                               @RequestParam(value = "type", required = false) String type) throws Exception
+    {
+        boolean raw = "RAW".equalsIgnoreCase(type);
+        String[] headers = raw
+                ? new String[]{"物料名称", "规格门幅", "材质", "数量单位", "剩余数量", "辅助单位", "剩余辅助数量"}
+                : new String[]{"产品名称", "规格尺寸", "装箱数量", "数量单位", "剩余数量", "剩余箱数"};
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook())
+        {
+            var sheet = wb.createSheet("库存导入");
+            var row = sheet.createRow(0);
+            var style = wb.createCellStyle();
+            var font = wb.createFont();
+            font.setBold(true);
+            style.setFont(font);
+            for (int i = 0; i < headers.length; i++)
+            {
+                var cell = row.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(style);
+                sheet.setColumnWidth(i, 20 * 256);
+            }
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setCharacterEncoding("utf-8");
+            String fileName = java.net.URLEncoder.encode(raw ? "物料库存导入模板" : "成品库存导入模板", "UTF-8");
+            response.setHeader("Content-Disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+            wb.write(response.getOutputStream());
+        }
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:remove')")

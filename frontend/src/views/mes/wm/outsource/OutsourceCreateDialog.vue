@@ -102,6 +102,8 @@
       <div class="mt8 line-actions">
         <el-button type="primary" plain icon="Plus" size="small" @click="addLine">添加物料</el-button>
         <el-button v-if="outsourceInfo?.productId" plain icon="Box" size="small" @click="addProductLine">发产品本身（{{ outsourceInfo.productName }}）</el-button>
+        <el-button plain icon="Document" size="small" @click="addProductBomLines">加入产品BOM</el-button>
+        <el-button plain icon="Document" size="small" :disabled="!currentProcessBom.length" @click="addProcessBomLines">加入工序BOM</el-button>
       </div>
     </el-form>
 
@@ -121,6 +123,7 @@ import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import { createOutsource } from '@/api/mes/wm/outsource'
 import { getOutsourceProcessAttr } from '@/api/mes/wm/outsourceProcessAttr'
 import { getOutsourceInfo } from '@/api/mes/pro/workorder'
+import { listBomByWorkorderId } from '@/api/mes/pro/workorderbom'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { listProcard } from '@/api/mes/pro/procard'
 import ItemSelect from '@/components/itemSelect/single.vue'
@@ -140,6 +143,7 @@ const currentItemIdx = ref(0)
 const vendorOptions = ref<any[]>([])
 const cardOptions = ref<any[]>([])
 const processOptions = ref<any[]>([])
+const productBomLines = ref<any[]>([])
 // 工单外协信息（外协工序/默认厂商/BOM发料行/产品本身）
 const outsourceInfo = ref<any>(null)
 
@@ -183,6 +187,11 @@ async function open() {
   }
 }
 
+async function openWithWorkorder(row: any) {
+  await open()
+  if (row) await onWorkorderSelected(row)
+}
+
 function resetForm() {
   Object.assign(form, {
     vendorId: null, vendorCode: '', vendorName: '',
@@ -195,6 +204,7 @@ function resetForm() {
   attrSchema.value = []
   cardOptions.value = []
   processOptions.value = []
+  productBomLines.value = []
   outsourceInfo.value = null
 }
 
@@ -215,6 +225,7 @@ async function onWorkorderSelected(row: any) {
   form.issueLines = []
   processOptions.value = []
   loadCards(row.workorderId)
+  loadProductBom(row.workorderId)
   // 工单联动：只展示该工单的外协工序，默认选中第一道并带出厂商与发料明细
   try {
     const res = await getOutsourceInfo(row.workorderCode)
@@ -282,15 +293,49 @@ function onProcessChange(processId: number) {
 function addProductLine() {
   const info = outsourceInfo.value
   if (!info?.productId) return
-  form.issueLines.push({
+  addIssueLineFromItem({
     itemId: info.productId, itemCode: info.productCode, itemName: info.productName,
-    specification: info.productSpecification,
-    quantity: Number(info.productQuantity || 0),
-    unitOfMeasure: info.productUnitOfMeasure || null, unitName: info.productUnitName || null,
+    specification: info.productSpecification, quantity: info.productQuantity,
+    unitOfMeasure: info.productUnitOfMeasure, unitName: info.productUnitName
+  }, Number(info.productQuantity || 0))
+}
+
+/** 任意物料加入发料明细；同一物料去重 */
+function addIssueLineFromItem(item: any, qty: number) {
+  if (!item?.itemId) return
+  if (form.issueLines.some((l: any) => l.itemId === item.itemId)) return
+  form.issueLines.push({
+    itemId: item.itemId, itemCode: item.itemCode, itemName: item.itemName,
+    specification: item.specification || item.productSpecification,
+    quantity: qty > 0 ? qty : Number(item.quantity || 0),
+    unitOfMeasure: item.unitOfMeasure || null, unitName: item.unitName || null,
     batchId: null, batchCode: null,
     warehouseId: null, warehouseCode: '', warehouseName: '',
     unitPrice: null, amount: null, _attrs: {}
   })
+}
+
+const currentProcessBom = computed(() => {
+  const p = processOptions.value.find((x: any) => x.processId === form.processId)
+  return p?.bomLines || []
+})
+
+function addProductBomLines() {
+  if (!productBomLines.value.length) { proxy.$modal.msgWarning('产品BOM无物料'); return }
+  const qty = Number(outsourceInfo.value?.productQuantity || 1)
+  productBomLines.value.forEach((b: any) => addIssueLineFromItem(b, Number(b.quantity || 0) * qty))
+}
+
+function addProcessBomLines() {
+  currentProcessBom.value.forEach((b: any) => addIssueLineFromItem(b, Number(b.quantity || 0)))
+}
+
+/** 产品BOM：工单BOM中 processId 为空的行 */
+function loadProductBom(workorderId: number) {
+  productBomLines.value = []
+  listBomByWorkorderId(workorderId).then((r: any) => {
+    productBomLines.value = (r.data || r.rows || []).filter((b: any) => !b.processId)
+  }).catch(() => {})
 }
 
 function onItemSelected(row: any) {
@@ -347,7 +392,7 @@ async function submit() {
 
 function cancel() { visible.value = false; resetForm() }
 
-defineExpose({ open })
+defineExpose({ open, openWithWorkorder })
 </script>
 
 <style scoped>

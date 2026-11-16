@@ -40,6 +40,7 @@ export * from "./mes/pur/order";
 
 // MES SAL 模块(销售订单)
 export * from "./mes/sal/order";
+export * from "./mes/sal/quote";
 
 // MES WM 模块 (wm-core)
 export * from "./mes/wm/barcode";

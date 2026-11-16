@@ -1,12 +1,34 @@
 <template>
   <!--
-    动态扩展属性表单（物料页/销售行/采购行/工单 共用）
+    动态扩展属性表单（物料/销售行/采购行/工单/流转单 共用）
     schema: 属性定义列表（来自 getEffAttrSchema，含继承）
     modelValue: { attrCode: value } 扁平值对象
+    scope: 只渲染指定属性域（PRODUCT-产品属性 / PRODUCTION-生产属性），不传则全部
+    plain: 只读展示形态（流转单预览用），不渲染输入控件
     schema 中没有但 modelValue 里存在的 key → 作为"游离历史值"只读降级展示（设计文档 12.1）
   -->
   <div class="ext-attr-form">
     <el-empty v-if="!renderList.length" description="该分类未配置扩展属性" :image-size="60" />
+    <div v-else-if="plain" class="ext-attr-plain">
+      <div v-for="item in renderList" :key="item.attrCode" class="ext-attr-plain-row">
+        <span class="ext-attr-plain-label">{{ labelText(item) }}</span>
+        <span class="ext-attr-plain-value">
+          <template v-if="widgetOf(item) === 'IMAGE'">
+            <el-image v-if="formData[item.attrCode!]" :src="formData[item.attrCode!]" :preview-src-list="[formData[item.attrCode!]]"
+                      fit="contain" class="ext-attr-image" preview-teleported />
+            <span v-else>-</span>
+          </template>
+          <template v-else-if="widgetOf(item) === 'FILE'">
+            <template v-if="fileList(item).length">
+              <el-link v-for="(f, i) in fileList(item)" :key="i" :href="f.url" target="_blank" type="primary"
+                       underline="never" class="ext-attr-file">{{ f.name }}</el-link>
+            </template>
+            <span v-else>-</span>
+          </template>
+          <template v-else>{{ displayValue(item) }}</template>
+        </span>
+      </div>
+    </div>
     <el-form v-else ref="formRef" :model="formData" label-width="120px" class="ext-attr-inner">
       <el-form-item
         v-for="item in renderList"
@@ -15,25 +37,40 @@
         :prop="item.attrCode"
         :rules="item.required === '1' ? [{ required: true, message: `${item.attrName}不能为空`, trigger: 'blur' }] : undefined"
       >
-        <!-- TEXT -->
-        <el-input v-if="!item.attrType || item.attrType === 'TEXT'"
+        <!-- 文本 -->
+        <el-input v-if="widgetOf(item) === 'TEXT'"
           v-model="formData[item.attrCode!]" placeholder="请输入" clearable :disabled="item.readonly" />
-        <!-- NUMBER -->
-        <el-input-number v-else-if="item.attrType === 'NUMBER'"
+        <!-- 多行文本 -->
+        <el-input v-else-if="widgetOf(item) === 'TEXTAREA'"
+          v-model="formData[item.attrCode!]" type="textarea" :rows="3" placeholder="请输入" :disabled="item.readonly" />
+        <!-- 数字 -->
+        <el-input-number v-else-if="widgetOf(item) === 'NUMBER'"
           v-model="formData[item.attrCode!]" :controls="false" style="width: 100%"
           placeholder="请输入" :disabled="item.readonly" />
-        <!-- SELECT -->
-        <el-select v-else-if="item.attrType === 'SELECT'"
+        <!-- 单选 -->
+        <el-select v-else-if="widgetOf(item) === 'SELECT'"
           v-model="formData[item.attrCode!]" placeholder="请选择" clearable :disabled="item.readonly" style="width: 100%">
           <el-option v-for="opt in parseOptions(item.optionsJson)" :key="opt" :label="opt" :value="opt" />
         </el-select>
-        <!-- BOOL -->
-        <el-switch v-else-if="item.attrType === 'BOOL'"
+        <!-- 多选 -->
+        <el-select v-else-if="widgetOf(item) === 'MULTI_SELECT'"
+          v-model="formData[item.attrCode!]" placeholder="请选择" multiple clearable collapse-tags
+          :disabled="item.readonly" style="width: 100%">
+          <el-option v-for="opt in parseOptions(item.optionsJson)" :key="opt" :label="opt" :value="opt" />
+        </el-select>
+        <!-- 开关 -->
+        <el-switch v-else-if="widgetOf(item) === 'BOOL'"
           v-model="formData[item.attrCode!]" :disabled="item.readonly" />
-        <!-- DATE -->
-        <el-date-picker v-else-if="item.attrType === 'DATE'"
+        <!-- 日期 -->
+        <el-date-picker v-else-if="widgetOf(item) === 'DATE'"
           v-model="formData[item.attrCode!]" type="date" value-format="YYYY-MM-DD"
           placeholder="请选择" :disabled="item.readonly" style="width: 100%" />
+        <!-- 图片 -->
+        <image-upload v-else-if="widgetOf(item) === 'IMAGE'"
+          v-model="formData[item.attrCode!]" :limit="1" :disabled="item.readonly" />
+        <!-- 附件 -->
+        <file-upload v-else-if="widgetOf(item) === 'FILE'"
+          v-model="formData[item.attrCode!]" :limit="5" :disabled="item.readonly" />
       </el-form-item>
     </el-form>
   </div>
@@ -52,6 +89,10 @@ const props = defineProps<{
   modelValue?: Record<string, any>
   /** 是否只读（单据查看态） */
   readonly?: boolean
+  /** 只渲染指定属性域：PRODUCT-产品属性 / PRODUCTION-生产属性 */
+  scope?: 'PRODUCT' | 'PRODUCTION'
+  /** 只读展示形态：不渲染输入控件，按文本/图片/附件展示 */
+  plain?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -66,13 +107,13 @@ const renderList = computed<(MdItemTypeAttr & { readonly?: boolean })[]>(() => {
   const list: (MdItemTypeAttr & { readonly?: boolean })[] = []
   const covered = new Set<string>()
   for (const s of props.schema || []) {
-    if (s.attrCode) {
-      list.push({ ...s, readonly: props.readonly })
-      covered.add(s.attrCode)
-    }
+    if (!s.attrCode) continue
+    if (props.scope && (s.attrScope || 'PRODUCT') !== props.scope) continue
+    list.push({ ...s, readonly: props.readonly })
+    covered.add(s.attrCode)
   }
-  // 游离历史值：在 modelValue 但不在 schema 中（属性后被删/改名），只读降级展示
-  if (props.modelValue) {
+  // 游离历史值：仅在未按属性域过滤时展示，避免把生产属性混进产品属性区
+  if (!props.scope && props.modelValue) {
     for (const key of Object.keys(props.modelValue)) {
       if (!covered.has(key) && props.modelValue[key] !== null && props.modelValue[key] !== undefined && props.modelValue[key] !== '') {
         list.push({
@@ -84,6 +125,11 @@ const renderList = computed<(MdItemTypeAttr & { readonly?: boolean })[]>(() => {
   }
   return list
 })
+
+/** 控件类型：新数据取 widgetType，历史数据回退 attrType */
+function widgetOf(item: MdItemTypeAttr): string {
+  return item.widgetType || item.attrType || 'TEXT'
+}
 
 function labelText(item: MdItemTypeAttr): string {
   return item.attrName + (item.attrUnit ? `(${item.attrUnit})` : '')
@@ -98,6 +144,23 @@ function parseOptions(optionsJson?: string): string[] {
   } catch {
     return []
   }
+}
+
+function displayValue(item: MdItemTypeAttr): string {
+  const val = formData[item.attrCode!]
+  if (val === null || val === undefined || val === '') return '-'
+  if (widgetOf(item) === 'BOOL') return val === true || val === '1' || val === 1 ? '是' : '否'
+  if (Array.isArray(val)) return val.join('、')
+  return String(val)
+}
+
+function fileList(item: MdItemTypeAttr) {
+  const val = formData[item.attrCode!]
+  if (!val) return []
+  return String(val).split(',').filter(Boolean).map(url => ({
+    url: url.startsWith('http') ? url : url,
+    name: url.substring(url.lastIndexOf('/') + 1) || url
+  }))
 }
 
 // modelValue → formData（外部变化时同步）
@@ -120,7 +183,7 @@ async function validate() {
   for (const item of props.schema || []) {
     if (item.required === '1' && item.attrCode) {
       const v = formData[item.attrCode]
-      if (v === null || v === undefined || v === '') {
+      if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) {
         return Promise.reject(new Error(`${item.attrName}不能为空`))
       }
     }
@@ -133,4 +196,11 @@ defineExpose({ validate })
 <style scoped>
 .ext-attr-form { width: 100%; }
 .ext-attr-inner { max-width: 600px; }
+.ext-attr-plain { border: 1px solid #ebeef5; border-radius: 4px; overflow: hidden; }
+.ext-attr-plain-row { display: flex; border-bottom: 1px solid #ebeef5; font-size: 13px; }
+.ext-attr-plain-row:last-child { border-bottom: none; }
+.ext-attr-plain-label { width: 140px; flex: 0 0 140px; padding: 8px 12px; background: #fafafa; color: #606266; }
+.ext-attr-plain-value { flex: 1; padding: 8px 12px; color: #303133; word-break: break-all; }
+.ext-attr-image { width: 80px; height: 80px; border-radius: 4px; }
+.ext-attr-file { margin-right: 12px; }
 </style>

@@ -24,6 +24,10 @@ public class SalOrderLine extends BaseEntity
     private Long orderId;
 
     private Integer lineNo;
+
+    /** 外部系统明细行ID/行号（ERP采购单明细） */
+    private String externalLineId;
+
     private Long productId;
     private String productCode;
 
@@ -79,6 +83,8 @@ public class SalOrderLine extends BaseEntity
     public void setOrderId(Long v) { this.orderId = v; }
     public Integer getLineNo() { return lineNo; }
     public void setLineNo(Integer v) { this.lineNo = v; }
+    public String getExternalLineId() { return externalLineId; }
+    public void setExternalLineId(String v) { this.externalLineId = v; }
     public Long getProductId() { return productId; }
     public void setProductId(Long v) { this.productId = v; }
     public String getProductCode() { return productCode; }

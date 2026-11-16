@@ -18,6 +18,10 @@ export function dispatchTask(taskId: number) { return request({ url: '/mes/pro/t
 export function completeTask(taskId: number) { return request({ url: '/mes/pro/task/complete/' + taskId, method: 'put' }) }
 // 取消
 export function cancelTask(taskId: number) { return request({ url: '/mes/pro/task/cancel/' + taskId, method: 'put' }) }
+// 工序快捷状态：START-开始, PAUSE-停止, COMPLETE-完成（弱流程，仅记录）
+export function quickTaskStatus(taskId: number, action: string) {
+  return request({ url: '/mes/pro/task/quickStatus/' + taskId, method: 'put', params: { action } })
+}
 // 工序进度汇总
 export function progressByWorkorder(workorderId: number) { return request({ url: '/mes/pro/task/progressByWorkorder/' + workorderId, method: 'get' }) }
 // 跟单质检不合格放行（理由必填，需 mes:pro:task:release 权限）

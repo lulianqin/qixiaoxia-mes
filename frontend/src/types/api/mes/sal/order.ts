@@ -1,7 +1,7 @@
 import type { PageDomain, BaseEntity } from "../../common";
 
 /** 销售订单状态（五态主线 + CANCEL 链外） */
-export type SalOrderStatus = 'PENDING_ACCEPT' | 'CONFIRMED' | 'PRODUCING' | 'SHIPPED' | 'CLOSED' | 'CANCEL'
+export type SalOrderStatus = 'PENDING_ACCEPT' | 'REJECTED' | 'CONFIRMED' | 'PRODUCING' | 'SHIPPED' | 'CLOSED' | 'CANCEL'
 
 export interface SalOrderQueryParams extends PageDomain {
   orderCode?: string;
@@ -17,8 +17,12 @@ export interface SalOrderQueryParams extends PageDomain {
   statusList?: SalOrderStatus[];
   /** 是否在列表行内返回生产进度 progressPercent */
   includeProgress?: boolean;
-  /** 订单来源：1=直接新增 2=CRM系统 */
+  /** 订单来源：1=直接新增 2=CRM系统 3=ERP系统 */
   source?: number;
+  /** 来源系统：MANUAL/CRM/ERP */
+  sourceSystem?: string;
+  /** ERP 单号 */
+  externalOrderNo?: string;
 }
 
 export interface SalOrder extends BaseEntity {
@@ -39,8 +43,23 @@ export interface SalOrder extends BaseEntity {
   outsourceFlag?: string;
   /** 是否包装 Y/N */
   packageFlag?: string;
-  /** 订单来源：1=直接新增 2=CRM系统 */
+  /** 订单来源：1=直接新增 2=CRM系统 3=ERP系统 */
   source?: number;
+  /** 来源系统：MANUAL/CRM/ERP */
+  sourceSystem?: string;
+  /** ERP 单号（采购单号） */
+  externalOrderNo?: string;
+  externalOrderId?: string;
+  externalVersion?: number;
+  /** 外部接单状态：PENDING/ACCEPTED/REJECTED */
+  acceptStatus?: string;
+  acceptTime?: string;
+  rejectReason?: string;
+  rejectBy?: string;
+  rejectTime?: string;
+  /** 回写ERP状态：PENDING/SUCCESS/FAILED */
+  syncStatus?: string;
+  syncTime?: string;
   orderDate?: string;
   requestDate?: string;
   totalAmount?: number;

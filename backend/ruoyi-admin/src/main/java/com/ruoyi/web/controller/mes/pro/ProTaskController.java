@@ -214,6 +214,19 @@ public class ProTaskController extends BaseController
         return success();
     }
 
+    /**
+     * 工序快捷状态：START-开始, PAUSE-停止, COMPLETE-完成。
+     * 弱流程记录：不校验机台/负责人/质检，直接记录状态与时间。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
+    @Log(title = "工序快捷状态", businessType = BusinessType.UPDATE)
+    @PutMapping("/quickStatus/{taskId}")
+    public AjaxResult quickStatus(@PathVariable Long taskId, @RequestParam("action") String action)
+    {
+        proTaskService.quickChangeStatus(taskId, action);
+        return success();
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:pro:task:remove')")
     @Log(title = "生产任务", businessType = BusinessType.DELETE)
     @DeleteMapping("/{taskIds}")

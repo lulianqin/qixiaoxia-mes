@@ -26,6 +26,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
+import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
+import com.ruoyi.system.domain.mes.sal.SalOrder;
+import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
@@ -86,6 +90,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 {
     @Autowired
     private ProWorkorderMapper qxxProWorkorderMapper;
+
+    @Autowired
+    private SalOrderMapper salOrderMapper;
+
+    @Autowired
+    private SalOrderLineMapper salOrderLineMapper;
 
     @Autowired
     private ISysUserService userService;
@@ -719,6 +729,100 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
      * @param proWorkorder 生产工单
      * @return 结果
      */
+    @Override
+    @Transactional
+    public ProWorkorder generateFlowSheet(Long workorderId, ProWorkorder patch)
+    {
+        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("工单不存在");
+
+        ProWorkorder data = new ProWorkorder();
+        data.setWorkorderId(workorderId);
+        data.setTitle(StringUtils.isEmpty(wo.getTitle()) ? "生产流转单" : wo.getTitle());
+        if (wo.getBillDate() == null) data.setBillDate(DateUtils.getNowDate());
+
+        // 下单日期/订单数量/业务员以销售订单为准
+        fillFlowSheetOrderInfo(wo, findSourceOrder(wo), data);
+        if (StringUtils.isEmpty(wo.getProductionNo()))
+        {
+            String base = StringUtils.isNotEmpty(wo.getSourceCode()) ? wo.getSourceCode() : wo.getWorkorderCode();
+            Integer max = qxxProWorkorderMapper.selectMaxProductionSeq(base);
+            int seq = (max == null ? 0 : max) + 1;
+            data.setProductionNo(base + "-s" + seq);
+        }
+
+        // 人工补全字段覆盖自动值
+        if (patch != null)
+        {
+            if (patch.getTitle() != null) data.setTitle(patch.getTitle());
+            if (patch.getBillDate() != null) data.setBillDate(patch.getBillDate());
+            if (patch.getOrderDate() != null) data.setOrderDate(patch.getOrderDate());
+            if (patch.getOrderQty() != null) data.setOrderQty(patch.getOrderQty());
+            if (patch.getBagMouth() != null) data.setBagMouth(patch.getBagMouth());
+            if (patch.getBottomBoard() != null) data.setBottomBoard(patch.getBottomBoard());
+            if (patch.getMaterial() != null) data.setMaterial(patch.getMaterial());
+            if (patch.getMaterialGram() != null) data.setMaterialGram(patch.getMaterialGram());
+            if (patch.getRollWidth() != null) data.setRollWidth(patch.getRollWidth());
+            if (patch.getLossRate() != null) data.setLossRate(patch.getLossRate());
+            if (patch.getOrderWeight() != null) data.setOrderWeight(patch.getOrderWeight());
+            if (patch.getPlateCircumference() != null) data.setPlateCircumference(patch.getPlateCircumference());
+            if (patch.getProcessFlow() != null) data.setProcessFlow(patch.getProcessFlow());
+            if (patch.getProductImage() != null) data.setProductImage(patch.getProductImage());
+            if (patch.getSalesperson() != null) data.setSalesperson(patch.getSalesperson());
+        }
+
+        data.setUpdateBy(SecurityUtils.getUsername());
+        data.setUpdateTime(DateUtils.getNowDate());
+        qxxProWorkorderMapper.updateProWorkorder(data);
+        return selectProWorkorderByWorkorderId(workorderId);
+    }
+
+    @Override
+    public ProWorkorder enrichFlowSheet(ProWorkorder workorder)
+    {
+        if (workorder == null) return null;
+        fillFlowSheetOrderInfo(workorder, findSourceOrder(workorder), workorder);
+        return workorder;
+    }
+
+    private SalOrder findSourceOrder(ProWorkorder wo)
+    {
+        if (StringUtils.isEmpty(wo.getSourceCode())) return null;
+        return salOrderMapper.selectSalOrderByOrderCode(wo.getSourceCode());
+    }
+
+    /** 流转单下单日期/订单数量/业务员：优先销售订单，订单数量取对应销售明细行数量 */
+    private void fillFlowSheetOrderInfo(ProWorkorder wo, SalOrder order, ProWorkorder target)
+    {
+        if (order == null) return;
+        Date orderDate = order.getOrderDate() != null ? order.getOrderDate() : order.getCreateTime();
+        if (orderDate != null) target.setOrderDate(orderDate);
+        BigDecimal qty = resolveOrderQuantity(wo, order);
+        if (qty != null) target.setOrderQty(qty);
+        if (StringUtils.isNotEmpty(order.getSalesperson())) target.setSalesperson(order.getSalesperson());
+    }
+
+    private BigDecimal resolveOrderQuantity(ProWorkorder wo, SalOrder order)
+    {
+        List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(order.getOrderId());
+        if (lines == null || lines.isEmpty()) return null;
+        if (wo.getSalesOrderLineId() != null)
+        {
+            for (SalOrderLine line : lines)
+            {
+                if (wo.getSalesOrderLineId().equals(line.getLineId())) return line.getQuantity();
+            }
+        }
+        if (wo.getProductId() != null)
+        {
+            for (SalOrderLine line : lines)
+            {
+                if (wo.getProductId().equals(line.getProductId())) return line.getQuantity();
+            }
+        }
+        return lines.size() == 1 ? lines.get(0).getQuantity() : null;
+    }
+
     @Override
     @Transactional
     public int updateProWorkorder(ProWorkorder proWorkorder)

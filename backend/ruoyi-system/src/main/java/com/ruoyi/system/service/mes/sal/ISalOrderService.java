@@ -6,6 +6,8 @@ import com.ruoyi.system.domain.mes.sal.CrmOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.domain.mes.sal.dto.ErpOrderReceiveRequest;
+import com.ruoyi.system.domain.mes.sal.dto.SalOrderAcceptRequest;
 
 /**
  * 销售订单Service接口
@@ -39,6 +41,21 @@ public interface ISalOrderService
     public int cancelOrder(Long orderId);
     /** 接单:PENDING_ACCEPT->CONFIRMED（仅待接单可接，其他态拒绝） */
     public int acceptOrder(Long orderId);
+
+    /** ERP 下发采购单接收（幂等：同外部单号覆盖，已投产拒绝变更） */
+    public SalOrder receiveFromErp(ErpOrderReceiveRequest req);
+
+    /** 接单（ERP 来源可调整交期），返回回写任务ID；非 ERP 来源返回 null */
+    public Long acceptOrderWithSync(Long orderId, SalOrderAcceptRequest req);
+
+    /** 接单默认关联：按已记录的两系统映射，回填 MES 客户/产品建议 */
+    public java.util.Map<String, Object> buildAcceptDefaults(Long orderId);
+
+    /** 打回（仅 ERP 来源待接单订单），返回回写任务ID */
+    public Long rejectOrder(Long orderId, String reason);
+
+    /** 人工改状态（一期弱化流程）：任意状态互转，仅留痕不校验 */
+    public SalOrder changeStatus(Long orderId, String targetStatus, String reason);
 
     public int deleteSalOrderByOrderIds(Long[] orderIds);
 

@@ -43,3 +43,39 @@ export function availableBatches(itemId: number, warehouseId?: number | null): P
 export function getStockByBatchCode(batchCode: string): Promise<AjaxResult<WmMaterialStock[]>> {
   return request({ url: '/mes/wm/material_stock/scan/' + encodeURIComponent(batchCode), method: 'get' })
 }
+
+/** 库存 Excel 导入（COVER 覆盖，按物料分类+仓库，匹配不到自动建物料） */
+export function importMaterialStock(file: File, itemTypeId: number, warehouseId: number,
+                                    vendorId?: number | null, clientId?: number | null) {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('itemTypeId', String(itemTypeId))
+  fd.append('warehouseId', String(warehouseId))
+  if (vendorId != null) fd.append('vendorId', String(vendorId))
+  if (clientId != null) fd.append('clientId', String(clientId))
+  return request({
+    url: '/mes/wm/material_stock/import',
+    method: 'post',
+    data: fd,
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+/** 下载导入模板：type=RAW 物料类模板，其它为成品模板 */
+export function downloadStockTemplate(type: string, fileName?: string) {
+  return request({
+    url: '/mes/wm/material_stock/importTemplate',
+    method: 'get',
+    params: { type },
+    responseType: 'blob'
+  }).then((blob: any) => {
+    const url = window.URL.createObjectURL(new Blob([blob]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName || (type === 'RAW' ? '物料库存导入模板.xlsx' : '成品库存导入模板.xlsx')
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  })
+}

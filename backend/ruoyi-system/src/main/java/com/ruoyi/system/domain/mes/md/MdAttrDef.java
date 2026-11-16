@@ -33,6 +33,14 @@ public class MdAttrDef extends BaseEntity
     @Excel(name = "类型")
     private String attrType;
 
+    /** 属性域:PRODUCT-产品属性,PRODUCTION-生产/流转单属性 */
+    @Excel(name = "属性域")
+    private String attrScope;
+
+    /** 控件类型:TEXT/TEXTAREA/NUMBER/DATE/SELECT/MULTI_SELECT/BOOL/IMAGE/FILE */
+    @Excel(name = "控件类型")
+    private String widgetType;
+
     /** 单位,如 mm/g */
     @Excel(name = "单位")
     private String attrUnit;
@@ -62,6 +70,12 @@ public class MdAttrDef extends BaseEntity
 
     public String getAttrType() { return attrType; }
     public void setAttrType(String attrType) { this.attrType = attrType; }
+
+    public String getAttrScope() { return attrScope; }
+    public void setAttrScope(String attrScope) { this.attrScope = attrScope; }
+
+    public String getWidgetType() { return widgetType; }
+    public void setWidgetType(String widgetType) { this.widgetType = widgetType; }
 
     public String getAttrUnit() { return attrUnit; }
     public void setAttrUnit(String attrUnit) { this.attrUnit = attrUnit; }

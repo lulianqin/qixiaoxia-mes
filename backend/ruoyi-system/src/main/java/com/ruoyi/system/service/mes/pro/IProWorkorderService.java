@@ -81,6 +81,12 @@ public interface IProWorkorderService
      */
     public int updateProWorkorder(ProWorkorder proWorkorder);
 
+    /** 生成生产流转单：自动带出订单/工单字段 + 生成 -sN 生产编号，人工补全字段覆盖 */
+    public ProWorkorder generateFlowSheet(Long workorderId, ProWorkorder patch);
+
+    /** 流转单只读补全：下单日期/订单数量/业务员取销售订单，不落库 */
+    public ProWorkorder enrichFlowSheet(ProWorkorder workorder);
+
     /**
      * 批量删除生产工单
      *

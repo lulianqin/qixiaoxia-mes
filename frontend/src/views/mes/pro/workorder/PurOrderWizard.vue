@@ -1,5 +1,12 @@
 <template>
-  <el-dialog v-model="visible" title="采购单快捷创建" width="1100px" append-to-body @open="load">
+  <el-dialog v-model="visible" title="采购单快捷创建" width="1150px" append-to-body @open="load">
+    <div class="line-actions">
+      <el-button plain icon="Plus" size="small" @click="itemSelectRef?.open()">添加物料</el-button>
+      <el-button plain icon="Box" size="small" :disabled="!workorder.productId" @click="addProductLine">加入产品本身</el-button>
+      <el-button plain icon="Document" size="small" @click="addBomLines(false)">加入产品BOM</el-button>
+      <el-button plain icon="Document" size="small" @click="addBomLines(true)">加入工序BOM</el-button>
+      <span class="line-tip">可采购任意物料；缺口行已默认勾选</span>
+    </div>
     <el-table :data="lines" size="small" border ref="tableRef" @selection-change="handleSelection">
       <el-table-column type="selection" width="45" />
       <el-table-column label="物料编码" prop="itemCode" width="130" align="center"  :show-overflow-tooltip="true" />
@@ -45,6 +52,8 @@
       </el-table-column>
     </el-table>
 
+    <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
+
     <el-divider />
     <div v-if="checked.length === 0" style="color:#909399;text-align:center;padding:12px">请勾选需要采购的物料</div>
     <div v-else>
@@ -73,6 +82,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { loadPurOrderWizard, submitPurOrderWizard } from '@/api/mes/pro/kit'
+import { getWorkorder } from '@/api/mes/pro/workorder'
+import { listBomByWorkorderId } from '@/api/mes/pro/workorderbom'
+import { listItemVendor } from '@/api/mes/md/itemvendor'
+import ItemSelect from '@/components/itemSelect/single.vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps<{ modelValue: boolean; workorderId: number | null }>()
@@ -81,6 +94,9 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void; (e: 'refr
 const visible = ref(false)
 const lines = ref<any[]>([])
 const tableRef = ref()
+const itemSelectRef = ref()
+const workorder = ref<any>({})
+const bomLines = ref<any[]>([])
 const checked = ref<any[]>([])
 const submitting = ref(false)
 
@@ -89,6 +105,8 @@ watch(visible, (v: boolean) => { emit('update:modelValue', v) })
 
 function load() {
   if (!props.workorderId) return
+  getWorkorder(props.workorderId).then((r: any) => { workorder.value = r.data || {} }).catch(() => {})
+  listBomByWorkorderId(props.workorderId).then((r: any) => { bomLines.value = r.data || r.rows || [] }).catch(() => {})
   loadPurOrderWizard(props.workorderId).then((r: any) => {
     lines.value = (r.data?.lines || []).map((l: any) => ({
       ...l,
@@ -106,6 +124,55 @@ function load() {
 }
 
 function handleSelection(rows: any[]) { checked.value = rows }
+
+/** 任意物料加入采购明细；同一物料去重并自动勾选 */
+async function addLineFromItem(item: any, qty: number) {
+  if (!item?.itemId) return
+  const exist = lines.value.find((l: any) => l.itemId === item.itemId)
+  if (exist) {
+    nextTick(() => tableRef.value?.toggleRowSelection(exist, true))
+    return
+  }
+  let vendorOptions: any[] = []
+  try {
+    const res: any = await listItemVendor({ itemId: item.itemId, enableFlag: '1', pageNum: 1, pageSize: 100 })
+    vendorOptions = (res.rows || []).map((v: any) => ({ ...v }))
+  } catch (e) { /* 无供应商权限时保持待定 */ }
+  const preferred = vendorOptions.find((v: any) => v.isPreferred === 'Y')
+  const row: any = {
+    itemId: item.itemId, itemCode: item.itemCode, itemName: item.itemName,
+    unitOfMeasure: item.unitOfMeasure, unitName: item.unitName,
+    shortageQty: 0, recommendedQty: qty > 0 ? qty : 1,
+    vendorOptions, vendorId: preferred?.vendorId ?? null,
+    vendorCode: preferred?.vendorCode ?? null, vendorName: preferred?.vendorName ?? null,
+    itemDefaultPrice: item.defaultPurchasePrice, itemDefaultTaxRate: item.defaultTaxRate,
+    unitPrice: preferred?.purchasePrice ?? item.defaultPurchasePrice ?? 0,
+    taxRate: preferred?.taxRate ?? item.defaultTaxRate ?? 0,
+    hasExistingPO: false
+  }
+  recalcAmount(row)
+  lines.value.push(row)
+  nextTick(() => tableRef.value?.toggleRowSelection(row, true))
+}
+
+function onItemSelected(row: any) { if (row) addLineFromItem(row, 1) }
+
+function addProductLine() {
+  const wo = workorder.value
+  if (!wo?.productId) { ElMessage.warning('工单未关联产品'); return }
+  addLineFromItem({
+    itemId: wo.productId, itemCode: wo.productCode, itemName: wo.productName,
+    unitOfMeasure: wo.unitOfMeasure, unitName: wo.unitName
+  }, Number(wo.quantity || 1))
+}
+
+/** 产品BOM = 工单BOM中 processId 为空的行；工序BOM = 带 processId 的行 */
+function addBomLines(processBom: boolean) {
+  const qty = Number(workorder.value.quantity || 1)
+  const rows = bomLines.value.filter((b: any) => processBom ? !!b.processId : !b.processId)
+  if (!rows.length) { ElMessage.info(processBom ? '工序BOM无物料' : '产品BOM无物料'); return }
+  rows.forEach((b: any) => addLineFromItem(b, Number(b.quantity || 0) * qty))
+}
 
 /** 金额 = 采购数量 × 单价（不含税，2 位小数） */
 function recalcAmount(row: any) {
@@ -170,3 +237,8 @@ function submit() {
   }).catch(() => {}).finally(() => { submitting.value = false })
 }
 </script>
+
+<style scoped>
+.line-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.line-tip { color: #909399; font-size: 12px; margin-left: 4px; }
+</style>

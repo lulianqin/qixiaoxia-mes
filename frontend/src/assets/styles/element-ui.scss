@@ -176,6 +176,24 @@
   padding: 10px 20px 0;
 }
 
+// 弹窗/抽屉表单控件与列表页搜索框保持同样大小（32px / 13px），避免输入框偏小
+.el-dialog .el-form-item__content,
+.el-drawer .el-form-item__content {
+  > .el-input .el-input__wrapper,
+  > .el-select .el-select__wrapper,
+  > .el-input-number .el-input__wrapper,
+  > .el-date-editor .el-input__wrapper,
+  > .el-cascader .el-input__wrapper,
+  > .el-autocomplete .el-input__wrapper {
+    min-height: 32px;
+  }
+  .el-input__inner,
+  .el-select__placeholder,
+  .el-textarea__inner {
+    font-size: 13px;
+  }
+}
+
 // 卡片头部样式
 .el-card__header {
   padding: 14px 15px 7px !important;

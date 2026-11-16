@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sys.SysExternalDocMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.sys.SysExternalDoc" id="SysExternalDocResult">
+        <id property="docId" column="doc_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="systemCode" column="system_code" />
+        <result property="bizType" column="biz_type" />
+        <result property="bizId" column="biz_id" />
+        <result property="bizNo" column="biz_no" />
+        <result property="externalId" column="external_id" />
+        <result property="externalNo" column="external_no" />
+        <result property="externalVersion" column="external_version" />
+        <result property="syncStatus" column="sync_status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <insert id="upsertExternalDoc" parameterType="com.ruoyi.system.domain.mes.sys.SysExternalDoc">
+        insert into qxx_sys_external_doc
+            (factory_id, system_code, biz_type, biz_id, biz_no, external_id, external_no, external_version, sync_status, remark, create_by, create_time)
+        values
+            (#{factoryId}, #{systemCode}, #{bizType}, #{bizId}, #{bizNo}, #{externalId}, #{externalNo},
+             #{externalVersion}, #{syncStatus}, #{remark}, #{createBy}, sysdate())
+        on duplicate key update
+            biz_id = #{bizId},
+            biz_no = #{bizNo},
+            external_id = #{externalId},
+            external_version = #{externalVersion},
+            sync_status = #{syncStatus},
+            remark = #{remark},
+            update_by = #{createBy},
+            update_time = sysdate()
+    </insert>
+
+    <select id="selectByBiz" resultMap="SysExternalDocResult">
+        select doc_id, factory_id, system_code, biz_type, biz_id, biz_no, external_id, external_no,
+               external_version, sync_status, remark, create_by, create_time, update_by, update_time
+        from qxx_sys_external_doc
+        where biz_type = #{bizType} and biz_id = #{bizId}
+        order by doc_id asc
+    </select>
+
+</mapper>

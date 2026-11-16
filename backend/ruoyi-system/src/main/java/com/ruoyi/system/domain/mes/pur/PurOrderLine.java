@@ -30,6 +30,18 @@ public class PurOrderLine extends BaseEntity
     @Excel(name = "采购订单ID(关联qxx_pur_order)")
     private Long orderId;
 
+    /** 工序任务ID(关联qxx_pro_task,成品采购/多工序合并) */
+    private Long taskId;
+
+    /** 工序ID(关联qxx_pro_process) */
+    private Long processId;
+
+    /** 工序编码 */
+    private String processCode;
+
+    /** 工序名称 */
+    private String processName;
+
     /** 物料ID(关联qxx_md_item) */
     @Excel(name = "物料ID(关联qxx_md_item)")
     private Long itemId;
@@ -153,6 +165,46 @@ public class PurOrderLine extends BaseEntity
     public Long getOrderId() 
     {
         return orderId;
+    }
+
+    public Long getTaskId()
+    {
+        return taskId;
+    }
+
+    public void setTaskId(Long taskId)
+    {
+        this.taskId = taskId;
+    }
+
+    public Long getProcessId()
+    {
+        return processId;
+    }
+
+    public void setProcessId(Long processId)
+    {
+        this.processId = processId;
+    }
+
+    public String getProcessCode()
+    {
+        return processCode;
+    }
+
+    public void setProcessCode(String processCode)
+    {
+        this.processCode = processCode;
+    }
+
+    public String getProcessName()
+    {
+        return processName;
+    }
+
+    public void setProcessName(String processName)
+    {
+        this.processName = processName;
     }
 
     public void setItemId(Long itemId) 

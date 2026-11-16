@@ -80,4 +80,13 @@ public interface IOutsourceService
 
     /** 详情（含 issueLines + recptLines） */
     WmOutsourceOrder selectByOrderId(Long orderId);
+
+    /** 人工改加工单状态（一期弱化流程，不校验流转） */
+    WmOutsourceOrder changeStatus(Long orderId, String status, String reason);
+
+    /** 加工单工序行（多工序合并一张单） */
+    java.util.List<com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine> selectProcessLines(Long orderId);
+
+    /** 覆盖保存工序行 */
+    void saveProcessLines(Long orderId, java.util.List<com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine> lines);
 }

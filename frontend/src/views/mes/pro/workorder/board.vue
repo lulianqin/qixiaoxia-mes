@@ -10,6 +10,13 @@
     </el-page-header>
 
     <div v-loading="loading">
+      <!-- 基于工单创建采购单 / 加工单 -->
+      <div class="board-actions mb16">
+        <el-button type="primary" icon="Plus" @click="purWizOpen = true" v-hasPermi="['mes:pur:order:add']">新增采购单</el-button>
+        <el-button type="warning" icon="Plus" @click="openOutsource" v-hasPermi="['mes:wm:outsource:add']">新增加工单</el-button>
+        <span class="action-tip">采购单/加工单自动关联当前工单 {{ wo.workorderCode }}</span>
+      </div>
+
       <!-- 工单信息 -->
       <el-card shadow="never" class="mb16">
         <template #header><span>工单信息</span></template>
@@ -48,8 +55,13 @@
           <el-table-column label="不合格" align="center" prop="quantityUnqualified" width="80"  :show-overflow-tooltip="true" />
           <el-table-column label="上机" align="center" width="110"><template #default="s">{{ fmtTime(s.row.startTime) }}</template></el-table-column>
           <el-table-column label="完工" align="center" width="110"><template #default="s">{{ fmtTime(s.row.finishDate) }}</template></el-table-column>
-          <el-table-column label="操作" align="center" width="90" fixed="right">
-            <template #default="s"><el-button link type="primary" size="small" @click.stop="goProcess(s.row)">工序看板</el-button></template>
+          <el-table-column label="操作" align="center" width="230" fixed="right">
+            <template #default="s">
+              <el-button v-if="canStartTask(s.row)" link type="primary" size="small" @click.stop="quickStatus(s.row,'START')" v-hasPermi="['mes:pro:task:edit']">开工</el-button>
+              <el-button v-if="s.row.status==='PRODUCING'" link type="warning" size="small" @click.stop="quickStatus(s.row,'PAUSE')" v-hasPermi="['mes:pro:task:edit']">停止</el-button>
+              <el-button v-if="s.row.status!=='COMPLETED' && s.row.status!=='CANCEL'" link type="success" size="small" @click.stop="quickStatus(s.row,'COMPLETE')" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+              <el-button link type="primary" size="small" @click.stop="goProcess(s.row)">工序看板</el-button>
+            </template>
           </el-table-column>
         </el-table>
       </el-card>
@@ -89,12 +101,26 @@
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="outsource">
-            <template #title><span class="dim-title">外协单（{{ dims.outsource.total }}）</span></template>
+            <template #title><span class="dim-title">加工单（外协）（{{ dims.outsource.total }}）</span></template>
             <el-table :data="dims.outsource.list" size="small" border>
-              <el-table-column label="外协单号" align="center" prop="orderCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="加工单号" align="center" prop="orderCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="外协厂商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
+            </el-table>
+          </el-collapse-item>
+          <el-collapse-item name="purchase">
+            <template #title><span class="dim-title">采购单（{{ dims.purchase.total || 0 }}）</span></template>
+            <el-table :data="dims.purchase.list || []" size="small" border>
+              <el-table-column label="采购单号" align="center" prop="orderCode" width="150" :show-overflow-tooltip="true" />
+              <el-table-column label="单据名称" align="center" prop="orderName" min-width="130" :show-overflow-tooltip="true" />
+              <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
+              <el-table-column label="采购数量" align="center" prop="totalQuantity" width="100" />
+              <el-table-column label="采购金额" align="center" prop="totalAmount" width="110" />
+              <el-table-column label="预计到货" align="center" width="120">
+                <template #default="s">{{ fmtDate(s.row.expectedDate) }}</template>
+              </el-table-column>
+              <el-table-column label="状态" align="center" prop="status" width="100" :show-overflow-tooltip="true" />
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="issue">
@@ -131,6 +157,9 @@
         </el-collapse>
       </el-card>
     </div>
+
+    <PurOrderWizard v-model="purWizOpen" :workorder-id="workorderId" @refresh="load" />
+    <OutsourceCreateDialog ref="outsourceRef" @success="load" />
   </div>
 </template>
 
@@ -138,6 +167,9 @@
 import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getWorkorderBoard } from '@/api/mes/pro/workorder'
+import { quickTaskStatus } from '@/api/mes/pro/task'
+import PurOrderWizard from './PurOrderWizard.vue'
+import OutsourceCreateDialog from '@/views/mes/wm/outsource/OutsourceCreateDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_wm_issue_status } = proxy.useDict('mes_wm_issue_status')
@@ -148,13 +180,15 @@ const workorderId = computed(() => Number(route.query.workorderId))
 const loading = ref(false)
 const wo = ref<any>({})
 const tasks = ref<any[]>([])
-const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, issue: {}, itemRecpt: {}, productRecpt: {} })
+const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, purchase: {}, issue: {}, itemRecpt: {}, productRecpt: {} })
 const activeDims = ref<string[]>([])
 const activeDim = ref('')
+const purWizOpen = ref(false)
+const outsourceRef = ref()
 
 const WO_STATUS = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
 const WO_TAG = { PREPARE: 'info', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'danger', CLOSED: 'info' }
-const TASK_STATUS = { NORMAL: '未开工', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消' }
+const TASK_STATUS = { NORMAL: '未开工', PREPARE: '未开工', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 const FB_STATUS = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
 
 const woStatusText = computed(() => WO_STATUS[wo.value.status] || wo.value.status || '')
@@ -167,20 +201,39 @@ const progressPercent = computed(() => {
 const dimCards = computed(() => [
   { key: 'feedback', label: '报工', total: dims.value.feedback.total ?? 0 },
   { key: 'inspection', label: '检验', total: dims.value.inspection.total ?? 0 },
-  { key: 'outsource', label: '外协', total: dims.value.outsource.total ?? 0 },
+  { key: 'outsource', label: '加工单', total: dims.value.outsource.total ?? 0 },
+  { key: 'purchase', label: '采购', total: dims.value.purchase.total ?? 0 },
   { key: 'issue', label: '领料', total: dims.value.issue.total ?? 0 },
   { key: 'itemRecpt', label: '收料', total: dims.value.itemRecpt.total ?? 0 },
   { key: 'productRecpt', label: '入库', total: dims.value.productRecpt.total ?? 0 },
 ])
 
 function taskStatusText(t: any) { return t.qcBlocked ? '不可开工' : (TASK_STATUS[t.status] || t.status || '') }
-function taskTagType(t: any) { if (t.qcBlocked) return 'error'; return ({ COMPLETED: 'success', PRODUCING: 'warning', CANCEL: 'error' })[t.status] || 'info' }
+function taskTagType(t: any) { if (t.qcBlocked) return 'error'; return ({ COMPLETED: 'success', PRODUCING: 'warning', PAUSED: 'info', CANCEL: 'error' })[t.status] || 'info' }
+function canStartTask(t: any) { return ['NORMAL', 'PREPARE', 'PAUSED'].includes(t.status) }
+/** 工序快捷状态（弱流程记录，不校验机台/负责人/质检） */
+function quickStatus(t: any, action: string) {
+  const label = ({ START: '开工', PAUSE: '停止', COMPLETE: '完成' } as Record<string, string>)[action]
+  const run = () => quickTaskStatus(t.taskId, action).then(() => {
+    proxy.$modal.msgSuccess(label + '成功')
+    load()
+  }).catch(() => {})
+  if (action === 'START') run()
+  else proxy.$modal.confirm(`确认${label}工序「${t.processName || ''}」？`).then(run).catch(() => {})
+}
 function fbStatusText(s: string) { return FB_STATUS[s] || s || '-' }
 function fbTagType(s: string) { return ({ AUDITED: 'success', CONFIRMED: 'warning', PREPARE: 'info' })[s] || 'info' }
 function fmtDate(v?: string) { return v ? proxy.parseTime(v, '{y}-{m}-{d}') : '-' }
 function fmtTime(v?: string) { return v ? proxy.parseTime(v, '{m}-{d} {h}:{i}') : '-' }
 function goBack() { router.push('/mes/pro/workorder') }
 function goProcess(t: any) { router.push({ path: '/mes/pro/process_board', query: { taskId: t.taskId } }) }
+function openOutsource() {
+  outsourceRef.value?.openWithWorkorder({
+    workorderId: workorderId.value,
+    workorderCode: wo.value.workorderCode,
+    routeId: wo.value.routeId
+  })
+}
 
 function load() {
   if (!workorderId.value) return
@@ -193,6 +246,7 @@ function load() {
         feedback: r.data.feedback || {},
         inspection: r.data.inspection || {},
         outsource: r.data.outsource || {},
+        purchase: r.data.purchase || {},
         issue: r.data.issue || {},
         itemRecpt: r.data.itemRecpt || {},
         productRecpt: r.data.productRecpt || {},
@@ -206,6 +260,8 @@ load()
 
 <style scoped>
 .mb16 { margin-bottom: 16px; }
+.board-actions { display: flex; align-items: center; gap: 10px; }
+.action-tip { color: #909399; font-size: 12px; }
 .mt16 { margin-top: 16px; }
 .ml8 { margin-left: 8px; }
 .header-title { font-weight: bold; font-size: 16px; margin-right: 8px; }

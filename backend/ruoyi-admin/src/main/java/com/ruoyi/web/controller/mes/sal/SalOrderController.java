@@ -32,6 +32,10 @@ import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
+import com.ruoyi.system.service.mes.sys.ISysSyncTaskService;
+import com.ruoyi.system.domain.mes.sal.dto.SalOrderAcceptRequest;
+import com.ruoyi.system.domain.mes.sal.dto.SalOrderChangeStatusRequest;
+import com.ruoyi.system.domain.mes.sal.dto.SalOrderRejectRequest;
 
 /**
  * 销售订单Controller（factory_id 由 FactoryIdInterceptor 自动注入）
@@ -54,6 +58,9 @@ public class SalOrderController extends BaseController
 
     @Autowired
     private SalOrderDetailExcelExporter excelExporter;
+
+    @Autowired
+    private ISysSyncTaskService syncTaskService;
 
     /**
      * 查询销售订单列表
@@ -199,9 +206,40 @@ public class SalOrderController extends BaseController
     @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
     @Log(title = "销售订单接单", businessType = BusinessType.UPDATE)
     @PutMapping("/accept/{orderId}")
-    public AjaxResult accept(@PathVariable("orderId") Long orderId)
+    public AjaxResult accept(@PathVariable("orderId") Long orderId,
+            @RequestBody(required = false) SalOrderAcceptRequest req)
     {
-        return toAjax(salOrderService.acceptOrder(orderId));
+        Long taskId = salOrderService.acceptOrderWithSync(orderId, req);
+        if (taskId != null) syncTaskService.dispatch(taskId);
+        return AjaxResult.success(taskId);
+    }
+
+    /** 接单默认关联：按已记录的两系统映射回填 MES 客户/产品 */
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
+    @GetMapping("/acceptDefaults/{orderId}")
+    public AjaxResult acceptDefaults(@PathVariable("orderId") Long orderId)
+    {
+        return AjaxResult.success(salOrderService.buildAcceptDefaults(orderId));
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:reject')")
+    @Log(title = "销售订单打回", businessType = BusinessType.UPDATE)
+    @PutMapping("/reject/{orderId}")
+    public AjaxResult reject(@PathVariable("orderId") Long orderId,
+            @RequestBody SalOrderRejectRequest req)
+    {
+        Long taskId = salOrderService.rejectOrder(orderId, req.getReason());
+        if (taskId != null) syncTaskService.dispatch(taskId);
+        return AjaxResult.success(taskId);
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:changeStatus')")
+    @Log(title = "销售订单改状态", businessType = BusinessType.UPDATE)
+    @PutMapping("/changeStatus")
+    public AjaxResult changeStatus(@RequestBody SalOrderChangeStatusRequest req)
+    {
+        return AjaxResult.success(salOrderService.changeStatus(
+                req.getOrderId(), req.getTargetStatus(), req.getReason()));
     }
 
     @PreAuthorize("@ss.hasPermi('mes:sal:order:workorder')")

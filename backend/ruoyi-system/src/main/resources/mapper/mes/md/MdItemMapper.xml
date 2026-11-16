@@ -10,6 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="itemCode"        column="item_code"        />
         <result property="itemName"        column="item_name"        />
         <result property="specification"   column="specification"    />
+        <result property="imageUrl"        column="image_url"        />
         <result property="unitOfMeasure"   column="unit_of_measure"  />
         <result property="unitName"        column="unit_name"        />
         <result property="unit2"           column="unit2"            />
@@ -41,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMdItemVo">
-        select i.item_id, i.factory_id, i.item_code, i.item_name, i.specification, i.unit_of_measure,
+        select i.item_id, i.factory_id, i.item_code, i.item_name, i.specification, i.image_url, i.unit_of_measure,
                i.unit_name, i.unit2, i.unit2_name, i.conversion_rate, i.item_type_id,
                coalesce(nullif(i.item_type_code, ''), t.item_type_code) as item_type_code,
                coalesce(nullif(i.item_type_name, ''), t.item_type_name) as item_type_name,
@@ -95,6 +96,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="itemCode != null and itemCode != ''">item_code,</if>
             <if test="itemName != null and itemName != ''">item_name,</if>
             <if test="specification != null">specification,</if>
+            <if test="imageUrl != null">image_url,</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
             <if test="unitName != null and unitName != ''">unit_name,</if>
             <if test="unit2 != null">unit2,</if>
@@ -126,6 +128,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="itemCode != null and itemCode != ''">#{itemCode},</if>
             <if test="itemName != null and itemName != ''">#{itemName},</if>
             <if test="specification != null">#{specification},</if>
+            <if test="imageUrl != null">#{imageUrl},</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>
             <if test="unitName != null and unitName != ''">#{unitName},</if>
             <if test="unit2 != null">#{unit2},</if>
@@ -162,6 +165,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="itemCode != null and itemCode != ''">item_code = #{itemCode},</if>
             <if test="itemName != null and itemName != ''">item_name = #{itemName},</if>
             <if test="specification != null">specification = #{specification},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #{unitOfMeasure},</if>
             <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>
             <if test="unit2 != null">unit2 = #{unit2},</if>

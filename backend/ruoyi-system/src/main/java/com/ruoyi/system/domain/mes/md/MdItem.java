@@ -36,6 +36,9 @@ public class MdItem extends BaseEntity
     @Excel(name = "规格型号")
     private String specification;
 
+    /** 物料主图 */
+    private String imageUrl;
+
     /** 主单位编码 */
     @Excel(name = "主单位编码")
     private String unitOfMeasure;
@@ -135,6 +138,9 @@ public class MdItem extends BaseEntity
 
     public String getSpecification() { return specification; }
     public void setSpecification(String specification) { this.specification = specification; }
+
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
     public String getUnitOfMeasure() { return unitOfMeasure; }
     public void setUnitOfMeasure(String unitOfMeasure) { this.unitOfMeasure = unitOfMeasure; }

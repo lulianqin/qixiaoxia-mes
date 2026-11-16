@@ -8,7 +8,12 @@
         <el-tag v-if="task.isOutsource === '1'" type="warning" class="ml8">外协</el-tag>
       </template>
       <template #extra>
-        <el-button link type="primary" size="small" @click="goWorkorder" v-if="wo.workorderId">所属工单：{{ wo.workorderCode }}</el-button>
+        <div class="header-actions">
+          <el-button link type="primary" size="small" @click="goWorkorder" v-if="wo.workorderId">所属工单：{{ wo.workorderCode }}</el-button>
+          <el-button v-if="canStart" type="primary" size="small" @click="quickStatus('START')" v-hasPermi="['mes:pro:task:edit']">开工</el-button>
+          <el-button v-if="canStop" type="warning" size="small" @click="quickStatus('PAUSE')" v-hasPermi="['mes:pro:task:edit']">停止</el-button>
+          <el-button v-if="canComplete" type="success" size="small" @click="quickStatus('COMPLETE')" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+        </div>
       </template>
     </el-page-header>
 
@@ -92,6 +97,7 @@
 import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProcessBoard } from '@/api/mes/pro/workorder'
+import { quickTaskStatus } from '@/api/mes/pro/task'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_wm_issue_status } = proxy.useDict('mes_wm_issue_status')
@@ -105,7 +111,7 @@ const wo = ref<any>({})
 const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, issue: {} })
 const activeDims = ref<string[]>([])
 
-const TASK_STATUS = { NORMAL: '未开工', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消' }
+const TASK_STATUS = { NORMAL: '未开工', PREPARE: '未开工', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 const FB_STATUS = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
 
 const statusText = computed(() => {
@@ -129,6 +135,21 @@ function fbTagType(s: string) { return ({ AUDITED: 'success', CONFIRMED: 'warnin
 function fmtTime(v?: string) { return v ? proxy.parseTime(v, '{m}-{d} {h}:{i}') : '-' }
 function goBack() { router.push('/mes/pro/workorder') }
 function goWorkorder() { router.push({ path: '/mes/pro/workorder_board', query: { workorderId: wo.value.workorderId } }) }
+
+const canStart = computed(() => ['NORMAL', 'PREPARE', 'PAUSED'].includes(task.value.status))
+const canStop = computed(() => task.value.status === 'PRODUCING')
+const canComplete = computed(() => !['COMPLETED', 'CANCEL'].includes(task.value.status))
+
+/** 工序快捷状态（弱流程记录） */
+function quickStatus(action: string) {
+  const label = ({ START: '开工', PAUSE: '停止', COMPLETE: '完成' } as Record<string, string>)[action]
+  const run = () => quickTaskStatus(task.value.taskId, action).then(() => {
+    proxy.$modal.msgSuccess(label + '成功')
+    load()
+  }).catch(() => {})
+  if (action === 'START') run()
+  else proxy.$modal.confirm(`确认${label}工序「${task.value.processName || ''}」？`).then(run).catch(() => {})
+}
 
 function load() {
   if (!taskId.value) return
@@ -155,6 +176,7 @@ load()
 .mt16 { margin-top: 16px; }
 .ml8 { margin-left: 8px; }
 .header-title { font-weight: bold; font-size: 16px; margin-right: 8px; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .stat { text-align: center; padding: 12px 0; background: #fafafa; border-radius: 8px; }
 .stat-num { font-size: 22px; font-weight: bold; color: #1f2d3d; }
 .stat-num.hl { color: #409eff; }

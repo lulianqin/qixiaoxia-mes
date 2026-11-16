@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sys.SysIntegrationEndpointMapper">
+
+    <resultMap type="SysIntegrationEndpoint" id="SysIntegrationEndpointResult">
+        <result property="endpointId"  column="endpoint_id"  />
+        <result property="factoryId"   column="factory_id"   />
+        <result property="systemCode"  column="system_code"  />
+        <result property="systemName"  column="system_name"  />
+        <result property="baseUrl"     column="base_url"     />
+        <result property="apiKey"      column="api_key"      />
+        <result property="enabled"     column="enabled"      />
+        <result property="remark"      column="remark"       />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+    </resultMap>
+
+    <sql id="selectEndpointVo">
+        select endpoint_id, factory_id, system_code, system_name, base_url, api_key, enabled, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_sys_integration_endpoint
+    </sql>
+
+    <select id="selectSysIntegrationEndpointList" parameterType="SysIntegrationEndpoint" resultMap="SysIntegrationEndpointResult">
+        <include refid="selectEndpointVo"/>
+        <where>
+            <if test="systemCode != null and systemCode != ''"> and system_code = #{systemCode}</if>
+            <if test="enabled != null and enabled != ''"> and enabled = #{enabled}</if>
+        </where>
+        order by endpoint_id
+    </select>
+
+    <select id="selectSysIntegrationEndpointById" parameterType="Long" resultMap="SysIntegrationEndpointResult">
+        <include refid="selectEndpointVo"/>
+        where endpoint_id = #{endpointId}
+    </select>
+
+    <select id="selectByFactoryAndSystem" resultMap="SysIntegrationEndpointResult">
+        <include refid="selectEndpointVo"/>
+        where factory_id = #{factoryId} and system_code = #{systemCode}
+        limit 1
+    </select>
+
+    <insert id="insertSysIntegrationEndpoint" parameterType="SysIntegrationEndpoint" useGeneratedKeys="true" keyProperty="endpointId">
+        insert into qxx_sys_integration_endpoint
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="systemCode != null and systemCode != ''">system_code,</if>
+            <if test="systemName != null">system_name,</if>
+            <if test="baseUrl != null">base_url,</if>
+            <if test="apiKey != null">api_key,</if>
+            <if test="enabled != null">enabled,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="systemCode != null and systemCode != ''">#{systemCode},</if>
+            <if test="systemName != null">#{systemName},</if>
+            <if test="baseUrl != null">#{baseUrl},</if>
+            <if test="apiKey != null">#{apiKey},</if>
+            <if test="enabled != null">#{enabled},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSysIntegrationEndpoint" parameterType="SysIntegrationEndpoint">
+        update qxx_sys_integration_endpoint
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="systemCode != null and systemCode != ''">system_code = #{systemCode},</if>
+            <if test="systemName != null">system_name = #{systemName},</if>
+            <if test="baseUrl != null">base_url = #{baseUrl},</if>
+            <if test="apiKey != null">api_key = #{apiKey},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where endpoint_id = #{endpointId}
+    </update>
+
+</mapper>

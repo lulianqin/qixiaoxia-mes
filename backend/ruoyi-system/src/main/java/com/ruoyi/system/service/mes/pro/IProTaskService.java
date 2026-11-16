@@ -49,6 +49,9 @@ public interface IProTaskService
      */
     public void completeTask(Long taskId);
 
+    /** 工序快捷状态：START-开始, PAUSE-停止, COMPLETE-完成（弱流程，仅记录状态与时间） */
+    public void quickChangeStatus(Long taskId, String action);
+
     /**
      * 取消单个任务：非终态（非 COMPLETED/CANCEL）→ CANCEL
      */

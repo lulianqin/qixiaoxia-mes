@@ -18,6 +18,8 @@ export interface MdItem extends BaseEntity {
   itemCode?: string;
   itemName?: string;
   specification?: string;
+  /** 物料主图 */
+  imageUrl?: string;
   unitOfMeasure?: string;
   unitName?: string;
   unit2?: string;

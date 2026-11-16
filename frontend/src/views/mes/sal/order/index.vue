@@ -5,6 +5,7 @@
       <el-form-item label="订单名称" prop="orderName"><el-input v-model="queryParams.orderName" placeholder="订单名称" clearable @keyup.enter="handleQuery" /></el-form-item>
       <el-form-item label="客户" prop="clientName"><el-input v-model="queryParams.clientName" placeholder="客户名称" clearable @keyup.enter="handleQuery" /></el-form-item>
       <el-form-item label="客户PO号" prop="clientOrderCode"><el-input v-model="queryParams.clientOrderCode" placeholder="客户PO号" clearable @keyup.enter="handleQuery" /></el-form-item>
+      <el-form-item label="ERP单号" prop="externalOrderNo"><el-input v-model="queryParams.externalOrderNo" placeholder="ERP采购单号" clearable @keyup.enter="handleQuery" /></el-form-item>
       <el-form-item label="业务线" prop="businessLine">
         <el-select v-model="queryParams.businessLine" placeholder="全部" clearable style="width:110px">
           <el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" />
@@ -22,7 +23,7 @@
       </el-form-item>
       <el-form-item label="来源" prop="source">
         <el-select v-model="queryParams.source" placeholder="全部" clearable style="width:110px">
-          <el-option label="直接新增" :value="1" /><el-option label="CRM系统" :value="2" />
+          <el-option label="直接新增" :value="1" /><el-option label="CRM系统" :value="2" /><el-option label="ERP系统" :value="3" />
         </el-select>
       </el-form-item>
       <el-form-item><el-button type="primary" size="small" @click="handleQuery">搜索</el-button><el-button size="small" @click="resetQuery">重置</el-button></el-form-item>
@@ -36,7 +37,7 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="销售订单号" align="center" prop="orderCode" width="140" :show-overflow-tooltip="true">
         <template #default="s"><el-link type="primary" @click="handleView(s.row)">{{ s.row.orderCode }}</el-link></template>
@@ -47,6 +48,10 @@
       <el-table-column label="客户PO号" align="center" prop="clientOrderCode" width="120" :show-overflow-tooltip="true" />
       <el-table-column label="业务线" align="center" prop="businessLine" width="80" :show-overflow-tooltip="true"><template #default="s">{{ businessLineText(s.row.businessLine) }}</template></el-table-column>
       <el-table-column label="来源" align="center" prop="source" width="90"><template #default="s"><el-tag :type="sourceTag(s.row.source)">{{ sourceText(s.row.source) }}</el-tag></template></el-table-column>
+      <el-table-column label="ERP单号" align="center" prop="externalOrderNo" width="150" :show-overflow-tooltip="true" />
+      <el-table-column label="回写状态" align="center" prop="syncStatus" width="90">
+        <template #default="s"><el-tag v-if="s.row.syncStatus" :type="syncTag(s.row.syncStatus)">{{ syncText(s.row.syncStatus) }}</el-tag><span v-else>-</span></template>
+      </el-table-column>
       <el-table-column label="交期" align="center" prop="requestDate" width="180" :show-overflow-tooltip="true"><template #default="s">{{ parseTime(s.row.requestDate, '{y}-{m}-{d}') }}</template></el-table-column>
       <el-table-column label="总金额" align="center" prop="totalAmount" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="生产进度" align="center" width="150">
@@ -59,11 +64,21 @@
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
           <el-button v-if="scope.row.status==='PENDING_ACCEPT'" link type="success" size="small" @click="handleAccept(scope.row)" v-hasPermi="['mes:sal:order:edit']">接单</el-button>
+          <el-button v-if="scope.row.status==='PENDING_ACCEPT' && scope.row.sourceSystem==='ERP'" link type="danger" size="small" @click="handleReject(scope.row)" v-hasPermi="['mes:sal:order:reject']">打回</el-button>
           <el-button v-if="canModify(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
           <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
           <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">结单</el-button>
           <el-button v-if="['PENDING_ACCEPT','CONFIRMED','PRODUCING'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
           <el-button v-if="canModify(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
+          <el-dropdown @command="(cmd) => handleChangeStatus(scope.row, cmd)" v-hasPermi="['mes:sal:order:changeStatus']">
+            <el-button link type="primary" size="small">改状态<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="s in salStatusOptions" :key="s.dictValue" :command="s.dictValue"
+                                  :disabled="s.dictValue === scope.row.status">{{ s.dictLabel }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-dropdown @command="(cmd) => handleRowExport(scope.row, cmd)" v-hasPermi="['mes:sal:order:exportDetail']">
             <el-button link type="primary" size="small">导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
             <template #dropdown>
@@ -79,22 +94,27 @@
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <OrderEditDialog ref="editDialogRef" :order-type-options="salOrderTypeOptions" @success="getList" />
+    <AcceptDialog ref="acceptDialogRef" @success="getList" />
+    <RejectDialog ref="rejectDialogRef" @success="getList" />
     <ToWorkorderDialog v-model="twOpen" :order="twOrder" @created="getList" />
   </div>
 </template>
 
 <script>
-import { listOrder, closeOrder, cancelOrder, acceptOrder, delOrder } from '@/api/mes/sal/order'
+import { listOrder, closeOrder, cancelOrder, delOrder, changeOrderStatus } from '@/api/mes/sal/order'
 import { getDicts } from '@/api/system/dict/data'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import OrderEditDialog from './OrderEditDialog.vue'
 import ToWorkorderDialog from './ToWorkorderDialog.vue'
+import AcceptDialog from './AcceptDialog.vue'
+import RejectDialog from './RejectDialog.vue'
 
 // 进度满格阈值（百分比）；CLOSED/CANCEL 由进度条 exception 态标识
 const PROGRESS_FULL = 100
 
 export default {
   name: 'SalOrder',
-  components: { OrderEditDialog, ToWorkorderDialog },
+  components: { OrderEditDialog, ToWorkorderDialog, AcceptDialog, RejectDialog },
   data() {
     return {
       loading: true, ids: [], selectedRows: [], single: true, multiple: true, showSearch: true, total: 0,
@@ -103,7 +123,7 @@ export default {
       salStatusOptions: [],
       // 销售订单类型字典(mes_sal_order_type)
       salOrderTypeOptions: [],
-      queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, businessLine: null, orderType: null, status: null, source: null },
+      queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, externalOrderNo: null, businessLine: null, orderType: null, status: null, source: null },
       twOpen: false, twOrder: {}
     }
   },
@@ -124,6 +144,19 @@ export default {
     loadStatusDict() { getDicts('mes_sal_order_status').then(r => { this.salStatusOptions = r.data || [] }) },
     /** 加载销售订单类型字典 */
     loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.salOrderTypeOptions = r.data || [] }) },
+    /** 一期：人工改订单状态（任意状态互转，后端记录变更原因） */
+    handleChangeStatus(row, targetStatus) {
+      if (targetStatus === row.status) return
+      const label = (this.salStatusOptions.find(s => s.dictValue === targetStatus) || {}).dictLabel || targetStatus
+      ElMessageBox.prompt(`将订单 ${row.orderCode} 状态改为「${label}」，请填写变更原因（可空）`, '改状态', {
+        inputPlaceholder: '变更原因', confirmButtonText: '确定', cancelButtonText: '取消'
+      }).then(({ value }) => {
+        return changeOrderStatus({ orderId: row.orderId, targetStatus, reason: value })
+      }).then(() => {
+        ElMessage.success('状态已更新')
+        this.getList()
+      }).catch(() => {})
+    },
     /** 状态 → {text, type}，由字典驱动渲染 */
     statusMeta(s) {
       const d = this.salStatusOptions.find(o => o.dictValue === s)
@@ -135,8 +168,10 @@ export default {
       return { text: d ? d.dictLabel : (t || ''), type: d && d.listClass ? d.listClass : '' }
     },
     businessLineText(b) { return { DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }[b] || b },
-    sourceText(s) { return { 1: '直接新增', 2: 'CRM系统' }[s] || (s == null ? '' : s) },
-    sourceTag(s) { return s === 2 ? 'warning' : 'info' },
+    sourceText(s) { return { 1: '直接新增', 2: 'CRM系统', 3: 'ERP系统' }[s] || (s == null ? '' : s) },
+    sourceTag(s) { return s === 3 ? 'success' : s === 2 ? 'warning' : 'info' },
+    syncText(s) { return { PENDING: '待回写', SUCCESS: '已回写', FAILED: '回写失败' }[s] || s },
+    syncTag(s) { return s === 'SUCCESS' ? 'success' : s === 'FAILED' ? 'danger' : 'warning' },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() { this.resetForm('queryRef'); this.handleQuery() },
     handleSelectionChange(sel) { this.selectedRows = sel; this.ids = sel.map(i => i.orderId); this.single = sel.length !== 1; this.multiple = !sel.length },
@@ -147,7 +182,8 @@ export default {
       const id = row.orderId || this.ids
       if (id) this.$refs.editDialogRef.openEdit(id)
     },
-    handleAccept(row) { this.$modal.confirm('确认接单 "' + row.orderCode + '"？接单后进入已确认状态，可转工单生产。').then(() => acceptOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('接单成功') }).catch(() => {}) },
+    handleAccept(row) { this.$refs.acceptDialogRef.open(row) },
+    handleReject(row) { this.$refs.rejectDialogRef.open(row) },
     handleClose(row) { this.$modal.confirm('确认结单 "' + row.orderCode + '"？结单后不可恢复。').then(() => closeOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('结单成功') }).catch(() => {}) },
     handleCancel(row) { this.$modal.confirm('确认取消 "' + row.orderCode + '" ?').then(() => cancelOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('取消成功，关联工单需另行处理') }).catch(() => {}) },
     handleDelete(row) { const ids = row.orderId || this.ids; this.$modal.confirm('是否确认删除销售订单 "' + ids + '" ?').then(() => delOrder(ids)).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },

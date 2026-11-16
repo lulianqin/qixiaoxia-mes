@@ -110,6 +110,9 @@ public interface IPurOrderService
      */
     public int closePurOrder(Long orderId, String closeReason);
 
+    /** 人工改采购单状态（一期弱化流程，不校验流转） */
+    public int changeStatus(Long orderId, String status, String reason);
+
     /**
      * 取消采购订单（DRAFT/APPROVED/ORDERED -> CANCEL）
      * 校验：所有行已收货数量为0

@@ -402,6 +402,45 @@ public class ProTaskServiceImpl implements IProTaskService
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void quickChangeStatus(Long taskId, String action)
+    {
+        ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
+        if (task == null) throw new ServiceException("任务不存在");
+        if (TASK_INACTIVE.contains(task.getStatus()) && !"COMPLETE".equals(action))
+            throw new ServiceException("已完成/取消的任务不能操作，当前状态：" + task.getStatus());
+        Date now = DateUtils.getNowDate();
+        if ("START".equals(action))
+        {
+            if (TASK_INACTIVE.contains(task.getStatus()))
+                throw new ServiceException("已完成/取消的任务不能开工");
+            task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
+            if (task.getStartTime() == null) task.setStartTime(now);
+        }
+        else if ("PAUSE".equals(action))
+        {
+            if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus()))
+                throw new ServiceException("只有生产中的工序才能停止");
+            task.setStatus(ProConstants.TASK_STATUS_PAUSED);
+        }
+        else if ("COMPLETE".equals(action))
+        {
+            if (ProConstants.TASK_STATUS_COMPLETED.equals(task.getStatus())) return;
+            if (ProConstants.TASK_STATUS_CANCEL.equals(task.getStatus()))
+                throw new ServiceException("已取消的任务不能完成");
+            task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
+            task.setFinishDate(now);
+        }
+        else
+        {
+            throw new ServiceException("不支持的快捷操作：" + action);
+        }
+        task.setUpdateTime(now);
+        task.setUpdateBy(SecurityUtils.getUsername());
+        proTaskMapper.updateProTask(task);
+    }
+
+    @Override
     public void cancelTask(Long taskId)
     {
         ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);

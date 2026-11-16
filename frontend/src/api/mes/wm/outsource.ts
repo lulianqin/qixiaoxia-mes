@@ -59,3 +59,22 @@ export function receiveOutsource(orderId: number) {
 export function batchReceiveOutsource(orderIds: number[]) {
   return request({ url: '/mes/wm/outsource/batchReceive', method: 'post', data: orderIds })
 }
+
+// 一期：人工改加工单状态（任意状态互转）
+export function changeOutsourceStatus(data: { orderId: number; status: string; remark?: string }) {
+  return request({ url: '/mes/wm/outsource/changeStatus', method: 'put', data })
+}
+
+// 导出加工单（Excel 套打）
+export function exportOutsource(orderId: number) {
+  return request({ url: '/mes/wm/outsource/export/' + orderId, method: 'post', responseType: 'blob' })
+}
+
+// 加工单工序行（多工序合并一张单）
+export function getProcessLines(orderId: number) {
+  return request({ url: `/mes/wm/outsource/${orderId}/processLines`, method: 'get' })
+}
+
+export function saveProcessLines(orderId: number, lines: any[]) {
+  return request({ url: `/mes/wm/outsource/${orderId}/processLines`, method: 'put', data: lines })
+}

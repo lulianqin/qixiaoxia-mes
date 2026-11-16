@@ -22,6 +22,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.mes.md.MdClient;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.pro.ProRoute;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
@@ -36,18 +37,26 @@ import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.domain.mes.sal.dto.ErpOrderLineRequest;
+import com.ruoyi.system.domain.mes.sal.dto.ErpOrderReceiveRequest;
+import com.ruoyi.system.domain.mes.sal.dto.SalOrderAcceptRequest;
 import com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow;
 import com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow;
+import com.ruoyi.system.mapper.mes.md.MdClientMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
+import com.ruoyi.system.mapper.mes.sys.SysExternalMappingMapper;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.system.service.mes.pro.ProRouteResolveService;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
+import com.ruoyi.system.service.mes.sys.ISysSyncTaskService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
+import com.ruoyi.system.service.mes.sys.integration.ErpCallbackPaths;
+import com.ruoyi.system.service.mes.sys.integration.ErpCallbackPayload;
 
 /**
  * 销售订单Service实现
@@ -71,6 +80,18 @@ public class SalOrderServiceImpl implements ISalOrderService
 
     @Autowired
     private MdItemMapper mdItemMapper;
+
+    @Autowired
+    private MdClientMapper mdClientMapper;
+
+    @Autowired
+    private SysExternalMappingMapper externalMappingMapper;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.sys.SysExternalDocService externalDocService;
+
+    @Autowired
+    private ISysSyncTaskService syncTaskService;
 
     @Autowired
     private AutoCodeGenerator autoCodeGenerator;
@@ -178,6 +199,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         // CRM 推单同样落待接单，需 MES 内人工接单（createWithLines 还会再强制一次）
         order.setStatus(SalOrderStatus.PENDING_ACCEPT.getCode());
         order.setSource(SalConstants.SOURCE_CRM);
+        order.setSourceSystem(SalConstants.SYSTEM_CRM);
+        order.setClientId(resolveClientId(order.getClientCode(), order.getClientName(), SalConstants.SYSTEM_CRM));
 
         if (req.getLines() == null || req.getLines().isEmpty())
         {
@@ -216,6 +239,525 @@ public class SalOrderServiceImpl implements ISalOrderService
         line.setRequestDate(dto.getRequestDate());
         line.setRemark(dto.getRemark());
         return line;
+    }
+
+    // ==================== ERP 采购单下发 ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SalOrder receiveFromErp(ErpOrderReceiveRequest req)
+    {
+        String system = StringUtils.isEmpty(req.getSourceSystem()) ? SalConstants.SYSTEM_ERP : req.getSourceSystem();
+        SalOrder existing = salOrderMapper.selectSalOrderByExternalNo(system, req.getExternalOrderNo());
+        SalOrder order;
+        if (existing == null)
+        {
+            order = new SalOrder();
+            order.setOrderCode(autoCodeGenerator.genSerialCode("ORDER_NO", ""));
+            order.setSource(SalConstants.SOURCE_ERP);
+            order.setSourceSystem(system);
+            order.setExternalOrderNo(req.getExternalOrderNo());
+            order.setExternalVersion(req.getExternalVersion() == null ? 1 : req.getExternalVersion());
+            order.setStatus(SalOrderStatus.PENDING_ACCEPT.getCode());
+            order.setAcceptStatus("PENDING");
+            order.setOrderType(SalOrderType.STANDARD.getCode());
+            order.setSampleFlag(NO);
+            order.setOutsourceFlag(NO);
+            order.setPackageFlag(NO);
+            fillErpHeader(order, req);
+            order.setCreateBy(SecurityUtils.getUsername());
+            order.setCreateTime(DateUtils.getNowDate());
+            salOrderMapper.insertSalOrder(order);
+        }
+        else
+        {
+            assertErpUpdatable(existing, "重发");
+            order = existing;
+            int version = Math.max(nvl(existing.getExternalVersion()), nvl(req.getExternalVersion())) + 1;
+            fillErpHeader(order, req);
+            order.setExternalVersion(version);
+            order.setUpdateBy(SecurityUtils.getUsername());
+            order.setUpdateTime(DateUtils.getNowDate());
+            salOrderMapper.updateSalOrder(order);
+            // 表头更新后再重置接单/打回痕迹，避免被 updateSalOrder 的旧状态覆盖
+            salOrderMapper.resetForErpResend(order.getOrderId(), order.getFactoryId(), version,
+                    SecurityUtils.getUsername(), DateUtils.getNowDate());
+            order.setStatus(SalOrderStatus.PENDING_ACCEPT.getCode());
+            order.setAcceptStatus("PENDING");
+            order.setRejectReason(null);
+            order.setRejectBy(null);
+            order.setRejectTime(null);
+            salOrderLineMapper.deleteSalOrderLineByOrderId(order.getOrderId());
+        }
+
+        List<SalOrderLine> lines = new ArrayList<>();
+        for (ErpOrderLineRequest dto : req.getLines())
+        {
+            lines.add(buildLineFromErp(dto));
+        }
+        saveLines(order, lines, true);
+        // ERP / SRM 两端单据号分别留痕
+        externalDocService.recordOrder(system, order);
+        return order;
+    }
+
+    @Override
+    public Long acceptOrderWithSync(Long orderId, SalOrderAcceptRequest req)
+    {
+        return lockTemplate.executeWithResult("sal:order:accept:" + orderId, 5,
+                () -> txTemplate.execute(status -> doAccept(orderId, req)));
+    }
+
+    @Override
+    public Long rejectOrder(Long orderId, String reason)
+    {
+        return lockTemplate.executeWithResult("sal:order:reject:" + orderId, 5,
+                () -> txTemplate.execute(status -> doReject(orderId, reason)));
+    }
+
+    private Long doAccept(Long orderId, SalOrderAcceptRequest req)
+    {
+        SalOrder order = mustExist(orderId);
+        if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())
+                && !SalOrderStatus.REJECTED.is(order.getStatus()))
+        {
+            throw new ServiceException("仅待接单/已打回订单可接单");
+        }
+        applyAcceptDates(order, req);
+        applyAcceptSalesperson(order, req);
+        // 接单时确认 MES 客户/产品，首次建立两系统映射，后续默认关联且允许调整
+        // 必须先落库映射再校验必填项，否则 ERP/SRM 单据会因 clientId/productId 未回填而校验失败
+        applyAcceptMappings(orderId, order, req);
+        SalOrder fresh = mustExist(orderId);
+        validateAcceptable(fresh);
+        boolean fromErp = SalConstants.SYSTEM_ERP.equals(fresh.getSourceSystem());
+
+        SalOrder update = new SalOrder();
+        update.setOrderId(orderId);
+        update.setStatus(SalOrderStatus.CONFIRMED.getCode());
+        update.setUpdateBy(SecurityUtils.getUsername());
+        update.setUpdateTime(DateUtils.getNowDate());
+        if (fromErp)
+        {
+            update.setAcceptStatus("ACCEPTED");
+            update.setAcceptTime(DateUtils.getNowDate());
+            salOrderMapper.clearRejectForAccept(orderId, fresh.getFactoryId(),
+                    SecurityUtils.getUsername(), DateUtils.getNowDate());
+        }
+        salOrderMapper.updateSalOrder(update);
+        if (!fromErp) return null;
+
+        List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(orderId);
+        String payload = ErpCallbackPayload.orderAccept(mustExist(orderId), lines, SecurityUtils.getUsername());
+        return syncTaskService.enqueue(ErpCallbackPaths.BIZ_ORDER_ACCEPT, orderId, fresh.getExternalOrderNo(),
+                ErpCallbackPaths.PURCHASE_ACCEPT, payload, ErpCallbackPaths.SYSTEM_ERP);
+    }
+
+    /**
+     * 接单时确认 MES 客户与产品：
+     *  - 首次接单建立「外部编码 → MES ID」映射，后续接单默认带出且允许调整
+     *  - ERP/SRM 来源订单必须全部行产品已关联，否则拒绝接单（后续流程依赖产品）
+     */
+    private void applyAcceptMappings(Long orderId, SalOrder order, SalOrderAcceptRequest req)
+    {
+        String system = order.getSourceSystem();
+        Long clientId = req == null ? null : req.getClientId();
+        if (clientId == null) clientId = order.getClientId();
+        if (clientId == null && isExternalSystem(system))
+        {
+            clientId = lookupMapping(system, "CLIENT", order.getClientCode(), order.getClientName());
+        }
+        if (clientId != null)
+        {
+            applyClientMapping(orderId, order, system, clientId);
+        }
+        List<String> missing = applyLineMappings(orderId, system, collectLineProducts(req));
+        if (!missing.isEmpty())
+        {
+            throw new ServiceException("以下产品未关联 MES 物料，请先选择后再接单："
+                    + String.join("、", missing));
+        }
+    }
+
+    /** 表头客户落库 + 记录「外部客户编码/名称 → MES 客户」映射 */
+    private void applyClientMapping(Long orderId, SalOrder order, String system, Long clientId)
+    {
+        SalOrder upd = new SalOrder();
+        upd.setOrderId(orderId);
+        upd.setClientId(clientId);
+        salOrderMapper.updateSalOrder(upd);
+        order.setClientId(clientId);
+        if (StringUtils.isEmpty(system)) return;
+        String extCode = StringUtils.isNotEmpty(order.getClientCode())
+                ? order.getClientCode() : order.getClientName();
+        if (StringUtils.isNotEmpty(extCode))
+        {
+            upsertMapping(system, "CLIENT", order.getClientCode(), extCode, clientId);
+        }
+    }
+
+    /** 明细产品落库 + 记录「外部产品编码/名称 → MES 物料」映射，返回仍未关联的 ERP/SRM 行 */
+    private List<String> applyLineMappings(Long orderId, String system, Map<Long, Long> lineProducts)
+    {
+        List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(orderId);
+        List<String> missing = new ArrayList<>();
+        for (SalOrderLine line : lines)
+        {
+            // 该行尚未关联 MES 物料时，当前编码/名称仍是外部系统的值，需要留痕映射
+            boolean needMapping = line.getProductId() == null;
+            Long productId = lineProducts.get(line.getLineId());
+            if (productId == null) productId = line.getProductId();
+            if (productId == null && isExternalSystem(system))
+            {
+                productId = lookupMapping(system, "ITEM", line.getProductCode(), line.getProductName());
+            }
+            if (productId == null)
+            {
+                if (isExternalSystem(system)) missing.add(line.getProductName());
+                continue;
+            }
+            MdItem item = mdItemMapper.selectMdItemById(productId);
+            if (item == null) throw new ServiceException("MES 物料不存在:" + productId);
+            String extCode = StringUtils.isNotEmpty(line.getProductCode())
+                    ? line.getProductCode() : line.getProductName();
+
+            SalOrderLine patch = new SalOrderLine();
+            patch.setLineId(line.getLineId());
+            patch.setProductId(productId);
+            patch.setProductCode(item.getItemCode());
+            patch.setProductName(item.getItemName());
+            patch.setUnitOfMeasure(item.getUnitOfMeasure());
+            patch.setUnitName(item.getUnitName());
+            salOrderLineMapper.updateSalOrderLine(patch);
+
+            if (needMapping && StringUtils.isNotEmpty(system) && StringUtils.isNotEmpty(extCode))
+            {
+                upsertMapping(system, "ITEM", line.getProductCode(), extCode, productId);
+            }
+        }
+        return missing;
+    }
+
+    private Map<Long, Long> collectLineProducts(SalOrderAcceptRequest req)
+    {
+        Map<Long, Long> lineProducts = new HashMap<>();
+        if (req.getLines() == null) return lineProducts;
+        for (SalOrderAcceptRequest.LineDate l : req.getLines())
+        {
+            if (l.getLineId() != null && l.getProductId() != null)
+            {
+                lineProducts.put(l.getLineId(), l.getProductId());
+            }
+        }
+        return lineProducts;
+    }
+
+    private boolean isExternalSystem(String system)
+    {
+        return "ERP".equals(system) || "SRM".equals(system);
+    }
+
+    private void upsertMapping(String system, String entityType, String externalId,
+                               String externalCode, Long localId)
+    {
+        com.ruoyi.system.domain.mes.sys.SysExternalMapping mapping =
+                new com.ruoyi.system.domain.mes.sys.SysExternalMapping();
+        mapping.setSystemCode(system);
+        mapping.setEntityType(entityType);
+        mapping.setFactoryId(SecurityUtils.getFactoryId());
+        mapping.setExternalId(externalId);
+        mapping.setExternalCode(externalCode);
+        mapping.setLocalId(localId);
+        externalMappingMapper.upsertExternalMapping(mapping);
+    }
+
+    @Override
+    public Map<String, Object> buildAcceptDefaults(Long orderId)
+    {
+        SalOrder order = mustExist(orderId);
+        String system = order.getSourceSystem();
+        Map<String, Object> result = new HashMap<>();
+        Long clientId = order.getClientId();
+        if (clientId == null && isExternalSystem(system))
+        {
+            clientId = lookupMapping(system, "CLIENT", order.getClientCode(), order.getClientName());
+        }
+        result.put("clientId", clientId);
+        if (clientId != null)
+        {
+            MdClient client = mdClientMapper.selectMdClientByClientId(clientId);
+            result.put("clientName", client == null ? null : client.getClientName());
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (SalOrderLine line : salOrderLineMapper.selectSalOrderLineByOrderId(orderId))
+        {
+            Map<String, Object> row = new HashMap<>();
+            row.put("lineId", line.getLineId());
+            Long productId = line.getProductId();
+            if (productId == null && isExternalSystem(system))
+            {
+                productId = lookupMapping(system, "ITEM", line.getProductCode(), line.getProductName());
+            }
+            row.put("productId", productId);
+            if (productId != null)
+            {
+                MdItem item = mdItemMapper.selectMdItemById(productId);
+                if (item != null)
+                {
+                    row.put("productCode", item.getItemCode());
+                    row.put("productName", item.getItemName());
+                    row.put("unitOfMeasure", item.getUnitOfMeasure());
+                }
+            }
+            rows.add(row);
+        }
+        result.put("lines", rows);
+        return result;
+    }
+
+    /** 按外部编码优先、外部名称兜底查映射 */
+    private Long lookupMapping(String system, String entityType, String code, String name)
+    {
+        for (String key : new String[] { code, name })
+        {
+            if (StringUtils.isEmpty(key)) continue;
+            Long localId = externalMappingMapper.selectLocalId(system, entityType, key);
+            if (localId != null) return localId;
+        }
+        return null;
+    }
+
+    private Long doReject(Long orderId, String reason)
+    {
+        if (StringUtils.isEmpty(reason)) throw new ServiceException("打回原因不能为空");
+        SalOrder order = mustExist(orderId);
+        if (!SalConstants.SYSTEM_ERP.equals(order.getSourceSystem()))
+        {
+            throw new ServiceException("仅ERP下发订单可打回");
+        }
+        if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())
+                && !SalOrderStatus.REJECTED.is(order.getStatus()))
+        {
+            throw new ServiceException("仅待接单/已打回订单可打回");
+        }
+        SalOrder update = new SalOrder();
+        update.setOrderId(orderId);
+        update.setStatus(SalOrderStatus.REJECTED.getCode());
+        update.setAcceptStatus("REJECTED");
+        update.setRejectReason(reason);
+        update.setRejectBy(SecurityUtils.getUsername());
+        update.setRejectTime(DateUtils.getNowDate());
+        update.setUpdateBy(SecurityUtils.getUsername());
+        update.setUpdateTime(DateUtils.getNowDate());
+        salOrderMapper.updateSalOrder(update);
+
+        String payload = ErpCallbackPayload.orderReject(mustExist(orderId), reason, SecurityUtils.getUsername());
+        return syncTaskService.enqueue(ErpCallbackPaths.BIZ_ORDER_REJECT, orderId, order.getExternalOrderNo(),
+                ErpCallbackPaths.PURCHASE_ACCEPT, payload, ErpCallbackPaths.SYSTEM_ERP);
+    }
+
+    /** 接单时确认业务员：优先使用接单选择的 MES 账号；ERP 已带下单人时允许沿用 */
+    private void applyAcceptSalesperson(SalOrder order, SalOrderAcceptRequest req)
+    {
+        String salesperson = req == null ? null : req.getSalesperson();
+        if (StringUtils.isNotEmpty(salesperson))
+        {
+            SalOrder upd = new SalOrder();
+            upd.setOrderId(order.getOrderId());
+            upd.setSalesperson(salesperson);
+            salOrderMapper.updateSalOrder(upd);
+            order.setSalesperson(salesperson);
+            return;
+        }
+        if (StringUtils.isEmpty(order.getSalesperson()))
+        {
+            throw new ServiceException("请选择业务员（ERP采购单未提供下单人）");
+        }
+    }
+
+    /** 接单时调整交期（整单 + 行级），所有来源订单均允许；未变更不视为调整 */
+    private void applyAcceptDates(SalOrder order, SalOrderAcceptRequest req)
+    {
+        if (req == null) return;
+        boolean headerChanged = req.getRequestDate() != null && !sameDay(req.getRequestDate(), order.getRequestDate());
+        List<SalOrderAcceptRequest.LineDate> lineChanges = new ArrayList<>();
+        if (req.getLines() != null)
+        {
+            for (SalOrderAcceptRequest.LineDate row : req.getLines())
+            {
+                if (row.getLineId() == null || row.getRequestDate() == null) continue;
+                SalOrderLine line = salOrderLineMapper.selectSalOrderLineByLineId(row.getLineId());
+                if (line == null || !order.getOrderId().equals(line.getOrderId()))
+                {
+                    throw new ServiceException("明细行不属于当前订单");
+                }
+                if (!sameDay(row.getRequestDate(), line.getRequestDate())) lineChanges.add(row);
+            }
+        }
+        if (headerChanged)
+        {
+            SalOrder dateUpdate = new SalOrder();
+            dateUpdate.setOrderId(order.getOrderId());
+            dateUpdate.setRequestDate(req.getRequestDate());
+            dateUpdate.setUpdateBy(SecurityUtils.getUsername());
+            dateUpdate.setUpdateTime(DateUtils.getNowDate());
+            salOrderMapper.updateSalOrder(dateUpdate);
+        }
+        for (SalOrderAcceptRequest.LineDate row : lineChanges)
+        {
+            SalOrderLine lineUpdate = new SalOrderLine();
+            lineUpdate.setLineId(row.getLineId());
+            lineUpdate.setRequestDate(row.getRequestDate());
+            lineUpdate.setUpdateBy(SecurityUtils.getUsername());
+            lineUpdate.setUpdateTime(DateUtils.getNowDate());
+            salOrderLineMapper.updateSalOrderLine(lineUpdate);
+        }
+    }
+
+    private boolean sameDay(java.util.Date a, java.util.Date b)
+    {
+        if (a == null || b == null) return false;
+        return DateUtils.parseDateToStr("yyyy-MM-dd", a).equals(DateUtils.parseDateToStr("yyyy-MM-dd", b));
+    }
+
+    private void fillErpHeader(SalOrder order, ErpOrderReceiveRequest req)
+    {
+        order.setExternalOrderId(req.getExternalOrderId());
+        order.setOrderName(req.getOrderName());
+        order.setClientCode(req.getClientCode());
+        order.setClientName(req.getClientName());
+        // 外部系统未传客户PO号时，用采购单号回填，保证单据与列表能看到可追溯编号
+        order.setClientOrderCode(StringUtils.isNotEmpty(req.getClientOrderCode())
+                ? req.getClientOrderCode() : req.getExternalOrderNo());
+        order.setSalesperson(req.getSalesperson());
+        order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
+        order.setRequestDate(req.getRequestDate());
+        order.setTotalAmount(req.getTotalAmount());
+        order.setPaymentMethod(req.getPaymentMethod());
+        order.setRemark(req.getRemark());
+        Long clientId = resolveClientId(req.getClientCode(), req.getClientName(), SalConstants.SYSTEM_ERP);
+        if (clientId != null) order.setClientId(clientId);
+    }
+
+    private SalOrderLine buildLineFromErp(ErpOrderLineRequest dto)
+    {
+        SalOrderLine line = new SalOrderLine();
+        line.setExternalLineId(dto.getExternalLineId());
+        MdItem item = resolveItem(dto);
+        if (item != null)
+        {
+            line.setProductId(item.getItemId());
+            line.setProductCode(item.getItemCode());
+            line.setProductName(item.getItemName());
+            line.setProductSpc(item.getSpecification());
+            line.setUnitOfMeasure(item.getUnitOfMeasure());
+        }
+        else
+        {
+            line.setProductCode(dto.getProductCode());
+            line.setProductName(dto.getProductName());
+            line.setProductSpc(dto.getProductSpec());
+            line.setUnitOfMeasure(dto.getUnit());
+        }
+        line.setQuantity(dto.getQuantity());
+        line.setUnitPrice(dto.getUnitPrice());
+        line.setRequestDate(dto.getRequestDate());
+        line.setProductSize(dto.getProductSize());
+        line.setPrintingReq(dto.getPrintingReq());
+        line.setPackageReq(dto.getPackageReq());
+        line.setShippingReq(dto.getShippingReq());
+        line.setRemark(dto.getRemark());
+        return line;
+    }
+
+    /** 客户匹配：映射表 → 客户编码 → 客户名称精确匹配，未匹配返回 null（接单前需补主数据） */
+    private Long resolveClientId(String clientCode, String clientName, String system)
+    {
+        if (StringUtils.isNotEmpty(clientCode))
+        {
+            Long mapped = externalMappingMapper.selectLocalId(system, "CLIENT", clientCode);
+            if (mapped != null) return mapped;
+            MdClient query = new MdClient();
+            query.setClientCode(clientCode);
+            List<MdClient> list = mdClientMapper.selectMdClientList(query);
+            if (list != null && !list.isEmpty()) return list.get(0).getClientId();
+        }
+        if (StringUtils.isNotEmpty(clientName))
+        {
+            MdClient query = new MdClient();
+            query.setClientName(clientName);
+            List<MdClient> list = mdClientMapper.selectMdClientList(query);
+            if (list != null)
+            {
+                for (MdClient client : list)
+                {
+                    if (clientName.equals(client.getClientName())) return client.getClientId();
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 物料匹配：映射表(编码/名称) → mesItemCode/productCode → 物料名称精确匹配，未匹配返回 null */
+    private MdItem resolveItem(ErpOrderLineRequest dto)
+    {
+        if (StringUtils.isNotEmpty(dto.getProductCode()))
+        {
+            Long mapped = externalMappingMapper.selectLocalId(SalConstants.SYSTEM_ERP, "ITEM", dto.getProductCode());
+            if (mapped != null)
+            {
+                MdItem mappedItem = mdItemMapper.selectMdItemById(mapped);
+                if (mappedItem != null) return mappedItem;
+            }
+        }
+        if (StringUtils.isNotEmpty(dto.getProductName()))
+        {
+            Long mapped = externalMappingMapper.selectLocalId(SalConstants.SYSTEM_ERP, "ITEM", dto.getProductName());
+            if (mapped != null)
+            {
+                MdItem mappedItem = mdItemMapper.selectMdItemById(mapped);
+                if (mappedItem != null) return mappedItem;
+            }
+        }
+        String code = StringUtils.isNotEmpty(dto.getMesItemCode()) ? dto.getMesItemCode() : dto.getProductCode();
+        if (StringUtils.isNotEmpty(code))
+        {
+            MdItem query = new MdItem();
+            query.setItemCode(code);
+            List<MdItem> list = mdItemMapper.selectMdItemList(query);
+            if (list != null && !list.isEmpty()) return list.get(0);
+        }
+        if (StringUtils.isNotEmpty(dto.getProductName()))
+        {
+            MdItem query = new MdItem();
+            query.setItemName(dto.getProductName().trim());
+            List<MdItem> list = mdItemMapper.selectMdItemList(query);
+            if (list != null)
+            {
+                for (MdItem item : list)
+                {
+                    if (dto.getProductName().trim().equals(item.getItemName())) return item;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void assertErpUpdatable(SalOrder order, String action)
+    {
+        if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())
+                && !SalOrderStatus.REJECTED.is(order.getStatus())
+                && !SalOrderStatus.CONFIRMED.is(order.getStatus()))
+        {
+            throw new ServiceException("ERP采购单已投产，不可" + action + "；如需变更请联系工厂处理");
+        }
+        assertNoDerivedWorkorder(order.getOrderId(), action);
+    }
+
+    private int nvl(Integer value)
+    {
+        return value == null ? 0 : value;
     }
 
     @Override
@@ -313,15 +855,31 @@ public class SalOrderServiceImpl implements ISalOrderService
         return updateStatus(orderId, SalOrderStatus.CANCEL.getCode());
     }
 
+    /**
+     * 一期人工改状态：允许任意状态互转，只做留痕，不做流转校验。
+     * ERP 回写状态不参与判断（一期改为仅展示）。
+     */
+    @Override
+    @Transactional
+    public SalOrder changeStatus(Long orderId, String targetStatus, String reason)
+    {
+        SalOrder order = mustExist(orderId);
+        SalOrderStatus target = SalOrderStatus.fromCode(targetStatus);
+        if (target == null) throw new ServiceException("无效的目标状态：" + targetStatus);
+        String from = order.getStatus();
+        if (target.getCode().equals(from)) throw new ServiceException("订单已是该状态，无需变更");
+
+        String operator = SecurityUtils.getUsername();
+        salOrderMapper.updateStatusDirect(orderId, target.getCode(), operator, DateUtils.getNowDate());
+        salOrderMapper.insertStatusLog(orderId, order.getOrderCode(), from, target.getCode(), reason, operator);
+        return salOrderMapper.selectSalOrderByOrderId(orderId);
+    }
+
     @Override
     public int acceptOrder(Long orderId)
     {
-        SalOrder order = mustExist(orderId);
-        if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())) {
-            throw new ServiceException("仅待接单订单可接单");
-        }
-        validateAcceptable(order);
-        return updateStatus(orderId, SalOrderStatus.CONFIRMED.getCode());
+        acceptOrderWithSync(orderId, null);
+        return 1;
     }
 
     /**
@@ -440,6 +998,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setClientId(order.getClientId());
         wo.setClientCode(order.getClientCode());
         wo.setClientName(order.getClientName());
+        wo.setSalesperson(order.getSalesperson());
+        wo.setOrderDate(order.getOrderDate() != null ? order.getOrderDate() : order.getCreateTime());
         wo.setClientOrderCode(StringUtils.isNotEmpty(req.getClientOrderCode())
                 ? req.getClientOrderCode() : order.getClientOrderCode());
         wo.setProductSize(line.getProductSize());
@@ -591,6 +1151,8 @@ public class SalOrderServiceImpl implements ISalOrderService
     {
         if (line.getRouteProductId() == null)
         {
+            // 外部系统下发且物料未映射时 productId 为空，无法解析路线（接单前需补物料主数据）
+            if (line.getProductId() == null) return null;
             RouteResolveResult result = autoResults.get(line.getProductId());
             if (result != null && result.isHardBlocked()) throw new ServiceException(result.getMessage());
             if (result == null || !result.isMatched()) return null;

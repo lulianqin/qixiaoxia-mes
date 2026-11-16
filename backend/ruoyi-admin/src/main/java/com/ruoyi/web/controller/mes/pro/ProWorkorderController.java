@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
+import com.ruoyi.web.controller.mes.pro.export.ProFlowSheetExporter;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import org.slf4j.Logger;
@@ -35,6 +36,12 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pur.PurOrder;
+import com.ruoyi.system.service.mes.pur.IPurOrderService;
+import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdItemTypeAttr;
+import com.ruoyi.system.service.mes.md.IMdItemService;
+import com.ruoyi.system.service.mes.md.IMdItemTypeAttrService;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
@@ -78,6 +85,15 @@ public class ProWorkorderController extends BaseController
 
     @Autowired
     private IProWorkorderService proWorkorderService;
+
+    @Autowired
+    private IMdItemService mdItemService;
+
+    @Autowired
+    private IMdItemTypeAttrService mdItemTypeAttrService;
+
+    @Autowired
+    private IPurOrderService purOrderService;
 
     @Autowired
     private IScheduleService scheduleService;
@@ -152,6 +168,119 @@ public class ProWorkorderController extends BaseController
         List<ProWorkorder> list = proWorkorderService.selectProWorkorderList(proWorkorder);
         ExcelUtil<ProWorkorder> util = new ExcelUtil<ProWorkorder>(ProWorkorder.class);
         util.exportExcel(response, list, "生产工单数据");
+    }
+
+    /**
+     * 生成生产流转单：自动带出订单/工单字段并生成 -sN 生产编号，人工补全字段覆盖
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:flowSheet')")
+    @Log(title = "生产流转单", businessType = BusinessType.UPDATE)
+    @PostMapping("/flowSheet/generate")
+    public AjaxResult generateFlowSheet(@RequestBody ProWorkorder req)
+    {
+        return success(proWorkorderService.generateFlowSheet(req.getWorkorderId(), req));
+    }
+
+    /**
+     * 导出生产流转单（Excel 套打）
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:flowSheet')")
+    @Log(title = "生产流转单导出", businessType = BusinessType.EXPORT)
+    @PostMapping("/flowSheet/export/{workorderId}")
+    public void exportFlowSheet(HttpServletResponse response, @PathVariable("workorderId") Long workorderId,
+                                @RequestBody(required = false) Map<String, String> body)
+            throws Exception
+    {
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null)
+        {
+            response.sendError(404, "工单不存在");
+            return;
+        }
+        String qrDataUrl = body == null ? null : body.get("qrDataUrl");
+        wo = proWorkorderService.enrichFlowSheet(wo);
+        ProFlowSheetExporter.export(response, wo, buildFlowSheetAttrs(wo), qrDataUrl);
+    }
+
+    /**
+     * 生产流转单预览数据：工单通用字段 + 分类驱动的生产属性（只读，不产生二次录入表单）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:flowSheet')")
+    @GetMapping("/flowSheet/{workorderId}")
+    public AjaxResult flowSheet(@PathVariable("workorderId") Long workorderId)
+    {
+        ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) return error("工单不存在");
+        wo = proWorkorderService.enrichFlowSheet(wo);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("workorder", wo);
+        data.put("productionAttrs", buildFlowSheetAttrRows(wo));
+        return success(data);
+    }
+
+    /**
+     * 流转单生产属性：按工单产品分类取 PRODUCTION 域属性，返回名称/单位/控件/值。
+     * 同时把产品主图回填为流转单产品图片的兜底值。
+     */
+    private List<Map<String, Object>> buildFlowSheetAttrRows(ProWorkorder wo)
+    {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        MdItem item = wo.getProductId() == null ? null : mdItemService.selectMdItemById(wo.getProductId());
+        if (item != null && StringUtils.isEmpty(wo.getProductImage()))
+        {
+            wo.setProductImage(item.getImageUrl());
+        }
+        Map<String, Object> values = wo.getLineAttrs();
+        if (values == null || values.isEmpty()) return rows;
+        if (item == null || item.getItemTypeId() == null)
+        {
+            values.forEach((k, v) -> addAttrRow(rows, k, k, null, "TEXT", v));
+            return rows;
+        }
+        List<MdItemTypeAttr> schema = mdItemTypeAttrService.selectEffAttrSchema(
+                SecurityUtils.getFactoryId(), item.getItemTypeId());
+        for (MdItemTypeAttr attr : schema)
+        {
+            if (!"PRODUCTION".equals(attr.getAttrScope())) continue;
+            addAttrRow(rows, attr.getAttrCode(), attr.getAttrName(), attr.getAttrUnit(),
+                    attr.getWidgetType(), values.get(attr.getAttrCode()));
+        }
+        return rows;
+    }
+
+    private void addAttrRow(List<Map<String, Object>> rows, String code, String name, String unit,
+                            String widgetType, Object value)
+    {
+        String text = attrText(value);
+        if (text.isEmpty()) return;
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("attrCode", code);
+        row.put("attrName", name);
+        row.put("attrUnit", unit);
+        row.put("widgetType", widgetType == null ? "TEXT" : widgetType);
+        row.put("attrValue", text);
+        row.put("label", name + (StringUtils.isNotEmpty(unit) ? "(" + unit + ")" : ""));
+        rows.add(row);
+    }
+
+    private String attrText(Object value)
+    {
+        if (value == null) return "";
+        if (value instanceof java.util.Collection<?> collection)
+        {
+            return collection.stream().map(String::valueOf).collect(Collectors.joining("、"));
+        }
+        return String.valueOf(value);
+    }
+
+    private Map<String, String> buildFlowSheetAttrs(ProWorkorder wo)
+    {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : buildFlowSheetAttrRows(wo))
+        {
+            result.put(String.valueOf(row.get("label")), String.valueOf(row.get("attrValue")));
+        }
+        return result;
     }
 
     /**
@@ -616,6 +745,7 @@ public class ProWorkorderController extends BaseController
         result.put("feedback", feedbackDim(workorderId, null, null));
         result.put("inspection", inspectionDim(workorderId, null, null));
         result.put("outsource", outsourceDim(workorderId, null));
+        result.put("purchase", purchaseDim(workorderId));
         result.put("issue", issueDim(workorderId, null, null));
         result.put("itemRecpt", itemRecptDim(workorderId));
         result.put("productRecpt", productRecptDim(workorderId));
@@ -646,6 +776,18 @@ public class ProWorkorderController extends BaseController
         result.put("outsource", outsourceDim(task.getWorkorderId(), task.getProcessId()));
         result.put("issue", issueDim(task.getWorkorderId(), taskId, task.getProcessId()));
         return success(result);
+    }
+
+    /** 采购维度：本工单开出的采购单 */
+    private Map<String, Object> purchaseDim(Long workorderId)
+    {
+        PurOrder query = new PurOrder();
+        query.setWorkorderId(workorderId);
+        List<com.ruoyi.system.domain.mes.pur.vo.PurOrderVO> list = purOrderService.selectPurOrderList(query);
+        Map<String, Object> dim = new LinkedHashMap<>();
+        dim.put("total", list.size());
+        dim.put("list", list);
+        return dim;
     }
 
     /** 报工维度：列表 + 总数 + 待审核数 + 已审核数 */

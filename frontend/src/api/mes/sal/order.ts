@@ -29,12 +29,27 @@ export function closeOrder(id: number): Promise<AjaxResult> {
 export function cancelOrder(id: number): Promise<AjaxResult> {
   return request({ url: '/mes/sal/order/cancel/' + id, method: 'put' })
 }
-export function acceptOrder(id: number): Promise<AjaxResult> {
-  return request({ url: '/mes/sal/order/accept/' + id, method: 'put' })
+export function acceptOrder(id: number, data?: {
+  requestDate?: string
+  clientId?: number
+  lines?: Array<{ lineId: number; requestDate?: string; productId?: number }>
+}): Promise<AjaxResult<number>> {
+  return request({ url: '/mes/sal/order/accept/' + id, method: 'put', data: data || {} })
+}
+/** 接单默认关联：按已记录的两系统映射回填 MES 客户/产品建议 */
+export function getAcceptDefaults(id: number): Promise<AjaxResult<any>> {
+  return request({ url: '/mes/sal/order/acceptDefaults/' + id, method: 'get' })
+}
+export function rejectOrder(id: number, reason: string): Promise<AjaxResult<number>> {
+  return request({ url: '/mes/sal/order/reject/' + id, method: 'put', data: { reason } })
 }
 export function toWorkorder(data: SalOrderToWorkorderRequest): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/toWorkorder', method: 'post', data })
 }
 export function delOrder(id: number | number[]): Promise<AjaxResult> {
   return request({ url: '/mes/sal/order/' + id, method: 'delete' })
+}
+/** 一期：人工改订单状态（任意状态互转，后端留痕） */
+export function changeOrderStatus(data: { orderId: number; targetStatus: string; reason?: string }): Promise<AjaxResult<SalOrder>> {
+  return request({ url: '/mes/sal/order/changeStatus', method: 'put', data })
 }

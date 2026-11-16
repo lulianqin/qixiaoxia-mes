@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sys.SysExternalMappingMapper">
+
+    <select id="selectLocalId" resultType="java.lang.Long">
+        select local_id
+        from qxx_sys_external_mapping
+        where system_code = #{systemCode}
+          and entity_type = #{entityType}
+          and external_code = #{externalCode}
+        limit 1
+    </select>
+
+    <insert id="insertSysExternalMapping" parameterType="SysExternalMapping" useGeneratedKeys="true" keyProperty="mappingId">
+        insert into qxx_sys_external_mapping
+            (system_code, entity_type, external_id, external_code, local_id)
+        values
+            (#{systemCode}, #{entityType}, #{externalId}, #{externalCode}, #{localId})
+    </insert>
+
+    <!-- 幂等写入：同系统 + 同实体类型 + 同外部编码则更新本地关联 -->
+    <insert id="upsertExternalMapping" parameterType="SysExternalMapping">
+        insert into qxx_sys_external_mapping
+            (factory_id, system_code, entity_type, external_id, external_code, local_id)
+        values
+            (#{factoryId}, #{systemCode}, #{entityType}, #{externalId}, #{externalCode}, #{localId})
+        on duplicate key update
+            local_id = #{localId},
+            external_id = #{externalId}
+    </insert>
+
+</mapper>

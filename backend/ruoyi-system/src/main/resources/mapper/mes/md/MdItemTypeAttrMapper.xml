@@ -16,6 +16,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="attrCode"      column="attr_code"      />
         <result property="attrName"      column="attr_name"      />
         <result property="attrType"      column="attr_type"      />
+        <result property="attrScope"     column="attr_scope"     />
+        <result property="widgetType"    column="widget_type"    />
         <result property="attrUnit"      column="attr_unit"      />
         <result property="optionsJson"   column="options_json_str" />
         <result property="inheritDepth"  column="inherit_depth"  />
@@ -24,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 查某分类直接绑定的属性（不含继承，配置页展示用）。@SkipFactoryId，显式按 factory_id 隔离 -->
     <select id="selectBindByTypeId" parameterType="com.ruoyi.system.domain.mes.md.MdItemTypeAttr" resultMap="ItemTypeAttrResult">
         select ta.id, ta.factory_id, ta.item_type_id, ta.attr_id, ta.required, ta.sort_order, ta.enable_flag,
-               d.attr_code, d.attr_name, d.attr_type, d.attr_unit, CAST(d.options_json AS CHAR) as options_json_str,
+               d.attr_code, d.attr_name, d.attr_type, d.attr_scope, d.widget_type, d.attr_unit, CAST(d.options_json AS CHAR) as options_json_str,
                0 as inherit_depth
           from qxx_md_item_type_attr ta
           join qxx_md_attr_def d on d.attr_id = ta.attr_id
@@ -53,10 +55,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         )
         select merged.id, merged.factory_id, merged.item_type_id, merged.attr_id, merged.required,
                merged.sort_order, merged.enable_flag, merged.attr_code, merged.attr_name, merged.attr_type,
-               merged.attr_unit, merged.options_json_str, merged.inherit_depth
+               merged.attr_scope, merged.widget_type, merged.attr_unit, merged.options_json_str, merged.inherit_depth
         from (
             select ta.id, ta.factory_id, ta.item_type_id, ta.attr_id, ta.required, ta.sort_order, ta.enable_flag,
-                   d.attr_code, d.attr_name, d.attr_type, d.attr_unit, CAST(d.options_json AS CHAR) as options_json_str,
+                   d.attr_code, d.attr_name, d.attr_type, d.attr_scope, d.widget_type, d.attr_unit, CAST(d.options_json AS CHAR) as options_json_str,
                    a.depth as inherit_depth,
                    row_number() over (partition by ta.attr_id order by a.depth asc) as rn
               from qxx_md_item_type_attr ta

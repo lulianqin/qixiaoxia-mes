@@ -10,52 +10,18 @@
 </template>
 
 <script setup lang="ts">
-import usePermissionStore from '@/store/modules/permission'
-
 const route = useRoute()
 const router = useRouter()
-const permissionStore = usePermissionStore()
 const levelList = ref<any[]>([])
 
 function getBreadcrumb(): void {
-  // only show routes with meta.title
-  let matched: any[] = []
-  const pathNum = findPathNum(route.path)
-  // multi-level menu
-  if (pathNum > 2) {
-    const reg = /\/\w+/gi
-    const pathList = route.path.match(reg)?.map((item: string, index: number) => {
-      if (index !== 0) item = item.slice(1)
-      return item
-    }) || []
-    getMatched(pathList, permissionStore.defaultRoutes, matched)
-  } else {
-    matched = route.matched.filter((item: any) => item.meta && item.meta.title)
-  }
+  // 直接用路由匹配链，避免多段路径按首段 "mes" 误匹配到第一个菜单（设备工具管理）
+  let matched: any[] = route.matched.filter((item: any) => item.meta && item.meta.title)
   // 判断是否为首页
-  if (!isDashboard(matched[0])) {
+  if (!matched.length || !isDashboard(matched[0])) {
     matched = [{ path: "/index", meta: { title: "首页" } }].concat(matched)
   }
   levelList.value = matched.filter(item => item.meta && item.meta.title && (item.meta.breadcrumb as boolean) !== false)
-}
-function findPathNum(str: string, char = "/"): number {
-  let index = str.indexOf(char)
-  let num = 0
-  while (index !== -1) {
-    num++
-    index = str.indexOf(char, index + 1)
-  }
-  return num
-}
-function getMatched(pathList: string[], routeList: any[], matched: any[]): void {
-  let data = routeList.find(item => item.path == pathList[0] || (item.name + '').toLowerCase() == pathList[0])
-  if (data) {
-    matched.push(data)
-    if (data.children && pathList.length) {
-      pathList.shift()
-      getMatched(pathList, data.children, matched)
-    }
-  }
 }
 function isDashboard(route?: any): boolean {
   const name = route && route.name

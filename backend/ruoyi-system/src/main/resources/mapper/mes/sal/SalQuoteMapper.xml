@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.sal.SalQuoteMapper">
+
+    <resultMap type="SalQuote" id="SalQuoteResult">
+        <result property="quoteId"          column="quote_id"           />
+        <result property="factoryId"        column="factory_id"         />
+        <result property="quoteCode"        column="quote_code"         />
+        <result property="externalQuoteId"  column="external_quote_id"  />
+        <result property="externalQuoteNo"  column="external_quote_no"  />
+        <result property="sourceSystem"     column="source_system"      />
+        <result property="title"            column="title"              />
+        <result property="clientCode"       column="client_code"        />
+        <result property="clientName"       column="client_name"        />
+        <result property="clientId"         column="client_id"          />
+        <result property="goodsType"        column="goods_type"         />
+        <result property="inquiryDate"      column="inquiry_date"       />
+        <result property="budget"           column="budget"             />
+        <result property="attachment"       column="attachment"         />
+        <result property="status"           column="status"             />
+        <result property="quoteUser"        column="quote_user"         />
+        <result property="quoteTime"        column="quote_time"         />
+        <result property="totalAmount"      column="total_amount"       />
+        <result property="returnReason"     column="return_reason"      />
+        <result property="returnTime"       column="return_time"        />
+        <result property="syncStatus"       column="sync_status"        />
+        <result property="syncTime"         column="sync_time"          />
+        <result property="remark"           column="remark"             />
+        <result property="createBy"         column="create_by"          />
+        <result property="createTime"       column="create_time"        />
+        <result property="updateBy"         column="update_by"          />
+        <result property="updateTime"       column="update_time"        />
+    </resultMap>
+
+    <resultMap type="SalQuoteLine" id="SalQuoteLineResult">
+        <result property="lineId"          column="line_id"           />
+        <result property="factoryId"       column="factory_id"        />
+        <result property="quoteId"         column="quote_id"          />
+        <result property="lineNo"          column="line_no"           />
+        <result property="externalLineId"  column="external_line_id"  />
+        <result property="productCode"     column="product_code"      />
+        <result property="productName"     column="product_name"      />
+        <result property="productId"       column="product_id"        />
+        <result property="productPhoto"    column="product_photo"     />
+        <result property="productSize"     column="product_size"      />
+        <result property="structure"       column="structure"         />
+        <result property="material"        column="material"          />
+        <result property="printingMode"    column="printing_mode"     />
+        <result property="processTxt"      column="process_txt"       />
+        <result property="accessoryTxt"    column="accessory_txt"     />
+        <result property="quantity"        column="quantity"          />
+        <result property="unit"            column="unit"              />
+        <result property="price"           column="price"             />
+        <result property="quoteRemark"     column="quote_remark"      />
+        <result property="deliveryDate"    column="delivery_date"     />
+        <result property="quoteValidDate"  column="quote_valid_date"  />
+        <result property="remark"          column="remark"            />
+        <result property="createBy"        column="create_by"         />
+        <result property="createTime"      column="create_time"       />
+        <result property="updateBy"        column="update_by"         />
+        <result property="updateTime"      column="update_time"       />
+    </resultMap>
+
+    <sql id="selectSalQuoteVo">
+        select quote_id, factory_id, quote_code, external_quote_id, external_quote_no, source_system,
+               title, client_code, client_name, client_id, goods_type, inquiry_date, budget, attachment, status,
+               quote_user, quote_time, total_amount, return_reason, return_time, sync_status, sync_time,
+               remark, create_by, create_time, update_by, update_time
+        from qxx_sal_quote
+    </sql>
+
+    <sql id="selectSalQuoteLineVo">
+        select line_id, factory_id, quote_id, line_no, external_line_id, product_code, product_name, product_id,
+               product_photo, product_size, structure, material, printing_mode, process_txt, accessory_txt,
+               quantity, unit, price, quote_remark, delivery_date, quote_valid_date, remark,
+               create_by, create_time, update_by, update_time
+        from qxx_sal_quote_line
+    </sql>
+
+    <select id="selectSalQuoteByQuoteId" parameterType="Long" resultMap="SalQuoteResult">
+        <include refid="selectSalQuoteVo"/>
+        where quote_id = #{quoteId}
+    </select>
+
+    <select id="selectSalQuoteByExternalNo" parameterType="String" resultMap="SalQuoteResult">
+        <include refid="selectSalQuoteVo"/>
+        where external_quote_no = #{externalQuoteNo} limit 1
+    </select>
+
+    <select id="selectSalQuoteList" parameterType="SalQuote" resultMap="SalQuoteResult">
+        <include refid="selectSalQuoteVo"/>
+        <where>
+            <if test="quoteCode != null and quoteCode != ''"> and quote_code like concat('%', #{quoteCode}, '%')</if>
+            <if test="externalQuoteNo != null and externalQuoteNo != ''"> and external_quote_no like concat('%', #{externalQuoteNo}, '%')</if>
+            <if test="title != null and title != ''"> and title like concat('%', #{title}, '%')</if>
+            <if test="clientName != null and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="statusList != null and statusList.size() > 0">
+                and status in
+                <foreach collection="statusList" item="st" open="(" separator="," close=")">#{st}</foreach>
+            </if>
+        </where>
+        order by quote_id desc
+    </select>
+
+    <insert id="insertSalQuote" parameterType="SalQuote" useGeneratedKeys="true" keyProperty="quoteId">
+        insert into qxx_sal_quote
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="quoteCode != null and quoteCode != ''">quote_code,</if>
+            <if test="externalQuoteId != null">external_quote_id,</if>
+            <if test="externalQuoteNo != null and externalQuoteNo != ''">external_quote_no,</if>
+            <if test="sourceSystem != null">source_system,</if>
+            <if test="title != null">title,</if>
+            <if test="clientCode != null">client_code,</if>
+            <if test="clientName != null">client_name,</if>
+            <if test="clientId != null">client_id,</if>
+            <if test="goodsType != null">goods_type,</if>
+            <if test="inquiryDate != null">inquiry_date,</if>
+            <if test="budget != null">budget,</if>
+            <if test="attachment != null">attachment,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="quoteCode != null and quoteCode != ''">#{quoteCode},</if>
+            <if test="externalQuoteId != null">#{externalQuoteId},</if>
+            <if test="externalQuoteNo != null and externalQuoteNo != ''">#{externalQuoteNo},</if>
+            <if test="sourceSystem != null">#{sourceSystem},</if>
+            <if test="title != null">#{title},</if>
+            <if test="clientCode != null">#{clientCode},</if>
+            <if test="clientName != null">#{clientName},</if>
+            <if test="goodsType != null">#{goodsType},</if>
+            <if test="inquiryDate != null">#{inquiryDate},</if>
+            <if test="budget != null">#{budget},</if>
+            <if test="attachment != null">#{attachment},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSalQuote" parameterType="SalQuote">
+        update qxx_sal_quote
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="quoteCode != null and quoteCode != ''">quote_code = #{quoteCode},</if>
+            <if test="externalQuoteId != null">external_quote_id = #{externalQuoteId},</if>
+            <if test="externalQuoteNo != null and externalQuoteNo != ''">external_quote_no = #{externalQuoteNo},</if>
+            <if test="sourceSystem != null">source_system = #{sourceSystem},</if>
+            <if test="title != null">title = #{title},</if>
+            <if test="clientCode != null">client_code = #{clientCode},</if>
+            <if test="clientName != null">client_name = #{clientName},</if>
+            <if test="clientId != null">client_id = #{clientId},</if>
+            <if test="goodsType != null">goods_type = #{goodsType},</if>
+            <if test="inquiryDate != null">inquiry_date = #{inquiryDate},</if>
+            <if test="budget != null">budget = #{budget},</if>
+            <if test="attachment != null">attachment = #{attachment},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="quoteUser != null">quote_user = #{quoteUser},</if>
+            <if test="quoteTime != null">quote_time = #{quoteTime},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="returnReason != null">return_reason = #{returnReason},</if>
+            <if test="returnTime != null">return_time = #{returnTime},</if>
+            <if test="syncStatus != null">sync_status = #{syncStatus},</if>
+            <if test="syncTime != null">sync_time = #{syncTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where quote_id = #{quoteId}
+    </update>
+
+    <!-- 回写状态更新（定时任务无登录上下文，显式 factory_id） -->
+    <update id="updateSyncStatus">
+        update qxx_sal_quote
+        set sync_status = #{syncStatus}, sync_time = #{syncTime}
+        where quote_id = #{quoteId} and factory_id = #{factoryId}
+    </update>
+
+    <select id="selectSalQuoteLineByLineId" parameterType="Long" resultMap="SalQuoteLineResult">
+        <include refid="selectSalQuoteLineVo"/>
+        where line_id = #{lineId}
+    </select>
+
+    <select id="selectSalQuoteLineByQuoteId" parameterType="Long" resultMap="SalQuoteLineResult">
+        <include refid="selectSalQuoteLineVo"/>
+        where quote_id = #{quoteId} order by line_no
+    </select>
+
+    <insert id="insertSalQuoteLine" parameterType="SalQuoteLine" useGeneratedKeys="true" keyProperty="lineId">
+        insert into qxx_sal_quote_line
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="quoteId != null">quote_id,</if>
+            <if test="lineNo != null">line_no,</if>
+            <if test="externalLineId != null">external_line_id,</if>
+            <if test="productCode != null">product_code,</if>
+            <if test="productName != null">product_name,</if>
+            <if test="productId != null">product_id,</if>
+            <if test="productPhoto != null">product_photo,</if>
+            <if test="productSize != null">product_size,</if>
+            <if test="structure != null">structure,</if>
+            <if test="material != null">material,</if>
+            <if test="printingMode != null">printing_mode,</if>
+            <if test="processTxt != null">process_txt,</if>
+            <if test="accessoryTxt != null">accessory_txt,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="unit != null">unit,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="quoteId != null">#{quoteId},</if>
+            <if test="lineNo != null">#{lineNo},</if>
+            <if test="externalLineId != null">#{externalLineId},</if>
+            <if test="productCode != null">#{productCode},</if>
+            <if test="productName != null">#{productName},</if>
+            <if test="productId != null">#{productId},</if>
+            <if test="productPhoto != null">#{productPhoto},</if>
+            <if test="productSize != null">#{productSize},</if>
+            <if test="structure != null">#{structure},</if>
+            <if test="material != null">#{material},</if>
+            <if test="printingMode != null">#{printingMode},</if>
+            <if test="processTxt != null">#{processTxt},</if>
+            <if test="accessoryTxt != null">#{accessoryTxt},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="unit != null">#{unit},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSalQuoteLine" parameterType="SalQuoteLine">
+        update qxx_sal_quote_line
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="lineNo != null">line_no = #{lineNo},</if>
+            <if test="externalLineId != null">external_line_id = #{externalLineId},</if>
+            <if test="productCode != null">product_code = #{productCode},</if>
+            <if test="productName != null">product_name = #{productName},</if>
+            <if test="productId != null">product_id = #{productId},</if>
+            <if test="productPhoto != null">product_photo = #{productPhoto},</if>
+            <if test="productSize != null">product_size = #{productSize},</if>
+            <if test="structure != null">structure = #{structure},</if>
+            <if test="material != null">material = #{material},</if>
+            <if test="printingMode != null">printing_mode = #{printingMode},</if>
+            <if test="processTxt != null">process_txt = #{processTxt},</if>
+            <if test="accessoryTxt != null">accessory_txt = #{accessoryTxt},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="unit != null">unit = #{unit},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="quoteRemark != null">quote_remark = #{quoteRemark},</if>
+            <if test="deliveryDate != null">delivery_date = #{deliveryDate},</if>
+            <if test="quoteValidDate != null">quote_valid_date = #{quoteValidDate},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where line_id = #{lineId}
+    </update>
+
+    <delete id="deleteSalQuoteLineByQuoteId" parameterType="Long">
+        delete from qxx_sal_quote_line where quote_id = #{quoteId}
+    </delete>
+
+</mapper>

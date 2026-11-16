@@ -1,6 +1,9 @@
 package com.ruoyi.web.controller.mes.wm;
 
 import java.util.List;
+import jakarta.servlet.http.HttpServletResponse;
+import com.ruoyi.web.controller.mes.wm.export.WmOutsourceExporter;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +56,49 @@ public class WmOutsourceController extends BaseController
     public AjaxResult getInfo(@PathVariable Long orderId)
     {
         return success(outsourceService.selectByOrderId(orderId));
+    }
+
+    /** 人工改加工单状态（一期弱化流程） */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:changeStatus')")
+    @Log(title = "加工单改状态", businessType = BusinessType.UPDATE)
+    @PutMapping("/changeStatus")
+    public AjaxResult changeStatus(@RequestBody WmOutsourceOrder req)
+    {
+        return success(outsourceService.changeStatus(req.getOrderId(), req.getStatus(), req.getRemark()));
+    }
+
+    /** 加工单工序行（多工序合并一张单） */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:query')")
+    @GetMapping("/{orderId}/processLines")
+    public AjaxResult processLines(@PathVariable Long orderId)
+    {
+        return success(outsourceService.selectProcessLines(orderId));
+    }
+
+    /** 覆盖保存加工单工序行 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:edit')")
+    @Log(title = "加工单工序行", businessType = BusinessType.UPDATE)
+    @PutMapping("/{orderId}/processLines")
+    public AjaxResult saveProcessLines(@PathVariable Long orderId,
+                                       @RequestBody List<WmOutsourceProcessLine> lines)
+    {
+        outsourceService.saveProcessLines(orderId, lines);
+        return success();
+    }
+
+    /** 导出加工单（Excel 套打，可直接打印） */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:export')")
+    @Log(title = "加工单导出", businessType = BusinessType.EXPORT)
+    @PostMapping("/export/{orderId}")
+    public void exportOrder(HttpServletResponse response, @PathVariable Long orderId) throws Exception
+    {
+        WmOutsourceOrder order = outsourceService.selectByOrderId(orderId);
+        if (order == null)
+        {
+            response.sendError(404, "加工单不存在");
+            return;
+        }
+        WmOutsourceExporter.export(response, order);
     }
 
     /** Step1 创建外协发货单（我方操作，草稿模式不扣料） */

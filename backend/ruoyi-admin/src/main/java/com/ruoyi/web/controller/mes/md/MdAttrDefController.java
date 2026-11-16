@@ -1,6 +1,8 @@
 package com.ruoyi.web.controller.mes.md;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -47,6 +49,29 @@ public class MdAttrDefController extends BaseController
         rsp.setRows(list);
         rsp.setTotal(list.size());
         return rsp;
+    }
+
+    /**
+     * 全量属性字典映射（attrCode → 属性名/单位/控件类型）。
+     * 供库存、单据等只读展示把 attrCode 翻译成中文，无需额外权限。
+     */
+    @GetMapping("/map")
+    public AjaxResult map()
+    {
+        MdAttrDef query = new MdAttrDef();
+        query.setEnableFlag("1");
+        List<MdAttrDef> list = mdAttrDefService.selectMdAttrDefList(query);
+        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
+        for (MdAttrDef d : list)
+        {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("attrName", d.getAttrName());
+            item.put("attrUnit", d.getAttrUnit());
+            item.put("widgetType", d.getWidgetType());
+            item.put("attrScope", d.getAttrScope());
+            result.put(d.getAttrCode(), item);
+        }
+        return success(result);
     }
 
     @PreAuthorize("@ss.hasPermi('mes:md:attrDef:export')")

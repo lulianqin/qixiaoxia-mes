@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessLineMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine" id="WmOutsourceProcessLineResult">
+        <id property="lineId" column="line_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="orderId" column="order_id" />
+        <result property="seq" column="seq" />
+        <result property="taskId" column="task_id" />
+        <result property="processId" column="process_id" />
+        <result property="processCode" column="process_code" />
+        <result property="processName" column="process_name" />
+        <result property="planQty" column="plan_qty" />
+        <result property="doneQty" column="done_qty" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <select id="selectByOrderId" resultMap="WmOutsourceProcessLineResult">
+        select line_id, factory_id, order_id, seq, task_id, process_id, process_code, process_name,
+               plan_qty, done_qty, remark
+        from qxx_wm_outsource_process_line
+        where order_id = #{orderId}
+        order by seq asc, line_id asc
+    </select>
+
+    <delete id="deleteByOrderId">
+        delete from qxx_wm_outsource_process_line where order_id = #{orderId}
+    </delete>
+
+    <insert id="insertBatch">
+        insert into qxx_wm_outsource_process_line
+            (order_id, seq, task_id, process_id, process_code, process_name, plan_qty, done_qty, remark, create_by, create_time)
+        values
+        <foreach collection="list" item="it" separator=",">
+            (#{it.orderId}, #{it.seq}, #{it.taskId}, #{it.processId}, #{it.processCode}, #{it.processName},
+             #{it.planQty}, #{it.doneQty}, #{it.remark}, #{it.createBy}, sysdate())
+        </foreach>
+    </insert>
+
+</mapper>

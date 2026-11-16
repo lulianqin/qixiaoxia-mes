@@ -47,6 +47,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="cancelDate"    column="cancel_date"    />
         <result property="finishDate"    column="finish_date"    />
         <result property="status"    column="status"    />
+        <result property="title"    column="title"    />
+        <result property="billDate"    column="bill_date"    />
+        <result property="orderDate"    column="order_date"    />
+        <result property="productionNo"    column="production_no"    />
+        <result property="orderQty"    column="order_qty"    />
+        <result property="bagMouth"    column="bag_mouth"    />
+        <result property="bottomBoard"    column="bottom_board"    />
+        <result property="material"    column="material"    />
+        <result property="materialGram"    column="material_gram"    />
+        <result property="rollWidth"    column="roll_width"    />
+        <result property="lossRate"    column="loss_rate"    />
+        <result property="orderWeight"    column="order_weight"    />
+        <result property="plateCircumference"    column="plate_circumference"    />
+        <result property="processFlow"    column="process_flow"    />
+        <result property="productImage"    column="product_image"    />
+        <result property="salesperson"    column="salesperson"    />
         <result property="quantityRecpt"    column="quantity_recpt"    />
         <result property="remark"    column="remark"    />
         <result property="createBy"    column="create_by"    />
@@ -56,7 +72,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProWorkorderVo">
-        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, owner_id, owner_name, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, line_attrs, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time
+        select workorder_id, factory_id, workorder_code, workorder_name, workorder_type, order_source, source_code, sales_order_line_id, product_id, product_code, product_name, product_spc, route_product_id, owner_id, owner_name, unit_of_measure, unit_name, quantity, quantity_produced, quantity_changed, quantity_scheduled, client_id, client_code, client_name, client_order_code, product_size, printing_req, rope_spec, package_req, shipping_req, line_attrs, order_type, vendor_id, vendor_code, vendor_name, outsource_factory_id, batch_code, request_date, cancel_date, finish_date, status, remark, create_by, create_time, update_by, update_time,
+        title, bill_date, order_date, production_no, order_qty, bag_mouth, bottom_board, material, material_gram, roll_width, loss_rate, order_weight, plate_circumference, process_flow, product_image, salesperson
         <!-- 已入库量子查询：JOIN ON 关联 + CASE WHEN 过滤状态，刻意不写 WHERE，避开 FactoryIdInterceptor 误判 -->
         ,(SELECT IFNULL(SUM(CASE WHEN r.status IN ('DRAFT','CONFIRMED','POSTED') THEN r.total_quantity ELSE 0 END),0)
           FROM qxx_wm_product_recpt r
@@ -64,6 +81,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           AND w.workorder_id = qxx_pro_workorder.workorder_id) as quantity_recpt
         from qxx_pro_workorder
     </sql>
+
+    <!-- 生产编号子序号：production_no 形如 {前缀}-s12 -->
+    <select id="selectMaxProductionSeq" resultType="java.lang.Integer">
+        select ifnull(max(cast(substring_index(production_no, '-s', -1) as unsigned)), 0)
+        from qxx_pro_workorder
+        where production_no like concat(#{prefix}, '-s%')
+    </select>
 
     <select id="selectProWorkorderList" parameterType="ProWorkorder" resultMap="ProWorkorderResult">
         <include refid="selectProWorkorderVo"/>
@@ -157,6 +181,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cancelDate != null">cancel_date,</if>
             <if test="finishDate != null">finish_date,</if>
             <if test="status != null and status != ''">status,</if>
+            <if test="title != null">title,</if>
+            <if test="billDate != null">bill_date,</if>
+            <if test="orderDate != null">order_date,</if>
+            <if test="productionNo != null">production_no,</if>
+            <if test="orderQty != null">order_qty,</if>
+            <if test="bagMouth != null">bag_mouth,</if>
+            <if test="bottomBoard != null">bottom_board,</if>
+            <if test="material != null">material,</if>
+            <if test="materialGram != null">material_gram,</if>
+            <if test="rollWidth != null">roll_width,</if>
+            <if test="lossRate != null">loss_rate,</if>
+            <if test="orderWeight != null">order_weight,</if>
+            <if test="plateCircumference != null">plate_circumference,</if>
+            <if test="processFlow != null">process_flow,</if>
+            <if test="productImage != null">product_image,</if>
+            <if test="salesperson != null">salesperson,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -201,6 +241,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cancelDate != null">#{cancelDate},</if>
             <if test="finishDate != null">#{finishDate},</if>
             <if test="status != null and status != ''">#{status},</if>
+            <if test="title != null">#{title},</if>
+            <if test="billDate != null">#{billDate},</if>
+            <if test="orderDate != null">#{orderDate},</if>
+            <if test="productionNo != null">#{productionNo},</if>
+            <if test="orderQty != null">#{orderQty},</if>
+            <if test="bagMouth != null">#{bagMouth},</if>
+            <if test="bottomBoard != null">#{bottomBoard},</if>
+            <if test="material != null">#{material},</if>
+            <if test="materialGram != null">#{materialGram},</if>
+            <if test="rollWidth != null">#{rollWidth},</if>
+            <if test="lossRate != null">#{lossRate},</if>
+            <if test="orderWeight != null">#{orderWeight},</if>
+            <if test="plateCircumference != null">#{plateCircumference},</if>
+            <if test="processFlow != null">#{processFlow},</if>
+            <if test="productImage != null">#{productImage},</if>
+            <if test="salesperson != null">#{salesperson},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -249,6 +305,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cancelDate != null">cancel_date = #{cancelDate},</if>
             <if test="finishDate != null">finish_date = #{finishDate},</if>
             <if test="status != null and status != ''">status = #{status},</if>
+            <if test="title != null">title = #{title},</if>
+            <if test="billDate != null">bill_date = #{billDate},</if>
+            <if test="orderDate != null">order_date = #{orderDate},</if>
+            <if test="productionNo != null">production_no = #{productionNo},</if>
+            <if test="orderQty != null">order_qty = #{orderQty},</if>
+            <if test="bagMouth != null">bag_mouth = #{bagMouth},</if>
+            <if test="bottomBoard != null">bottom_board = #{bottomBoard},</if>
+            <if test="material != null">material = #{material},</if>
+            <if test="materialGram != null">material_gram = #{materialGram},</if>
+            <if test="rollWidth != null">roll_width = #{rollWidth},</if>
+            <if test="lossRate != null">loss_rate = #{lossRate},</if>
+            <if test="orderWeight != null">order_weight = #{orderWeight},</if>
+            <if test="plateCircumference != null">plate_circumference = #{plateCircumference},</if>
+            <if test="processFlow != null">process_flow = #{processFlow},</if>
+            <if test="productImage != null">product_image = #{productImage},</if>
+            <if test="salesperson != null">salesperson = #{salesperson},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

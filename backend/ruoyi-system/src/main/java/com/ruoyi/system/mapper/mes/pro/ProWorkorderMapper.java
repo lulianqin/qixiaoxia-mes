@@ -11,6 +11,9 @@ public interface ProWorkorderMapper {
     ProWorkorder selectProWorkorderByWorkorderId(Long id);
     List<ProWorkorder> selectProWorkorderList(ProWorkorder w);
 
+    /** 生产编号前缀（{订单号}-s）下的最大子序号，用于生成 production_no */
+    Integer selectMaxProductionSeq(@Param("prefix") String prefix);
+
     int countMobileWorkorders(@Param("status") String status);
 
     int countMobilePendingTasks(@Param("status") String status);

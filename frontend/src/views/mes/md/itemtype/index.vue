@@ -119,7 +119,16 @@
       <el-table :data="attrBindList" v-loading="attrBindLoading" border size="small">
         <el-table-column label="属性编码" prop="attrCode" width="160"  :show-overflow-tooltip="true" />
         <el-table-column label="属性名称" prop="attrName" width="140"  :show-overflow-tooltip="true" />
-        <el-table-column label="类型" prop="attrType" width="90" align="center"  :show-overflow-tooltip="true" />
+        <el-table-column label="属性域" width="90" align="center">
+          <template #default="scope">
+            <el-tag size="small" :type="scope.row.attrScope === 'PRODUCTION' ? 'warning' : 'info'">
+              {{ scope.row.attrScope === 'PRODUCTION' ? '生产' : '产品' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="控件" width="100" align="center"  :show-overflow-tooltip="true">
+          <template #default="scope">{{ widgetLabel(scope.row.widgetType || scope.row.attrType) }}</template>
+        </el-table-column>
         <el-table-column label="必填" width="70" align="center">
           <template #default="scope">
             <el-checkbox v-model="scope.row.checked" true-value="1" false-value="0" :disabled="scope.row.inheritFromParent" />
@@ -169,13 +178,17 @@
           </el-row>
           <el-row :gutter="12">
             <el-col :span="6">
-              <el-form-item label="类型">
-                <el-select v-model="newAttrForm.attrType" style="width:100%">
-                  <el-option label="文本" value="TEXT" />
-                  <el-option label="数字" value="NUMBER" />
-                  <el-option label="下拉" value="SELECT" />
-                  <el-option label="开关" value="BOOL" />
-                  <el-option label="日期" value="DATE" />
+              <el-form-item label="属性域">
+                <el-select v-model="newAttrForm.attrScope" style="width:100%">
+                  <el-option label="产品属性" value="PRODUCT" />
+                  <el-option label="生产/流转属性" value="PRODUCTION" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="控件类型">
+                <el-select v-model="newAttrForm.widgetType" style="width:100%">
+                  <el-option v-for="w in widgetOptions" :key="w.value" :label="w.label" :value="w.value" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -186,7 +199,7 @@
               <el-form-item label="必填"><el-switch v-model="newAttrForm.required" /></el-form-item>
             </el-col>
           </el-row>
-          <el-form-item v-if="newAttrForm.attrType === 'SELECT'" label="下拉选项">
+          <el-form-item v-if="newAttrForm.widgetType === 'SELECT' || newAttrForm.widgetType === 'MULTI_SELECT'" label="下拉选项">
             <el-input v-model="newAttrForm.optionsInput" type="textarea" :rows="2" placeholder="逗号分隔，如 优,良,差" />
           </el-form-item>
           <div style="text-align:right">
@@ -343,9 +356,36 @@ const addAttrId = ref<number | undefined>(undefined)
 // 新建属性内联表单
 const newAttrOpen = ref(false)
 const newAttrSubmitting = ref(false)
-const newAttrForm = reactive<{ attrCode: string; attrName: string; attrType: string; attrUnit: string; required: boolean; optionsInput: string }>({
-  attrCode: '', attrName: '', attrType: 'TEXT', attrUnit: '', required: false, optionsInput: ''
+const widgetOptions = [
+  { label: '单行文本', value: 'TEXT' },
+  { label: '多行文本', value: 'TEXTAREA' },
+  { label: '数字', value: 'NUMBER' },
+  { label: '日期', value: 'DATE' },
+  { label: '单选', value: 'SELECT' },
+  { label: '多选', value: 'MULTI_SELECT' },
+  { label: '开关', value: 'BOOL' },
+  { label: '图片', value: 'IMAGE' },
+  { label: '附件', value: 'FILE' }
+]
+const newAttrForm = reactive<{
+  attrCode: string; attrName: string; attrScope: 'PRODUCT' | 'PRODUCTION';
+  widgetType: string; attrUnit: string; required: boolean; optionsInput: string
+}>({
+  attrCode: '', attrName: '', attrScope: 'PRODUCT', widgetType: 'TEXT', attrUnit: '', required: false, optionsInput: ''
 })
+
+function widgetLabel(type?: string): string {
+  return widgetOptions.find(w => w.value === type)?.label || type || '-'
+}
+
+/** 控件类型 → 历史 attr_type（兼容旧接口按 attrType 渲染的地方） */
+function toAttrType(widgetType: string): string {
+  if (widgetType === 'NUMBER') return 'NUMBER'
+  if (widgetType === 'DATE') return 'DATE'
+  if (widgetType === 'BOOL') return 'BOOL'
+  if (widgetType === 'SELECT' || widgetType === 'MULTI_SELECT') return 'SELECT'
+  return 'TEXT'
+}
 
 function handleAttrBind(row: MdItemType) {
   attrBindRow.value = row
@@ -392,6 +432,7 @@ function addAttrToBind() {
   }
   attrBindList.value.push({
     attrId: def.attrId!, attrCode: def.attrCode, attrName: def.attrName, attrType: def.attrType,
+    attrScope: def.attrScope, widgetType: def.widgetType,
     attrUnit: def.attrUnit, optionsJson: def.optionsJson,
     checked: '0', enableFlag: '1', inheritFromParent: false
   })
@@ -424,7 +465,8 @@ function toggleNewAttrForm() {
   if (newAttrOpen.value) {
     newAttrForm.attrCode = ''
     newAttrForm.attrName = ''
-    newAttrForm.attrType = 'TEXT'
+    newAttrForm.attrScope = 'PRODUCT'
+    newAttrForm.widgetType = 'TEXT'
     newAttrForm.attrUnit = ''
     newAttrForm.required = false
     newAttrForm.optionsInput = ''
@@ -443,18 +485,26 @@ function submitNewAttr() {
   const dup = attrDefOptions.value.find(a => a.attrCode === code)
   if (dup) { proxy.$modal.msgWarning(`属性编码 ${code} 已存在（${dup.attrName}），将复用该字典记录`); }
 
-  // SELECT 选项转 JSON 数组字符串
+  // 单选/多选选项转 JSON 数组字符串
   let optionsJson: string | undefined
-  if (newAttrForm.attrType === 'SELECT') {
+  if (newAttrForm.widgetType === 'SELECT' || newAttrForm.widgetType === 'MULTI_SELECT') {
     const opts = newAttrForm.optionsInput.split(/[,，]/).map(s => s.trim()).filter(Boolean)
-    if (!opts.length) { proxy.$modal.msgWarning('下拉类型需填写选项'); return }
+    if (!opts.length) { proxy.$modal.msgWarning('单选/多选类型需填写选项'); return }
     optionsJson = JSON.stringify(opts)
   }
 
   newAttrSubmitting.value = true
   createAttrAndBind({
     typeId: attrBindRow.value.itemTypeId!,
-    attrDef: { attrCode: code, attrName: name, attrType: newAttrForm.attrType, attrUnit: newAttrForm.attrUnit || undefined, optionsJson },
+    attrDef: {
+      attrCode: code,
+      attrName: name,
+      attrType: toAttrType(newAttrForm.widgetType) as any,
+      attrScope: newAttrForm.attrScope,
+      widgetType: newAttrForm.widgetType as any,
+      attrUnit: newAttrForm.attrUnit || undefined,
+      optionsJson
+    },
     required: newAttrForm.required
   }).then(r => {
     proxy.$modal.msgSuccess('属性已创建并绑定')
@@ -464,7 +514,12 @@ function submitNewAttr() {
     })
     // 同步到字典下拉选项
     if (!attrDefOptions.value.some(a => a.attrCode === code)) {
-      attrDefOptions.value.push({ attrId: (r.data as any)?.attrId, attrCode: code, attrName: name, attrType: newAttrForm.attrType, attrUnit: newAttrForm.attrUnit, optionsJson })
+      attrDefOptions.value.push({
+        attrId: (r.data as any)?.attrId, attrCode: code, attrName: name,
+        attrType: toAttrType(newAttrForm.widgetType) as any,
+        attrScope: newAttrForm.attrScope, widgetType: newAttrForm.widgetType as any,
+        attrUnit: newAttrForm.attrUnit, optionsJson
+      })
     }
     toggleNewAttrForm()
   }).finally(() => { newAttrSubmitting.value = false })

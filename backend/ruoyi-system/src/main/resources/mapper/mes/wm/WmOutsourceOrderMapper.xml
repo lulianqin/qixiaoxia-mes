@@ -7,6 +7,7 @@
         <result property="factoryId" column="factory_id" />
         <result property="outsourceFactoryId" column="outsource_factory_id" />
         <result property="orderCode" column="order_code" />
+        <result property="supplierType" column="supplier_type" />
         <result property="vendorId" column="vendor_id" />
         <result property="vendorCode" column="vendor_code" />
         <result property="vendorName" column="vendor_name" />
@@ -44,7 +45,7 @@
     </resultMap>
 
     <sql id="selectVo">
-        select order_id, factory_id, outsource_factory_id, order_code, vendor_id, vendor_code, vendor_name,
+        select order_id, factory_id, outsource_factory_id, order_code, supplier_type, vendor_id, vendor_code, vendor_name,
                workorder_id, workorder_code, card_id, route_id, process_id, process_code, process_name,
                source_type, source_ref_id, status, feedback_id, iqc_id, iqc_code,
                issue_total_qty, recpt_total_qty, operator, issue_time,
@@ -115,6 +116,7 @@
             <if test="factoryId != null">factory_id,</if>
             <if test="outsourceFactoryId != null">outsource_factory_id,</if>
             <if test="orderCode != null">order_code,</if>
+            <if test="supplierType != null">supplier_type,</if>
             <if test="vendorId != null">vendor_id,</if>
             <if test="vendorCode != null">vendor_code,</if>
             <if test="vendorName != null">vendor_name,</if>
@@ -146,6 +148,7 @@
             <if test="factoryId != null">#{factoryId},</if>
             <if test="outsourceFactoryId != null">#{outsourceFactoryId},</if>
             <if test="orderCode != null">#{orderCode},</if>
+            <if test="supplierType != null">#{supplierType},</if>
             <if test="vendorId != null">#{vendorId},</if>
             <if test="vendorCode != null">#{vendorCode},</if>
             <if test="vendorName != null">#{vendorName},</if>

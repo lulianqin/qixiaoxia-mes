@@ -46,6 +46,12 @@ public class MdItemTypeAttr extends BaseEntity
     /** 属性类型 */
     private String attrType;
 
+    /** 属性域:PRODUCT-产品属性,PRODUCTION-生产/流转单属性 */
+    private String attrScope;
+
+    /** 控件类型 */
+    private String widgetType;
+
     /** 属性单位 */
     private String attrUnit;
 
@@ -84,6 +90,12 @@ public class MdItemTypeAttr extends BaseEntity
 
     public String getAttrType() { return attrType; }
     public void setAttrType(String attrType) { this.attrType = attrType; }
+
+    public String getAttrScope() { return attrScope; }
+    public void setAttrScope(String attrScope) { this.attrScope = attrScope; }
+
+    public String getWidgetType() { return widgetType; }
+    public void setWidgetType(String widgetType) { this.widgetType = widgetType; }
 
     public String getAttrUnit() { return attrUnit; }
     public void setAttrUnit(String attrUnit) { this.attrUnit = attrUnit; }

@@ -44,6 +44,13 @@
 
         <el-table v-loading="loading" :data="itemList" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="50" align="center" />
+          <el-table-column label="主图" align="center" width="70">
+            <template #default="scope">
+              <el-image v-if="scope.row.imageUrl" :src="scope.row.imageUrl" :preview-src-list="[scope.row.imageUrl]"
+                        fit="cover" class="item-thumb" preview-teleported />
+              <span v-else class="item-thumb-empty">-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="物料编码" align="center" prop="itemCode" width="130">
             <template #default="scope">
               <span>{{ scope.row.itemCode }}</span>
@@ -92,6 +99,13 @@
               <el-col :span="24">
                 <el-form-item label="物料名称" prop="itemName">
                   <el-input v-model="form.itemName" placeholder="请输入物料名称" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row>
+              <el-col :span="24">
+                <el-form-item label="物料主图">
+                  <image-upload v-model="form.imageUrl" :limit="1" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -184,9 +198,9 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- 扩展属性 tab（分类驱动，动态渲染） -->
+        <!-- 扩展属性 tab（分类驱动，动态渲染；物料档案只维护产品属性） -->
         <el-tab-pane label="扩展属性" name="extAttr">
-          <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.extAttrs" />
+          <ExtAttrForm ref="extAttrFormRef" :schema="effAttrSchema" v-model="form.extAttrs" scope="PRODUCT" />
         </el-tab-pane>
 
         <!-- BOM组成 tab (编辑时显示) -->
@@ -438,5 +452,7 @@ getList()
 </script>
 
 <style scoped>
+.item-thumb { width: 40px; height: 40px; border-radius: 4px; }
+.item-thumb-empty { color: #c0c4cc; }
 :deep(.el-form-item__label) { padding-right: 16px !important; }
 </style>

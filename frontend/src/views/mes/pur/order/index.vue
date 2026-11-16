@@ -136,7 +136,7 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="50" align="center" />
 <el-table-column label="ID" align="center" prop="orderId" :show-overflow-tooltip="true" />      <el-table-column label="单据编号" align="center" prop="orderCode" :show-overflow-tooltip="true" />
 	      <el-table-column label="单据名称" align="center" prop="orderName" :show-overflow-tooltip="true" />
@@ -201,6 +201,15 @@
           <el-button v-if="['DRAFT','APPROVED','ORDERED'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:pur:order:cancel']">取消</el-button>
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="danger" size="small" @click="handleReturn(scope.row)" v-hasPermi="['mes:pur:order:return']">退货</el-button>
+          <el-dropdown @command="cmd => handleChangeStatus(scope.row, cmd)" v-hasPermi="['mes:pur:order:changeStatus']">
+            <el-button link type="primary" size="small">改状态<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="d in mes_order_status" :key="d.value" :command="d.value"
+                                  :disabled="d.value === scope.row.status">{{ d.label }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </template>
       </el-table-column>
     </el-table>
@@ -359,11 +368,12 @@
 </template>
 
 <script>
-import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder, rejectOrder } from "@/api/mes/pur/order"
+import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder, rejectOrder, changePurOrderStatus } from "@/api/mes/pur/order"
 import { listAllOrder } from "@/api/mes/sal/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import { listAllVendor } from "@/api/mes/md/vendor"
 import { listUser } from "@/api/system/user"
+import { ElMessageBox, ElMessage } from "element-plus"
 import useUserStore from '@/store/modules/user'
 import VendorSelect from "@/components/vendorSelect/single.vue"
 import PurOrderLine from "./line.vue"
@@ -672,6 +682,15 @@ export default {
         this.getList()
         this.$modal.msgSuccess("下单成功")
       }).catch(() => {})
+    },
+    /** 一期：人工改采购单状态 */
+    handleChangeStatus(row, targetStatus) {
+      if (targetStatus === row.status) return
+      ElMessageBox.prompt(`将采购单 ${row.orderCode} 状态改为「${targetStatus}」，请填写变更原因（可空）`, '改状态', {
+        inputPlaceholder: '变更原因', confirmButtonText: '确定', cancelButtonText: '取消'
+      }).then(({ value }) => changePurOrderStatus({ orderId: row.orderId, targetStatus, reason: value }))
+        .then(() => { ElMessage.success('状态已更新'); this.getList() })
+        .catch(() => {})
     },
     /** 关闭操作 */
     handleClose(row) {

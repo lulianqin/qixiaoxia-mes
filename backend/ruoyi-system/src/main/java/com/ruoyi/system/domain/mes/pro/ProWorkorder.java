@@ -69,6 +69,28 @@ public class ProWorkorder extends BaseEntity
     private Date finishDate;
     @Excel(name = "工单状态") private String status;
 
+    // ---- 生产流转单字段（一期新增，点击【生成流转单】时补齐） ----
+    @Excel(name = "标题") private String title;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "制单日期", width = 30, dateFormat = "yyyy-MM-dd")
+    private Date billDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "下单日期", width = 30, dateFormat = "yyyy-MM-dd")
+    private Date orderDate;
+    @Excel(name = "生产编号") private String productionNo;
+    @Excel(name = "订单数量") private BigDecimal orderQty;
+    @Excel(name = "口部提袋") private String bagMouth;
+    @Excel(name = "底板") private String bottomBoard;
+    @Excel(name = "订单材质") private String material;
+    @Excel(name = "订单材质克重") private BigDecimal materialGram;
+    @Excel(name = "订单门幅") private String rollWidth;
+    @Excel(name = "损耗比率") private BigDecimal lossRate;
+    @Excel(name = "订单重量") private BigDecimal orderWeight;
+    @Excel(name = "版辊周长") private BigDecimal plateCircumference;
+    @Excel(name = "工艺流程") private String processFlow;
+    @Excel(name = "产品图片") private String productImage;
+    @Excel(name = "业务员") private String salesperson;
+
     /** SKU变体创建标志（非DB字段，仅API传输用） */
     private Boolean createSkuVariant;
     /** BOM调整原因（非DB字段，仅编辑工单时传参用） */
@@ -203,6 +225,39 @@ public class ProWorkorder extends BaseEntity
     public void setFinishDate(Date v) { this.finishDate = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String v) { this.title = v; }
+    public Date getBillDate() { return billDate; }
+    public void setBillDate(Date v) { this.billDate = v; }
+    public Date getOrderDate() { return orderDate; }
+    public void setOrderDate(Date v) { this.orderDate = v; }
+    public String getProductionNo() { return productionNo; }
+    public void setProductionNo(String v) { this.productionNo = v; }
+    public BigDecimal getOrderQty() { return orderQty; }
+    public void setOrderQty(BigDecimal v) { this.orderQty = v; }
+    public String getBagMouth() { return bagMouth; }
+    public void setBagMouth(String v) { this.bagMouth = v; }
+    public String getBottomBoard() { return bottomBoard; }
+    public void setBottomBoard(String v) { this.bottomBoard = v; }
+    public String getMaterial() { return material; }
+    public void setMaterial(String v) { this.material = v; }
+    public BigDecimal getMaterialGram() { return materialGram; }
+    public void setMaterialGram(BigDecimal v) { this.materialGram = v; }
+    public String getRollWidth() { return rollWidth; }
+    public void setRollWidth(String v) { this.rollWidth = v; }
+    public BigDecimal getLossRate() { return lossRate; }
+    public void setLossRate(BigDecimal v) { this.lossRate = v; }
+    public BigDecimal getOrderWeight() { return orderWeight; }
+    public void setOrderWeight(BigDecimal v) { this.orderWeight = v; }
+    public BigDecimal getPlateCircumference() { return plateCircumference; }
+    public void setPlateCircumference(BigDecimal v) { this.plateCircumference = v; }
+    public String getProcessFlow() { return processFlow; }
+    public void setProcessFlow(String v) { this.processFlow = v; }
+    public String getProductImage() { return productImage; }
+    public void setProductImage(String v) { this.productImage = v; }
+    public String getSalesperson() { return salesperson; }
+    public void setSalesperson(String v) { this.salesperson = v; }
 
     public Boolean getCreateSkuVariant() { return createSkuVariant; }
     public void setCreateSkuVariant(Boolean v) { this.createSkuVariant = v; }

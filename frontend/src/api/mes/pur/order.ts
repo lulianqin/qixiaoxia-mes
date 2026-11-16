@@ -94,6 +94,11 @@ export function cancelOrder(orderId, cancelReason) {
   })
 }
 
+// 一期：人工改采购单状态（任意状态互转）
+export function changePurOrderStatus(data: { orderId: number; targetStatus: string; reason?: string }) {
+  return request({ url: '/mes/pur/order/changeStatus', method: 'put', data })
+}
+
 // 取消采购订单行（ORDERED/RECEIVING -> CANCEL）
 export function cancelLine(lineId, cancelReason) {
   return request({

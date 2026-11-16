@@ -18,6 +18,10 @@ public interface SalOrderMapper
 {
     public SalOrder selectSalOrderByOrderId(Long orderId);
     public SalOrder selectSalOrderByOrderCode(String orderCode);
+
+    /** ERP 下发幂等查询：来源系统 + 外部单号 */
+    public SalOrder selectSalOrderByExternalNo(@Param("sourceSystem") String sourceSystem,
+                                               @Param("externalOrderNo") String externalOrderNo);
     public SalOrder checkOrderCodeUnique(SalOrder salOrder);
     public List<SalOrder> selectSalOrderList(SalOrder salOrder);
     /** 工单选择器用:查已确认/生产中两态（CONFIRMED/PRODUCING）可转订单 */
@@ -26,6 +30,20 @@ public interface SalOrderMapper
     public int updateSalOrder(SalOrder salOrder);
     public int deleteSalOrderByOrderId(Long orderId);
     public int deleteSalOrderByOrderIds(Long[] orderIds);
+
+    /** 状态变更留痕（factory_id 由拦截器注入） */
+    int insertStatusLog(@Param("orderId") Long orderId,
+                        @Param("orderCode") String orderCode,
+                        @Param("fromStatus") String fromStatus,
+                        @Param("toStatus") String toStatus,
+                        @Param("reason") String reason,
+                        @Param("createBy") String createBy);
+
+    /** 人工改状态（一期弱化流程，不做流转校验） */
+    int updateStatusDirect(@Param("orderId") Long orderId,
+                           @Param("status") String status,
+                           @Param("updateBy") String updateBy,
+                           @Param("updateTime") Date updateTime);
 
     /**
      * 批量聚合订单生产进度（任务数量口径，排除已取消工单/任务）。
@@ -38,6 +56,28 @@ public interface SalOrderMapper
      * 主表 l 的 factory_id 由 FactoryIdInterceptor 注入。
      */
     public List<SalOrderWorkorderCountRow> selectWorkorderCountsByOrderIds(@Param("ids") List<Long> orderIds);
+
+    /** ERP 重发：重置接单/打回痕迹与状态，回到待接单（显式 factoryId） */
+    @SkipFactoryId
+    int resetForErpResend(@Param("orderId") Long orderId,
+                          @Param("factoryId") Long factoryId,
+                          @Param("externalVersion") Integer externalVersion,
+                          @Param("updateBy") String updateBy,
+                          @Param("updateTime") Date updateTime);
+
+    /** 接单成功后清空打回痕迹（显式 factoryId） */
+    @SkipFactoryId
+    int clearRejectForAccept(@Param("orderId") Long orderId,
+                             @Param("factoryId") Long factoryId,
+                             @Param("updateBy") String updateBy,
+                             @Param("updateTime") Date updateTime);
+
+    /** 回写任务更新同步状态（无登录上下文，显式 factoryId） */
+    @SkipFactoryId
+    int updateSyncStatus(@Param("orderId") Long orderId,
+                         @Param("factoryId") Long factoryId,
+                         @Param("syncStatus") String syncStatus,
+                         @Param("syncTime") Date syncTime);
 
     /** 仅 CONFIRMED 订单推进 PRODUCING（开工事件）。跳过拦截器：跨表事件链路显式带 factoryId */
     @SkipFactoryId

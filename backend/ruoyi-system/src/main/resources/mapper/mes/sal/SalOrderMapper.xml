@@ -22,6 +22,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="outsourceFlag"    column="outsource_flag"    />
         <result property="packageFlag"      column="package_flag"      />
         <result property="source"           column="source"            />
+        <result property="sourceSystem"     column="source_system"     />
+        <result property="externalOrderId"  column="external_order_id" />
+        <result property="externalOrderNo"  column="external_order_no" />
+        <result property="externalVersion"  column="external_version"  />
+        <result property="acceptStatus"     column="accept_status"     />
+        <result property="acceptTime"       column="accept_time"       />
+        <result property="rejectReason"     column="reject_reason"     />
+        <result property="rejectBy"         column="reject_by"         />
+        <result property="rejectTime"       column="reject_time"       />
+        <result property="syncStatus"       column="sync_status"       />
+        <result property="syncTime"         column="sync_time"         />
         <result property="orderDate"        column="order_date"        />
         <result property="requestDate"      column="request_date"      />
         <result property="totalAmount"      column="total_amount"      />
@@ -38,7 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSalOrderVo">
-        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
+        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, source_system, external_order_id, external_order_no, external_version, accept_status, accept_time, reject_reason, reject_by, reject_time, sync_status, sync_time, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
     </sql>
 
     <select id="selectSalOrderList" parameterType="SalOrder" resultMap="SalOrderResult">
@@ -52,6 +63,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="businessLine != null  and businessLine != ''"> and business_line = #{businessLine}</if>
             <if test="orderType != null  and orderType != ''"> and order_type = #{orderType}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="source != null"> and source = #{source}</if>
+            <if test="sourceSystem != null and sourceSystem != ''"> and source_system = #{sourceSystem}</if>
+            <if test="externalOrderNo != null and externalOrderNo != ''"> and external_order_no like concat('%', #{externalOrderNo}, '%')</if>
             <if test="statusList != null and statusList.size() > 0">
                 and status in
                 <foreach collection="statusList" item="st" open="(" separator="," close=")">#{st}</foreach>
@@ -74,6 +88,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectSalOrderByOrderCode" parameterType="String" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
         where order_code = #{orderCode}
+    </select>
+
+    <!-- ERP 下发幂等查询：按来源系统 + 外部单号定位（factory_id 由拦截器注入） -->
+    <select id="selectSalOrderByExternalNo" resultMap="SalOrderResult">
+        <include refid="selectSalOrderVo"/>
+        where source_system = #{sourceSystem} and external_order_no = #{externalOrderNo}
+        limit 1
     </select>
 
     <select id="checkOrderCodeUnique" parameterType="SalOrder" resultMap="SalOrderResult">
@@ -99,6 +120,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="outsourceFlag != null">outsource_flag,</if>
             <if test="packageFlag != null">package_flag,</if>
             <if test="source != null">source,</if>
+            <if test="sourceSystem != null">source_system,</if>
+            <if test="externalOrderId != null">external_order_id,</if>
+            <if test="externalOrderNo != null">external_order_no,</if>
+            <if test="externalVersion != null">external_version,</if>
+            <if test="acceptStatus != null">accept_status,</if>
+            <if test="acceptTime != null">accept_time,</if>
+            <if test="rejectReason != null">reject_reason,</if>
+            <if test="rejectBy != null">reject_by,</if>
+            <if test="rejectTime != null">reject_time,</if>
+            <if test="syncStatus != null">sync_status,</if>
+            <if test="syncTime != null">sync_time,</if>
             <if test="orderDate != null">order_date,</if>
             <if test="requestDate != null">request_date,</if>
             <if test="totalAmount != null">total_amount,</if>
@@ -127,6 +159,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="outsourceFlag != null">#{outsourceFlag},</if>
             <if test="packageFlag != null">#{packageFlag},</if>
             <if test="source != null">#{source},</if>
+            <if test="sourceSystem != null">#{sourceSystem},</if>
+            <if test="externalOrderId != null">#{externalOrderId},</if>
+            <if test="externalOrderNo != null">#{externalOrderNo},</if>
+            <if test="externalVersion != null">#{externalVersion},</if>
+            <if test="acceptStatus != null">#{acceptStatus},</if>
+            <if test="acceptTime != null">#{acceptTime},</if>
+            <if test="rejectReason != null">#{rejectReason},</if>
+            <if test="rejectBy != null">#{rejectBy},</if>
+            <if test="rejectTime != null">#{rejectTime},</if>
+            <if test="syncStatus != null">#{syncStatus},</if>
+            <if test="syncTime != null">#{syncTime},</if>
             <if test="orderDate != null">#{orderDate},</if>
             <if test="requestDate != null">#{requestDate},</if>
             <if test="totalAmount != null">#{totalAmount},</if>
@@ -158,6 +201,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="sampleFlag != null">sample_flag = #{sampleFlag},</if>
             <if test="outsourceFlag != null">outsource_flag = #{outsourceFlag},</if>
             <if test="packageFlag != null">package_flag = #{packageFlag},</if>
+            <if test="sourceSystem != null">source_system = #{sourceSystem},</if>
+            <if test="externalOrderId != null">external_order_id = #{externalOrderId},</if>
+            <if test="externalOrderNo != null">external_order_no = #{externalOrderNo},</if>
+            <if test="externalVersion != null">external_version = #{externalVersion},</if>
+            <if test="acceptStatus != null">accept_status = #{acceptStatus},</if>
+            <if test="acceptTime != null">accept_time = #{acceptTime},</if>
+            <if test="rejectReason != null">reject_reason = #{rejectReason},</if>
+            <if test="rejectBy != null">reject_by = #{rejectBy},</if>
+            <if test="rejectTime != null">reject_time = #{rejectTime},</if>
+            <if test="syncStatus != null">sync_status = #{syncStatus},</if>
+            <if test="syncTime != null">sync_time = #{syncTime},</if>
             <if test="orderDate != null">order_date = #{orderDate},</if>
             <if test="requestDate != null">request_date = #{requestDate},</if>
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
@@ -211,6 +265,38 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
         GROUP BY l.order_id
     </select>
+
+    <!-- ERP 重发：清空接单/打回/回写痕迹，回到待接单（显式 factory_id） -->
+    <update id="resetForErpResend">
+        update qxx_sal_order
+        set status = 'PENDING_ACCEPT',
+            accept_status = 'PENDING',
+            accept_time = null,
+            reject_reason = null,
+            reject_by = null,
+            reject_time = null,
+            sync_status = null,
+            sync_time = null,
+            external_version = #{externalVersion},
+            update_by = #{updateBy},
+            update_time = #{updateTime}
+        where order_id = #{orderId} and factory_id = #{factoryId}
+    </update>
+
+    <!-- 接单成功：清空打回痕迹（显式 factory_id） -->
+    <update id="clearRejectForAccept">
+        update qxx_sal_order
+        set reject_reason = null, reject_by = null, reject_time = null,
+            update_by = #{updateBy}, update_time = #{updateTime}
+        where order_id = #{orderId} and factory_id = #{factoryId}
+    </update>
+
+    <!-- 回写状态更新（定时任务无登录上下文，显式 factory_id） -->
+    <update id="updateSyncStatus">
+        update qxx_sal_order
+        set sync_status = #{syncStatus}, sync_time = #{syncTime}
+        where order_id = #{orderId} and factory_id = #{factoryId}
+    </update>
 
     <!-- 开工推进：仅 CONFIRMED→PRODUCING，幂等；factory_id 显式（事件链路 @SkipFactoryId） -->
     <update id="confirmProducing">
@@ -276,6 +362,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 and l.factory_id = #{factoryId}
                 and l.quantity &gt; coalesce(x.shipped_qty, 0)
           )
+    </update>
+
+    <!-- 状态变更留痕：factory_id 由 FactoryIdInterceptor 注入 -->
+    <insert id="insertStatusLog">
+        insert into qxx_sal_order_status_log
+            (order_id, order_code, from_status, to_status, reason, create_by, create_time)
+        values
+            (#{orderId}, #{orderCode}, #{fromStatus}, #{toStatus}, #{reason}, #{createBy}, sysdate())
+    </insert>
+
+    <!-- 人工改状态：一期弱化流程，不校验流转，直接落库 -->
+    <update id="updateStatusDirect">
+        update qxx_sal_order
+        set status = #{status}, update_by = #{updateBy}, update_time = #{updateTime}
+        where order_id = #{orderId}
     </update>
 
 </mapper>

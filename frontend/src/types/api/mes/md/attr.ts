@@ -2,8 +2,14 @@
  * 物料分类动态扩展属性 - 类型定义
  */
 
-/** 属性类型 */
+/** 属性类型（历史字段，新数据以 widgetType 为准） */
 export type AttrType = 'TEXT' | 'NUMBER' | 'SELECT' | 'BOOL' | 'DATE'
+
+/** 控件类型 */
+export type WidgetType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'MULTI_SELECT' | 'BOOL' | 'IMAGE' | 'FILE'
+
+/** 属性域：产品属性 / 生产（流转单）属性 */
+export type AttrScope = 'PRODUCT' | 'PRODUCTION'
 
 /** 属性字典（全局定义） */
 export interface MdAttrDef {
@@ -12,6 +18,10 @@ export interface MdAttrDef {
   attrCode: string
   attrName: string
   attrType: AttrType
+  /** 属性域 */
+  attrScope?: AttrScope
+  /** 控件类型 */
+  widgetType?: WidgetType
   attrUnit?: string
   /** SELECT 类型的可选值（JSON 字符串，如 '["锯齿口","平口"]'） */
   optionsJson?: string
@@ -35,6 +45,8 @@ export interface MdItemTypeAttr {
   attrCode?: string
   attrName?: string
   attrType?: AttrType
+  attrScope?: AttrScope
+  widgetType?: WidgetType
   attrUnit?: string
   optionsJson?: string
   /** 继承深度：0=本类绑定，>0=继承自祖先 */

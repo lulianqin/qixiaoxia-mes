@@ -24,6 +24,9 @@ public class WmOutsourceOrder extends BaseEntity
     private Long outsourceFactoryId;
     private String orderCode;
 
+    /** 加工类型：INSIDE-厂内 / OUTSIDE-外协 */
+    private String supplierType;
+
     // 关联
     private Long vendorId;
     private String vendorCode;
@@ -89,6 +92,8 @@ public class WmOutsourceOrder extends BaseEntity
     public void setOutsourceFactoryId(Long v) { this.outsourceFactoryId = v; }
     public String getOrderCode() { return orderCode; }
     public void setOrderCode(String v) { this.orderCode = v; }
+    public String getSupplierType() { return supplierType; }
+    public void setSupplierType(String v) { this.supplierType = v; }
     public Long getVendorId() { return vendorId; }
     public void setVendorId(Long v) { this.vendorId = v; }
     public String getVendorCode() { return vendorCode; }

@@ -101,6 +101,8 @@ public class MdItemTypeAttrServiceImpl implements IMdItemTypeAttrService
         {
             attrDef.setFactoryId(0L); // 全局共享
             if (StringUtils.isEmpty(attrDef.getAttrType())) attrDef.setAttrType("TEXT");
+            if (StringUtils.isEmpty(attrDef.getAttrScope())) attrDef.setAttrScope("PRODUCT");
+            if (StringUtils.isEmpty(attrDef.getWidgetType())) attrDef.setWidgetType(attrDef.getAttrType());
             if (attrDef.getEnableFlag() == null) attrDef.setEnableFlag("1");
             if (attrDef.getSortOrder() == null) attrDef.setSortOrder(0);
             attrDef.setCreateTime(DateUtils.getNowDate());
@@ -134,6 +136,8 @@ public class MdItemTypeAttrServiceImpl implements IMdItemTypeAttrService
         bind.setAttrCode(attrDef.getAttrCode());
         bind.setAttrName(attrDef.getAttrName());
         bind.setAttrType(attrDef.getAttrType());
+        bind.setAttrScope(attrDef.getAttrScope());
+        bind.setWidgetType(attrDef.getWidgetType());
         bind.setAttrUnit(attrDef.getAttrUnit());
         bind.setOptionsJson(attrDef.getOptionsJson());
         bind.setInheritDepth(0);

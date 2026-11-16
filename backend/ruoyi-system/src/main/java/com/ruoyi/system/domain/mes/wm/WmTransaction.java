@@ -110,6 +110,18 @@ public class WmTransaction extends BaseEntity
     @Excel(name = "事务时间")
     private Date transactionTime;
 
+    @Excel(name = "变更前数量")
+    private BigDecimal beforeQuantity;
+
+    @Excel(name = "变更后数量")
+    private BigDecimal afterQuantity;
+
+    @Excel(name = "导入批次号")
+    private String importBatchNo;
+
+    @Excel(name = "操作来源")
+    private String operationSource;
+
     public Long getTransactionId() { return transactionId; }
     public void setTransactionId(Long v) { this.transactionId = v; }
 
@@ -202,6 +214,18 @@ public class WmTransaction extends BaseEntity
 
     public Date getTransactionTime() { return transactionTime; }
     public void setTransactionTime(Date v) { this.transactionTime = v; }
+
+    public BigDecimal getBeforeQuantity() { return beforeQuantity; }
+    public void setBeforeQuantity(BigDecimal v) { this.beforeQuantity = v; }
+
+    public BigDecimal getAfterQuantity() { return afterQuantity; }
+    public void setAfterQuantity(BigDecimal v) { this.afterQuantity = v; }
+
+    public String getImportBatchNo() { return importBatchNo; }
+    public void setImportBatchNo(String v) { this.importBatchNo = v; }
+
+    public String getOperationSource() { return operationSource; }
+    public void setOperationSource(String v) { this.operationSource = v; }
 
     @Override
     public String toString() {

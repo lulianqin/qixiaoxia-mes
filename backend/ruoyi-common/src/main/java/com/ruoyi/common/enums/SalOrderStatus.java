@@ -18,6 +18,7 @@ package com.ruoyi.common.enums;
 public enum SalOrderStatus {
 
     PENDING_ACCEPT("PENDING_ACCEPT", "待接单"),
+    REJECTED("REJECTED", "已打回"),
     CONFIRMED("CONFIRMED", "已确认"),
     PRODUCING("PRODUCING", "生产中"),
     SHIPPED("SHIPPED", "已出货"),

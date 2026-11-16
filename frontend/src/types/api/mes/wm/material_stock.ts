@@ -6,6 +6,13 @@ export interface WmMaterialStockQueryParams extends PageDomain {
   specification?: string
   unitOfMeasure?: string
   unitName?: string
+  /** 物料分类（区分成品/原料/辅料/纸边/废纸等） */
+  itemTypeId?: number
+  warehouseId?: number
+  batchCode?: string
+  qualityStatus?: string
+  vendorId?: number
+  clientId?: number
 }
 
 export interface WmMaterialStock extends BaseEntity {
@@ -23,6 +30,7 @@ export interface WmMaterialStock extends BaseEntity {
   quantityOnhand?: number
   quantityOnhand2?: number
   quantityAvailable?: number
+  quantityAvailable2?: number
   batchId?: number
   batchCode?: string
   warehouseId?: number
@@ -37,6 +45,8 @@ export interface WmMaterialStock extends BaseEntity {
   vendorId?: number
   vendorCode?: string
   vendorName?: string
+  clientId?: number
+  clientName?: string
   workorderId?: number
   workorderCode?: string
   expireDate?: string
@@ -44,4 +54,12 @@ export interface WmMaterialStock extends BaseEntity {
   qualityStatus?: string
   status?: string
   enableFlag?: string
+  /** 盘点日期 */
+  stocktakeDate?: string
+  /** 以下字段取自物料档案（列表展示，非库存表字段） */
+  itemTypeId?: number
+  itemTypeCode?: string
+  itemTypeName?: string
+  packageSpec?: string
+  itemExtAttrs?: Record<string, any>
 }

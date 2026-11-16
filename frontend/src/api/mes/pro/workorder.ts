@@ -29,3 +29,14 @@ export function cancelWorkorder(workorderId) { return request({ url: '/mes/pro/w
 export function getWorkorderBoard(workorderId) { return request({ url: '/mes/pro/workorder/board/' + workorderId, method: 'get' }) }
 // 工序看板：工序任务 + 关联单据（报工/检验/外协/领料）汇总与明细
 export function getProcessBoard(taskId) { return request({ url: '/mes/pro/workorder/board/process/' + taskId, method: 'get' }) }
+
+// 生成生产流转单：自动带出订单/工单字段 + 生成 -sN 生产编号，人工补全字段覆盖
+export function generateFlowSheet(data) { return request({ url: '/mes/pro/workorder/flowSheet/generate', method: 'post', data }) }
+
+// 生产流转单预览数据（工单通用字段 + 分类生产属性，只读）
+export function getFlowSheet(workorderId) { return request({ url: '/mes/pro/workorder/flowSheet/' + workorderId, method: 'get' }) }
+
+// 导出生产流转单（Excel 套打，可带前端生成的二维码 dataURL）
+export function exportFlowSheet(workorderId, qrDataUrl?) {
+  return request({ url: '/mes/pro/workorder/flowSheet/export/' + workorderId, method: 'post', data: { qrDataUrl }, responseType: 'blob' })
+}

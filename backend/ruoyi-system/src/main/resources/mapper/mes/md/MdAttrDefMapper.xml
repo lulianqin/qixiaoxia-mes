@@ -10,6 +10,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="attrCode"     column="attr_code"     />
         <result property="attrName"     column="attr_name"     />
         <result property="attrType"     column="attr_type"     />
+        <result property="attrScope"    column="attr_scope"    />
+        <result property="widgetType"   column="widget_type"   />
         <result property="attrUnit"     column="attr_unit"     />
         <result property="optionsJson"  column="options_json_str" />
         <result property="sortOrder"    column="sort_order"    />
@@ -22,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMdAttrDefVo">
-        select attr_id, factory_id, attr_code, attr_name, attr_type, attr_unit,
+        select attr_id, factory_id, attr_code, attr_name, attr_type, attr_scope, widget_type, attr_unit,
                CAST(options_json AS CHAR) as options_json_str,
                sort_order, enable_flag, remark, create_by, create_time, update_by, update_time
           from qxx_md_attr_def
@@ -35,6 +37,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="attrCode != null and attrCode != ''"> and attr_code like concat('%', #{attrCode}, '%')</if>
             <if test="attrName != null and attrName != ''"> and attr_name like concat('%', #{attrName}, '%')</if>
             <if test="attrType != null and attrType != ''"> and attr_type = #{attrType}</if>
+            <if test="attrScope != null and attrScope != ''"> and attr_scope = #{attrScope}</if>
+            <if test="widgetType != null and widgetType != ''"> and widget_type = #{widgetType}</if>
             <if test="enableFlag != null and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
         </where>
         order by sort_order, attr_id
@@ -57,6 +61,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="attrCode != null and attrCode != ''">attr_code,</if>
             <if test="attrName != null and attrName != ''">attr_name,</if>
             <if test="attrType != null and attrType != ''">attr_type,</if>
+            <if test="attrScope != null and attrScope != ''">attr_scope,</if>
+            <if test="widgetType != null and widgetType != ''">widget_type,</if>
             <if test="attrUnit != null">attr_unit,</if>
             <if test="optionsJson != null">options_json,</if>
             <if test="sortOrder != null">sort_order,</if>
@@ -70,6 +76,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="attrCode != null and attrCode != ''">#{attrCode},</if>
             <if test="attrName != null and attrName != ''">#{attrName},</if>
             <if test="attrType != null and attrType != ''">#{attrType},</if>
+            <if test="attrScope != null and attrScope != ''">#{attrScope},</if>
+            <if test="widgetType != null and widgetType != ''">#{widgetType},</if>
             <if test="attrUnit != null">#{attrUnit},</if>
             <if test="optionsJson != null">#{optionsJson},</if>
             <if test="sortOrder != null">#{sortOrder},</if>
@@ -86,6 +94,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="attrCode != null and attrCode != ''">attr_code = #{attrCode},</if>
             <if test="attrName != null and attrName != ''">attr_name = #{attrName},</if>
             <if test="attrType != null and attrType != ''">attr_type = #{attrType},</if>
+            <if test="attrScope != null and attrScope != ''">attr_scope = #{attrScope},</if>
+            <if test="widgetType != null and widgetType != ''">widget_type = #{widgetType},</if>
             <if test="attrUnit != null">attr_unit = #{attrUnit},</if>
             <if test="optionsJson != null">options_json = #{optionsJson},</if>
             <if test="sortOrder != null">sort_order = #{sortOrder},</if>

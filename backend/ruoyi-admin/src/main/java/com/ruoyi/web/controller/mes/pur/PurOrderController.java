@@ -263,6 +263,28 @@ public class PurOrderController extends BaseController
         }
     }
 
+    /** 人工改采购单状态（一期弱化流程，不校验流转） */
+    @PreAuthorize("@ss.hasPermi('mes:pur:order:changeStatus')")
+    @Log(title = "采购单改状态", businessType = BusinessType.UPDATE)
+    @PutMapping("/changeStatus")
+    public AjaxResult changeStatus(@RequestBody java.util.Map<String, Object> req)
+    {
+        Object orderId = req.get("orderId");
+        Object status = req.get("targetStatus");
+        Object reason = req.get("reason");
+        if (orderId == null || status == null) return error("orderId 与 targetStatus 不能为空");
+        try
+        {
+            purOrderService.changeStatus(Long.valueOf(orderId.toString()), status.toString(),
+                    reason == null ? null : reason.toString());
+            return success();
+        }
+        catch (RuntimeException e)
+        {
+            return error(e.getMessage());
+        }
+    }
+
     /**
      * 取消采购订单（DRAFT/APPROVED/ORDERED -> CANCEL）
      */

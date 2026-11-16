@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import jakarta.annotation.PostConstruct;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
@@ -39,6 +40,7 @@ import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
@@ -117,6 +119,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Autowired private ProWorkorderMapper workorderMapper;
     @Autowired private ProRouteProcessMapper routeProcessMapper;
     @Autowired private WmOutsourceProcessAttrMapper processAttrMapper;
+    @Autowired private com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessLineMapper processLineMapper;
     @Autowired private ProCardMapper cardMapper;
     @Autowired private ProMaterialTraceMapper traceMapper;
     @Autowired private ProTaskMapper proTaskMapper;
@@ -1122,6 +1125,70 @@ public class OutsourceServiceImpl implements IOutsourceService
         order.setIssueLines(lineMapper.selectIssueLinesByOrderId(orderId));
         order.setRecptLines(lineMapper.selectRecptLinesByOrderId(orderId));
         return order;
+    }
+
+    /**
+     * 一期人工改状态：加工单状态只做标记，不做流转校验。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WmOutsourceOrder changeStatus(Long orderId, String status, String reason)
+    {
+        if (status == null || status.trim().isEmpty())
+        {
+            throw new ServiceException("目标状态不能为空");
+        }
+        WmOutsourceOrder order = orderMapper.selectOutsourceOrderByOrderId(orderId);
+        if (order == null) throw new ServiceException("加工单不存在");
+
+        WmOutsourceOrder patch = new WmOutsourceOrder();
+        patch.setOrderId(orderId);
+        patch.setStatus(status.trim());
+        patch.setUpdateBy(SecurityUtils.getUsername());
+        patch.setUpdateTime(DateUtils.getNowDate());
+        if (reason != null && !reason.trim().isEmpty())
+        {
+            patch.setRemark(reason.trim());
+        }
+        orderMapper.updateOutsourceOrder(patch);
+        return orderMapper.selectOutsourceOrderByOrderId(orderId);
+    }
+
+    @Override
+    public java.util.List<WmOutsourceProcessLine> selectProcessLines(Long orderId)
+    {
+        return processLineMapper.selectByOrderId(orderId);
+    }
+
+    /** 覆盖保存工序行：先删后插，首道工序回写单头 process_id/name 兼容旧逻辑 */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveProcessLines(Long orderId, java.util.List<WmOutsourceProcessLine> lines)
+    {
+        WmOutsourceOrder order = orderMapper.selectOutsourceOrderByOrderId(orderId);
+        if (order == null) throw new ServiceException("加工单不存在");
+
+        processLineMapper.deleteByOrderId(orderId);
+        if (lines == null || lines.isEmpty()) return;
+
+        int seq = 1;
+        for (WmOutsourceProcessLine line : lines)
+        {
+            line.setOrderId(orderId);
+            line.setSeq(seq++);
+            line.setCreateBy(SecurityUtils.getUsername());
+        }
+        processLineMapper.insertBatch(lines);
+
+        WmOutsourceProcessLine first = lines.get(0);
+        WmOutsourceOrder patch = new WmOutsourceOrder();
+        patch.setOrderId(orderId);
+        patch.setProcessId(first.getProcessId());
+        patch.setProcessCode(first.getProcessCode());
+        patch.setProcessName(first.getProcessName());
+        patch.setUpdateBy(SecurityUtils.getUsername());
+        patch.setUpdateTime(DateUtils.getNowDate());
+        orderMapper.updateOutsourceOrder(patch);
     }
 
     // ════════════════════════════════════════════════════════════════

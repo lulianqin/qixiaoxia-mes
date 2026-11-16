@@ -306,6 +306,24 @@ public class PurOrderServiceImpl implements IPurOrderService
      * 校验：status ∈ {RECEIVED, RECEIVING}，所有行到达终态(RECEIVED/CLOSED/CANCEL)
      * 强制关闭(有CLOSED/CANCEL行)时需填 closeReason
      */
+    /** 一期人工改状态：采购单状态只做标记，不做流转校验 */
+    @Override
+    @Transactional
+    public int changeStatus(Long orderId, String status, String reason)
+    {
+        PurOrder order = purOrderMapper.selectPurOrderByOrderId(orderId);
+        if (order == null) throw new RuntimeException("采购订单不存在");
+        if (status == null || status.trim().isEmpty()) throw new RuntimeException("目标状态不能为空");
+
+        PurOrder patch = new PurOrder();
+        patch.setOrderId(orderId);
+        patch.setStatus(status.trim());
+        if (reason != null && !reason.trim().isEmpty()) patch.setRemark(reason.trim());
+        patch.setUpdateBy(com.ruoyi.common.utils.SecurityUtils.getUsername());
+        patch.setUpdateTime(com.ruoyi.common.utils.DateUtils.getNowDate());
+        return purOrderMapper.updatePurOrder(patch);
+    }
+
     @Override
     @Transactional
     public int closePurOrder(Long orderId, String closeReason)
