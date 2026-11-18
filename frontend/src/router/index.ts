@@ -105,6 +105,20 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/mes/pro/workorder_edit',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/mes/pro/workorder/edit.vue'),
+        name: 'WorkorderEdit',
+        meta: { title: '生产工单开单', activeMenu: '/mes/pro/workorder' }
+      }
+    ]
+  },
+  {
     path: '/mes/pro/workorder_board',
     component: Layout,
     hidden: true,

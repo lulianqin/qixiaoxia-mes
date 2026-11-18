@@ -14,6 +14,7 @@ import com.ruoyi.common.enums.WmIssueConstants;
 import com.ruoyi.common.enums.WmWarehouseConstants;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1016,92 +1017,99 @@ public class ProWorkorderDocServiceImpl implements IProWorkorderDocService
     }
 
     @Override
-    public Map<String, Object> submitPurOrderWizard(Long workorderId, java.util.List<PurOrderWizardLineVO> lines) {
+    public Map<String, Object> submitPurOrderWizard(Long workorderId, PurOrderWizardSubmitVO body) {
         // 【Fix Finding #3 + CLAUDE.md】移除方法级 @Transactional，先锁后事务（与其它四入口共用 pro:workorder:doc-gen: 锁）。
         return lockTemplate.execute("pro:workorder:doc-gen:" + workorderId, () -> {
             TransactionTemplate tt = new TransactionTemplate(txManager);
             tt.setTimeout(30);
-            return tt.execute(status -> doSubmitPurOrderWizard(workorderId, lines));
+            return tt.execute(status -> doSubmitPurOrderWizard(workorderId, body));
         });
     }
 
-    private Map<String, Object> doSubmitPurOrderWizard(Long workorderId, java.util.List<PurOrderWizardLineVO> lines) {
+    private Map<String, Object> doSubmitPurOrderWizard(Long workorderId, PurOrderWizardSubmitVO body) {
         ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(workorderId);
         if (wo == null) {
             throw new ServiceException("工单不存在，无法生成采购单");
         }
-        if (lines == null || lines.isEmpty()) {
-            Map<String, Object> empty = new HashMap<>();
-            empty.put("message", "无提交行"); return empty;
+        if (body == null) {
+            throw new ServiceException("请填写采购单信息");
         }
-        String batch = UUID.randomUUID().toString();
+        MdVendor vendor = requireEnabledVendor(body.getVendorId());
+        if (vendor == null) {
+            throw new ServiceException("请选择供应商");
+        }
 
-        // 按 vendorId 分组；采购数量必须 > 0，避免生成 0 数量采购明细
-        Map<Long, List<PurOrderWizardLineVO>> groups = new LinkedHashMap<>();
-        for (PurOrderWizardLineVO line : lines) {
-            BigDecimal qty = line.getQuantity();
-            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) continue;
-            Long vid = line.getVendorId() != null ? line.getVendorId() : 0L;
-            groups.computeIfAbsent(vid, k -> new ArrayList<>()).add(line);
+        // 采购数量必须 > 0，避免生成 0 数量采购明细
+        List<PurOrderWizardLineVO> submitLines = new ArrayList<>();
+        if (body.getLines() != null) {
+            for (PurOrderWizardLineVO line : body.getLines()) {
+                if (line.getQuantity() != null && line.getQuantity().compareTo(BigDecimal.ZERO) > 0) {
+                    submitLines.add(line);
+                }
+            }
         }
-        if (groups.isEmpty()) {
+        if (submitLines.isEmpty()) {
             Map<String, Object> empty = new HashMap<>();
             empty.put("message", "采购数量必须大于 0"); return empty;
         }
 
-        List<Map<String, Object>> created = new ArrayList<>();
-        for (Map.Entry<Long, List<PurOrderWizardLineVO>> entry : groups.entrySet()) {
-            Long vendorId = entry.getKey();
-            List<PurOrderWizardLineVO> groupLines = entry.getValue();
-            MdVendor vendor = requireEnabledVendor(vendorId);
+        // 统一供应商：所有勾选明细归入同一张采购单
+        PurOrder po = new PurOrder();
+        po.setOrderCode(StringUtils.isEmpty(body.getOrderCode()) ? genCode("PO") : body.getOrderCode());
+        po.setOrderName(StringUtils.isEmpty(body.getOrderName()) ? wo.getWorkorderName() + "-采购" : body.getOrderName());
+        po.setWorkorderId(workorderId);
+        po.setWorkorderCode(wo.getWorkorderCode());
+        po.setVendorId(vendor.getVendorId());
+        po.setVendorCode(vendor.getVendorCode());
+        po.setVendorName(vendor.getVendorName());
+        po.setPurchaseType(body.getPurchaseType());
+        po.setOrderDate(body.getOrderDate() != null ? body.getOrderDate() : new Date());
+        po.setExpectedDate(body.getExpectedDate());
+        po.setPurchaser(StringUtils.isEmpty(body.getPurchaser()) ? SecurityUtils.getUsername() : body.getPurchaser());
+        po.setSourceOrderCode(body.getSourceOrderCode());
+        po.setCurrency(StringUtils.isEmpty(body.getCurrency()) ? "CNY" : body.getCurrency());
+        po.setRemark(body.getRemark());
+        po.setStatus("DRAFT");
+        purOrderService.insertPurOrder(po);
 
-            String orderCode = genCode("PO");
-            PurOrder po = new PurOrder();
-            po.setOrderCode(orderCode);
-            po.setOrderName(wo.getWorkorderName() + "-采购");
-            po.setWorkorderId(workorderId);
-            po.setWorkorderCode(wo.getWorkorderCode());
-            po.setVendorId(vendorId > 0 ? vendorId : 0L);
-            po.setVendorCode(vendor != null ? vendor.getVendorCode() : null);
-            po.setVendorName(vendor != null ? vendor.getVendorName() : "待定");
-            po.setOrderDate(new Date());
-            po.setStatus("DRAFT");
-            po.setCurrency("CNY");
-            purOrderService.insertPurOrder(po);
-
-            BigDecimal totalQty = BigDecimal.ZERO;
-            for (PurOrderWizardLineVO l : groupLines) {
-                PurOrderLine line = new PurOrderLine();
-                line.setOrderId(po.getOrderId());
-                line.setItemId(l.getItemId());
-                line.setItemCode(l.getItemCode());
-                line.setItemName(l.getItemName());
-                line.setUnitOfMeasure(l.getUnitOfMeasure());
-                line.setUnitName(l.getUnitName());
-                BigDecimal qty = l.getQuantity() != null ? l.getQuantity() : BigDecimal.ZERO;
-                line.setQuantityOrdered(qty);
-                // 单价按主单位记账；金额=数量×单价（不含税），后端计算不信任前端
-                line.setUnitPrice(l.getUnitPrice() != null ? l.getUnitPrice() : BigDecimal.ZERO);
-                line.setTaxRate(l.getTaxRate() != null ? l.getTaxRate() : BigDecimal.ZERO);
-                line.setAmount(computeAmount(qty, l.getUnitPrice()));
-                line.setStatus("ORDERED");
-                purOrderLineService.insertPurOrderLine(line);
-                totalQty = totalQty.add(qty);
-            }
-            po.setTotalQuantity(totalQty);
-            purOrderService.updatePurOrder(po);
-            insertLog(workorderId, DOC_PUR_ORDER, po.getOrderId(), orderCode, batch);
-
-            Map<String, Object> info = new HashMap<>();
-            info.put("orderId", po.getOrderId()); info.put("orderCode", orderCode);
-            info.put("vendorId", vendorId); info.put("vendorName", vendor != null ? vendor.getVendorName() : "待定");
-            info.put("lineCount", groupLines.size()); info.put("totalQuantity", totalQty);
-            created.add(info);
+        BigDecimal totalQty = BigDecimal.ZERO;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (PurOrderWizardLineVO l : submitLines) {
+            PurOrderLine line = new PurOrderLine();
+            line.setOrderId(po.getOrderId());
+            line.setItemId(l.getItemId());
+            line.setItemCode(l.getItemCode());
+            line.setItemName(l.getItemName());
+            line.setUnitOfMeasure(l.getUnitOfMeasure());
+            line.setUnitName(l.getUnitName());
+            BigDecimal qty = l.getQuantity() != null ? l.getQuantity() : BigDecimal.ZERO;
+            line.setQuantityOrdered(qty);
+            // 单价按主单位记账；金额=数量×单价（不含税），后端计算不信任前端
+            line.setUnitPrice(l.getUnitPrice() != null ? l.getUnitPrice() : BigDecimal.ZERO);
+            line.setTaxRate(l.getTaxRate() != null ? l.getTaxRate() : BigDecimal.ZERO);
+            BigDecimal amount = computeAmount(qty, l.getUnitPrice());
+            line.setAmount(amount);
+            line.setStatus("ORDERED");
+            purOrderLineService.insertPurOrderLine(line);
+            totalQty = totalQty.add(qty);
+            totalAmount = totalAmount.add(amount);
         }
+        po.setTotalQuantity(totalQty);
+        po.setTotalAmount(totalAmount);
+        purOrderService.updatePurOrder(po);
+        insertLog(workorderId, DOC_PUR_ORDER, po.getOrderId(), po.getOrderCode(), UUID.randomUUID().toString());
+
+        Map<String, Object> info = new HashMap<>();
+        info.put("orderId", po.getOrderId()); info.put("orderCode", po.getOrderCode());
+        info.put("vendorId", vendor.getVendorId()); info.put("vendorName", vendor.getVendorName());
+        info.put("lineCount", submitLines.size()); info.put("totalQuantity", totalQty);
+        info.put("totalAmount", totalAmount);
+        List<Map<String, Object>> created = new ArrayList<>();
+        created.add(info);
 
         Map<String, Object> result = new HashMap<>();
         result.put("purOrders", created);
-        result.put("message", "共生成 " + created.size() + " 张采购单");
+        result.put("message", "已生成采购单 " + po.getOrderCode() + "（" + submitLines.size() + " 项物料）");
         return result;
     }
 

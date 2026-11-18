@@ -7,7 +7,7 @@ import java.util.Map;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationRequestVO;
 import com.ruoyi.system.domain.mes.pro.ProDocGenerationResultVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderKitDashboardVO;
-import com.ruoyi.system.domain.mes.pro.PurOrderWizardLineVO;
+import com.ruoyi.system.domain.mes.pro.PurOrderWizardSubmitVO;
 import com.ruoyi.system.domain.mes.wm.WmProductRecpt;
 import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 
@@ -59,9 +59,9 @@ public interface IProWorkorderDocService
     Map<String, Object> buildPurOrderWizard(Long workorderId);
 
     /**
-     * 采购向导弹窗确认提交 — 按供应商分组生成真实采购单
+     * 采购向导弹窗确认提交 — 按主表统一供应商生成一张采购单
      */
-    Map<String, Object> submitPurOrderWizard(Long workorderId, List<PurOrderWizardLineVO> lines);
+    Map<String, Object> submitPurOrderWizard(Long workorderId, PurOrderWizardSubmitVO body);
 
     /**
      * 单独生成采购单（针对缺料物料）

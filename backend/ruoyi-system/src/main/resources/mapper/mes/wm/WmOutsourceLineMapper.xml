@@ -32,6 +32,9 @@
         <id property="lineId" column="line_id" />
         <result property="factoryId" column="factory_id" />
         <result property="orderId" column="order_id" />
+        <result property="processLineId" column="process_line_id" />
+        <result property="processId" column="process_id" />
+        <result property="processName" column="process_name" />
         <result property="itemId" column="item_id" />
         <result property="itemCode" column="item_code" />
         <result property="itemName" column="item_name" />
@@ -121,7 +124,8 @@
     </delete>
 
     <select id="selectRecptLinesByOrderId" parameterType="Long" resultMap="RecptLineResult">
-        select line_id, factory_id, order_id, item_id, item_code, item_name, specification,
+        select line_id, factory_id, order_id, process_line_id, process_id, process_name,
+               item_id, item_code, item_name, specification,
                unit_of_measure, unit_name, quantity, batch_id, batch_code,
                warehouse_id, warehouse_code, warehouse_name,
                ext_attrs, source_ref_type, source_ref_id,
@@ -135,6 +139,9 @@
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="factoryId != null">factory_id,</if>
             <if test="orderId != null">order_id,</if>
+            <if test="processLineId != null">process_line_id,</if>
+            <if test="processId != null">process_id,</if>
+            <if test="processName != null and processName != ''">process_name,</if>
             <if test="itemId != null">item_id,</if>
             <if test="itemCode != null">item_code,</if>
             <if test="itemName != null">item_name,</if>
@@ -160,6 +167,9 @@
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="factoryId != null">#{factoryId},</if>
             <if test="orderId != null">#{orderId},</if>
+            <if test="processLineId != null">#{processLineId},</if>
+            <if test="processId != null">#{processId},</if>
+            <if test="processName != null and processName != ''">#{processName},</if>
             <if test="itemId != null">#{itemId},</if>
             <if test="itemCode != null">#{itemCode},</if>
             <if test="itemName != null">#{itemName},</if>

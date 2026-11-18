@@ -1007,4 +1007,12 @@ function handleExport() {
 const q = route.query
 if (q.status) queryParams.status = q.status
 getList()
+// 看板「报工」入口：自动打开新增报工并带入指定工序任务
+if (q.add === '1' && q.taskId) {
+  handleAdd()
+  getTask(Number(q.taskId)).then((r: any) => {
+    if (r.data) onTaskSelected(r.data)
+  }).catch(() => {})
+  router.replace({ path: route.path, query: {} })
+}
 </script>

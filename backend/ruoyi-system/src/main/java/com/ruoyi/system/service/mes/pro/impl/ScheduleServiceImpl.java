@@ -37,6 +37,8 @@ public class ScheduleServiceImpl implements IScheduleService
     @Autowired
     private ProRouteProcessMapper routeProcessMapper;
     @Autowired
+    private ProWorkorderProcessMapper workorderProcessMapper;
+    @Autowired
     private ProTaskMapper taskMapper;
     @Autowired
     private IWorkCalendarService calendarService;
@@ -126,11 +128,9 @@ public class ScheduleServiceImpl implements IScheduleService
         }
         if (routeId == null) { result.put("error", "工单未关联工艺路线"); return result; }
 
-        // 3. 加载路线工序(按 order_num 排序)
-        ProRouteProcess rpQ = new ProRouteProcess();
-        rpQ.setRouteId(routeId);
-        List<ProRouteProcess> processes = routeProcessMapper.selectProRouteProcessList(rpQ);
-        processes.sort(Comparator.comparing(p -> p.getOrderNum() != null ? p.getOrderNum() : 0));
+        // 3. 加载工序：优先使用工单级工序快照（新增/编辑工单时增删调整过工序），否则取工艺路线
+        List<ProRouteProcess> processes = loadProcesses(workorderId, routeId);
+        if (processes.isEmpty()) { result.put("error", "工单无可用工序"); return result; }
 
         // 4. 加载排产任务(按 processId 分组)，无任务的工序自动创建
         ProTask tQ = new ProTask();
@@ -288,6 +288,36 @@ public class ScheduleServiceImpl implements IScheduleService
         result.put("workorderId", workorderId);
         result.put("pendingProcesses", pendingProcesses);
         return result;
+    }
+
+    /**
+     * 加载工单排产工序：优先工单级工序快照（支持开单页增删工序），无快照时回退工艺路线。
+     */
+    private List<ProRouteProcess> loadProcesses(Long workorderId, Long routeId) {
+        List<ProWorkorderProcess> snapshot = workorderProcessMapper.selectByWorkorderId(
+                workorderId, com.ruoyi.common.utils.SecurityUtils.getFactoryId());
+        if (snapshot != null && !snapshot.isEmpty()) {
+            List<ProRouteProcess> list = new ArrayList<>();
+            for (ProWorkorderProcess p : snapshot) {
+                ProRouteProcess rp = new ProRouteProcess();
+                rp.setRouteId(routeId);
+                rp.setProcessId(p.getProcessId());
+                rp.setProcessCode(p.getProcessCode());
+                rp.setProcessName(p.getProcessName());
+                rp.setOrderNum(p.getOrderNum());
+                rp.setIsOutsource(p.getIsOutsource());
+                rp.setVendorId(p.getVendorId());
+                rp.setVendorCode(p.getVendorCode());
+                rp.setVendorName(p.getVendorName());
+                list.add(rp);
+            }
+            return list;
+        }
+        ProRouteProcess rpQ = new ProRouteProcess();
+        rpQ.setRouteId(routeId);
+        List<ProRouteProcess> processes = routeProcessMapper.selectProRouteProcessList(rpQ);
+        processes.sort(Comparator.comparing(p -> p.getOrderNum() != null ? p.getOrderNum() : 0));
+        return processes;
     }
 
     @Override

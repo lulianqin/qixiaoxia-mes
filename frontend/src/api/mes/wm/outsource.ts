@@ -75,6 +75,11 @@ export function getProcessLines(orderId: number) {
   return request({ url: `/mes/wm/outsource/${orderId}/processLines`, method: 'get' })
 }
 
+// 按工序录加工结果：lines=本次产出（收货入库口径），processResults=各工序完成数量（仅进度）
+export function recordOutsourceProcessResult(orderId: number, data: { lines: any[]; processResults: any[] }) {
+  return request({ url: `/mes/wm/outsource/${orderId}/processResult`, method: 'post', data })
+}
+
 export function saveProcessLines(orderId: number, lines: any[]) {
   return request({ url: `/mes/wm/outsource/${orderId}/processLines`, method: 'put', data: lines })
 }

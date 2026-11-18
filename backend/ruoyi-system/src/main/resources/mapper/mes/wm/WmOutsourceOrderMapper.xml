@@ -20,6 +20,12 @@
         <result property="processName" column="process_name" />
         <result property="sourceType" column="source_type" />
         <result property="sourceRefId" column="source_ref_id" />
+        <result property="docTitle" column="doc_title" />
+        <result property="orderDate" column="order_date" />
+        <result property="expectedDate" column="expected_date" />
+        <result property="purchaser" column="purchaser" />
+        <result property="sourceOrderCode" column="source_order_code" />
+        <result property="deliveryAddress" column="delivery_address" />
         <result property="status" column="status" />
         <result property="feedbackId" column="feedback_id" />
         <result property="iqcId" column="iqc_id" />
@@ -47,7 +53,7 @@
     <sql id="selectVo">
         select order_id, factory_id, outsource_factory_id, order_code, supplier_type, vendor_id, vendor_code, vendor_name,
                workorder_id, workorder_code, card_id, route_id, process_id, process_code, process_name,
-               source_type, source_ref_id, status, feedback_id, iqc_id, iqc_code,
+               source_type, source_ref_id, doc_title, order_date, expected_date, purchaser, source_order_code, delivery_address, status, feedback_id, iqc_id, iqc_code,
                issue_total_qty, recpt_total_qty, operator, issue_time,
                vendor_receive_time, vendor_receiver, finish_time, finish_by, ship_time, ship_by,
                receive_time, agent_operator,
@@ -60,8 +66,15 @@
          存在 PENDING/INSPECTING→PENDING；全 PASS→PASSED；无单→NONE）。 -->
     <select id="selectOutsourceOrderList" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder" resultMap="WmOutsourceOrderResult">
         select t.order_id, t.factory_id, t.outsource_factory_id, t.order_code, t.vendor_id, t.vendor_code, t.vendor_name,
-               t.workorder_id, t.workorder_code, t.card_id, t.route_id, t.process_id, t.process_code, t.process_name,
-               t.source_type, t.source_ref_id, t.status, t.feedback_id, t.iqc_id, t.iqc_code,
+               t.workorder_id, t.workorder_code, t.card_id, t.route_id, t.process_id, t.process_code,
+               coalesce(
+                   (select group_concat(pl.process_name order by pl.seq separator '、')
+                    from qxx_wm_outsource_process_line pl
+                    where pl.order_id = t.order_id and pl.factory_id = t.factory_id
+                      and pl.process_name is not null and pl.process_name != ''),
+                   t.process_name
+               ) as process_name,
+               t.source_type, t.source_ref_id, t.doc_title, t.order_date, t.expected_date, t.purchaser, t.source_order_code, t.delivery_address, t.status, t.feedback_id, t.iqc_id, t.iqc_code,
                t.issue_total_qty, t.recpt_total_qty, t.operator, t.issue_time,
                t.vendor_receive_time, t.vendor_receiver, t.finish_time, t.finish_by, t.ship_time, t.ship_by,
                t.receive_time, t.agent_operator, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
@@ -129,6 +142,12 @@
             <if test="processName != null">process_name,</if>
             <if test="sourceType != null">source_type,</if>
             <if test="sourceRefId != null">source_ref_id,</if>
+            <if test="docTitle != null">doc_title,</if>
+            <if test="orderDate != null">order_date,</if>
+            <if test="expectedDate != null">expected_date,</if>
+            <if test="purchaser != null">purchaser,</if>
+            <if test="sourceOrderCode != null">source_order_code,</if>
+            <if test="deliveryAddress != null">delivery_address,</if>
             <if test="status != null">status,</if>
             <if test="issueTotalQty != null">issue_total_qty,</if>
             <if test="recptTotalQty != null">recpt_total_qty,</if>
@@ -161,6 +180,12 @@
             <if test="processName != null">#{processName},</if>
             <if test="sourceType != null">#{sourceType},</if>
             <if test="sourceRefId != null">#{sourceRefId},</if>
+            <if test="docTitle != null">#{docTitle},</if>
+            <if test="orderDate != null">#{orderDate},</if>
+            <if test="expectedDate != null">#{expectedDate},</if>
+            <if test="purchaser != null">#{purchaser},</if>
+            <if test="sourceOrderCode != null">#{sourceOrderCode},</if>
+            <if test="deliveryAddress != null">#{deliveryAddress},</if>
             <if test="status != null">#{status},</if>
             <if test="issueTotalQty != null">#{issueTotalQty},</if>
             <if test="recptTotalQty != null">#{recptTotalQty},</if>
@@ -181,6 +206,15 @@
     <update id="updateOutsourceOrder" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder">
         update qxx_wm_outsource_order
         <trim prefix="SET" suffixOverrides=",">
+            <if test="docTitle != null">doc_title = #{docTitle},</if>
+            <if test="orderDate != null">order_date = #{orderDate},</if>
+            <if test="expectedDate != null">expected_date = #{expectedDate},</if>
+            <if test="purchaser != null">purchaser = #{purchaser},</if>
+            <if test="sourceOrderCode != null">source_order_code = #{sourceOrderCode},</if>
+            <if test="deliveryAddress != null">delivery_address = #{deliveryAddress},</if>
+            <if test="vendorId != null">vendor_id = #{vendorId},</if>
+            <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
+            <if test="vendorName != null">vendor_name = #{vendorName},</if>
             <if test="status != null">status = #{status},</if>
             <if test="feedbackId != null">feedback_id = #{feedbackId},</if>
             <if test="iqcId != null">iqc_id = #{iqcId},</if>

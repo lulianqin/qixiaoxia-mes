@@ -3,6 +3,7 @@ package com.ruoyi.system.domain.mes.wm;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ruoyi.common.core.domain.BaseEntity;
 
@@ -43,6 +44,21 @@ public class WmOutsourceOrder extends BaseEntity
     private String sourceType;
     private Long sourceRefId;
 
+    /** 单据标题（如 印刷加工单/后道加工单） */
+    private String docTitle;
+    /** 下单日期 */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date orderDate;
+    /** 交货日期 */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date expectedDate;
+    /** 申购人 */
+    private String purchaser;
+    /** 业务单号（客户订单号） */
+    private String sourceOrderCode;
+    /** 送货地址 */
+    private String deliveryAddress;
+
     // 状态
     private String status;
     /** 多状态查询（IN 条件），与 status 互斥使用；非持久字段 */
@@ -79,6 +95,10 @@ public class WmOutsourceOrder extends BaseEntity
     /** 收货行（录结果/收货/详情时用） */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<WmOutsourceRecptLine> recptLines;
+
+    /** 工序明细行（多工序加工单，详情时用） */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<WmOutsourceProcessLine> processLines;
 
     /** 来料检验状态汇总（列表计算列：PASSED/CONCESSION/PENDING/FAILED/NONE），非持久字段 */
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -118,6 +138,18 @@ public class WmOutsourceOrder extends BaseEntity
     public void setSourceType(String v) { this.sourceType = v; }
     public Long getSourceRefId() { return sourceRefId; }
     public void setSourceRefId(Long v) { this.sourceRefId = v; }
+    public String getDocTitle() { return docTitle; }
+    public void setDocTitle(String v) { this.docTitle = v; }
+    public Date getOrderDate() { return orderDate; }
+    public void setOrderDate(Date v) { this.orderDate = v; }
+    public Date getExpectedDate() { return expectedDate; }
+    public void setExpectedDate(Date v) { this.expectedDate = v; }
+    public String getPurchaser() { return purchaser; }
+    public void setPurchaser(String v) { this.purchaser = v; }
+    public String getSourceOrderCode() { return sourceOrderCode; }
+    public void setSourceOrderCode(String v) { this.sourceOrderCode = v; }
+    public String getDeliveryAddress() { return deliveryAddress; }
+    public void setDeliveryAddress(String v) { this.deliveryAddress = v; }
     public String getStatus() { return status; }
     public void setStatus(String v) { this.status = v; }
     public List<String> getStatusList() { return statusList; }
@@ -158,6 +190,8 @@ public class WmOutsourceOrder extends BaseEntity
     public void setIssueLines(List<WmOutsourceIssueLine> v) { this.issueLines = v; }
     public List<WmOutsourceRecptLine> getRecptLines() { return recptLines; }
     public void setRecptLines(List<WmOutsourceRecptLine> v) { this.recptLines = v; }
+    public List<WmOutsourceProcessLine> getProcessLines() { return processLines; }
+    public void setProcessLines(List<WmOutsourceProcessLine> v) { this.processLines = v; }
     public String getQcStatus() { return qcStatus; }
     public void setQcStatus(String v) { this.qcStatus = v; }
 }

@@ -5,6 +5,8 @@ export function listAllWorkorder() { return request({ url: '/mes/pro/workorder/l
 export function getWorkorder(workorderId) { return request({ url: '/mes/pro/workorder/' + workorderId, method: 'get' }) }
 // 工单外协发料信息（外协工序+默认厂商+BOM发料行+产品本身，PC外协发货弹窗联动用）
 export function getOutsourceInfo(workorderCode: string) { return request({ url: '/mes/pro/workorder/outsourceInfo', method: 'get', params: { workorderCode } }) }
+// 工单工艺路线全部工序（含厂内/外协、BOM、扩展属性模板、已有加工单），新增加工单入口用
+export function getWorkorderProcessInfo(workorderId: number) { return request({ url: '/mes/pro/workorder/processInfo/' + workorderId, method: 'get' }) }
 // 获取工单详情（含BOM和工序参数，合并返回）
 export function getWorkorderDetail(workorderId) { return request({ url: '/mes/pro/workorder/detail/' + workorderId, method: 'get' }) }
 export function addWorkorder(data) { return request({ url: '/mes/pro/workorder', method: 'post', data }) }

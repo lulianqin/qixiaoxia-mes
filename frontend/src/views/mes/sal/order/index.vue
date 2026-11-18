@@ -187,7 +187,18 @@ export default {
     handleClose(row) { this.$modal.confirm('确认结单 "' + row.orderCode + '"？结单后不可恢复。').then(() => closeOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('结单成功') }).catch(() => {}) },
     handleCancel(row) { this.$modal.confirm('确认取消 "' + row.orderCode + '" ?').then(() => cancelOrder(row.orderId)).then(() => { this.getList(); this.$modal.msgSuccess('取消成功，关联工单需另行处理') }).catch(() => {}) },
     handleDelete(row) { const ids = row.orderId || this.ids; this.$modal.confirm('是否确认删除销售订单 "' + ids + '" ?').then(() => delOrder(ids)).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {}) },
-    handleToWorkorder(row) { this.twOrder = row; this.twOpen = true },
+    // 生成工单：统一跳转生产工单独立开单页（带入来源订单信息）
+    handleToWorkorder(row) {
+      this.$router.push({
+        path: '/mes/pro/workorder_edit',
+        query: {
+          mode: 'add',
+          sourceOrderCode: row.orderCode,
+          clientOrderCode: row.clientOrderCode,
+          orderType: row.orderType
+        }
+      })
+    },
     handleExport() { this.download('mes/sal/order/export', { ...this.queryParams }, `sal_order_${new Date().getTime()}.xlsx`) },
     handleRowExport(row, cmd) {
       const url = cmd === 'pdf' ? 'mes/sal/order/exportPdf/' + row.orderId : 'mes/sal/order/exportExcel/' + row.orderId

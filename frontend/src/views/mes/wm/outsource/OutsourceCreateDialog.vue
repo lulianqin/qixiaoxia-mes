@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="外协发货" width="1100px" :close-on-click-modal="false" append-to-body @close="cancel">
+  <el-dialog v-model="visible" title="新增加工单" width="1100px" :close-on-click-modal="false" append-to-body @close="cancel">
     <el-form label-width="100px">
       <el-row>
         <el-col :span="12">

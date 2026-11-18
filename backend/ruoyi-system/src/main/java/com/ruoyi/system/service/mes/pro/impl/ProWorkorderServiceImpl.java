@@ -140,6 +140,12 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     private com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper wmOutsourceOrderMapper;
 
     @Autowired
+    private com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessLineMapper wmOutsourceProcessLineMapper;
+
+    @Autowired
+    private com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessAttrMapper wmOutsourceProcessAttrMapper;
+
+    @Autowired
     private com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper wmMaterialStockMapper;
 
     @Autowired
@@ -420,6 +426,125 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         return vo;
+    }
+
+    @Override
+    public ProOutsourceWorkorderInfoVO getProcessInfoByWorkorderId(Long workorderId)
+    {
+        ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
+        if (wo == null) throw new ServiceException("未找到工单：" + workorderId);
+
+        ProOutsourceWorkorderInfoVO vo = new ProOutsourceWorkorderInfoVO();
+        vo.setWorkorderId(wo.getWorkorderId());
+        vo.setWorkorderCode(wo.getWorkorderCode());
+        vo.setWorkorderName(wo.getWorkorderName());
+        vo.setProductName(wo.getProductName());
+        vo.setProductId(wo.getProductId());
+        vo.setProductCode(wo.getProductCode());
+        vo.setProductSpecification(wo.getProductSpc());
+        vo.setProductUnitOfMeasure(wo.getUnitOfMeasure());
+        vo.setProductUnitName(wo.getUnitName());
+        vo.setProductQuantity(wo.getQuantity());
+
+        Long routeId = resolveRouteId(wo);
+        vo.setRouteId(routeId);
+        vo.setActiveCardId(resolveActiveCardId(wo.getWorkorderId()));
+
+        Map<Long, WmOutsourceOrder> existingByProcess = loadExistingOrderByProcess(wo.getWorkorderId());
+        Map<Long, List<ProWorkorderBom>> bomByProcess = loadBomByProcess(wo.getWorkorderId());
+
+        // 全部路线工序（含厂内/外协），按路线顺序返回
+        List<ProRouteProcess> routeProcesses = routeId != null
+                ? proRouteProcessService.selectProRouteProcessByRouteId(routeId) : new ArrayList<>();
+        if (routeProcesses == null) routeProcesses = new ArrayList<>();
+        routeProcesses.sort(Comparator.comparing(p -> p.getOrderNum() == null ? Integer.MAX_VALUE : p.getOrderNum()));
+
+        List<ProOutsourceWorkorderInfoVO.OutsourceProcessItem> items = new ArrayList<>();
+        for (ProRouteProcess rp : routeProcesses)
+        {
+            items.add(buildProcessItem(rp, existingByProcess, bomByProcess));
+        }
+        vo.setProcesses(items);
+        return vo;
+    }
+
+    /** 已有加工单索引：单头工序 + 多工序行（取最先命中的单据，前端据此防重） */
+    private Map<Long, WmOutsourceOrder> loadExistingOrderByProcess(Long workorderId)
+    {
+        Map<Long, WmOutsourceOrder> existingByProcess = new HashMap<>();
+        List<WmOutsourceOrder> existingOrders = wmOutsourceOrderMapper.selectByWorkorderId(workorderId);
+        if (existingOrders == null) return existingByProcess;
+        for (WmOutsourceOrder o : existingOrders)
+        {
+            if (o.getProcessId() != null) existingByProcess.putIfAbsent(o.getProcessId(), o);
+            List<com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine> lines =
+                    wmOutsourceProcessLineMapper.selectByOrderId(o.getOrderId());
+            if (lines == null) continue;
+            for (com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine line : lines)
+            {
+                if (line.getProcessId() != null) existingByProcess.putIfAbsent(line.getProcessId(), o);
+            }
+        }
+        return existingByProcess;
+    }
+
+    /** BOM 按工序分组（跳过未关联工序的产品级 BOM 行，与自动建草稿口径一致） */
+    private Map<Long, List<ProWorkorderBom>> loadBomByProcess(Long workorderId)
+    {
+        List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
+        Map<Long, List<ProWorkorderBom>> bomByProcess = new LinkedHashMap<>();
+        if (bomList == null) return bomByProcess;
+        for (ProWorkorderBom bom : bomList)
+        {
+            if (bom.getProcessId() == null) continue;
+            bomByProcess.computeIfAbsent(bom.getProcessId(), k -> new ArrayList<>()).add(bom);
+        }
+        return bomByProcess;
+    }
+
+    /** 组装单个工序节点：默认厂商、已有加工单、BOM 发料行、扩展属性模板 */
+    private ProOutsourceWorkorderInfoVO.OutsourceProcessItem buildProcessItem(
+            ProRouteProcess rp, Map<Long, WmOutsourceOrder> existingByProcess,
+            Map<Long, List<ProWorkorderBom>> bomByProcess)
+    {
+        ProOutsourceWorkorderInfoVO.OutsourceProcessItem item = new ProOutsourceWorkorderInfoVO.OutsourceProcessItem();
+        item.setProcessId(rp.getProcessId());
+        item.setProcessCode(rp.getProcessCode());
+        item.setProcessName(rp.getProcessName());
+        item.setOrderNum(rp.getOrderNum());
+        item.setIsOutsource(rp.getIsOutsource());
+        item.setVendorId(rp.getVendorId());
+        item.setVendorCode(rp.getVendorCode());
+        item.setVendorName(rp.getVendorName());
+
+        WmOutsourceOrder existing = existingByProcess.get(rp.getProcessId());
+        if (existing != null)
+        {
+            item.setExistingOrderId(existing.getOrderId());
+            item.setExistingOrderCode(existing.getOrderCode());
+            item.setExistingStatus(existing.getStatus());
+        }
+
+        List<ProWorkorderBom> processBoms = bomByProcess.getOrDefault(rp.getProcessId(), new ArrayList<>());
+        List<ProOutsourceWorkorderInfoVO.OutsourceBomLine> bomLines = new ArrayList<>();
+        for (ProWorkorderBom bom : processBoms)
+        {
+            ProOutsourceWorkorderInfoVO.OutsourceBomLine line = new ProOutsourceWorkorderInfoVO.OutsourceBomLine();
+            line.setItemId(bom.getItemId());
+            line.setItemCode(bom.getItemCode());
+            line.setItemName(bom.getItemName());
+            line.setSpecification(bom.getItemSpc());
+            line.setUnitOfMeasure(bom.getUnitOfMeasure());
+            line.setUnitName(bom.getUnitName());
+            line.setQuantity(bom.getTotalQuantity() != null ? bom.getTotalQuantity() : bom.getQuantity());
+            bomLines.add(line);
+        }
+        item.setBomLines(bomLines);
+
+        List<com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr> attrSchema =
+                wmOutsourceProcessAttrMapper.selectByProcessId(SecurityUtils.getFactoryId(), rp.getProcessId());
+        item.setAttrSchema(attrSchema != null ? attrSchema : new ArrayList<>());
+        return item;
     }
 
     /**
@@ -1178,11 +1303,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         ProWorkorder wo = selectProWorkorderByWorkorderId(workorderId);
         if (wo == null) throw new ServiceException("工单不存在");
         List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
+        // 无 BOM 不再拦截：支持无物料清单的工单（如成品直接采购/委外），返回空清单即可
         if (bomList == null || bomList.isEmpty()) {
-            if (hasRouteBomForProduct(wo)) {
-                throw new ServiceException("工单 BOM 未同步，请编辑工单并保存后再开工");
-            }
-            throw new ServiceException("工单无 BOM 数据，请先在工艺路线维护该产品的物料清单");
+            return new ArrayList<>();
         }
 
         // 2. 本工单已备料量（领料单 ALLOCATED/PARTIAL_ISSUED/ISSUED）—— 预占/出库时已扣
@@ -1234,22 +1357,6 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
 
         return result;
-    }
-
-    /**
-     * 判断工艺路线模板下是否已维护该工单产品的 BOM（快照为空时用于区分"未维护"与"未同步"）
-     */
-    private boolean hasRouteBomForProduct(ProWorkorder wo)
-    {
-        if (wo.getRouteProductId() == null) return false;
-        ProRouteProduct routeProduct = proRouteProductService
-                .selectProRouteProductByRecordId(wo.getRouteProductId());
-        if (routeProduct == null) return false;
-        List<ProRouteProductBom> routeBoms = proRouteProductBomService
-                .selectProRouteProductBomByRouteId(routeProduct.getRouteId());
-        if (routeBoms == null) return false;
-        return routeBoms.stream().anyMatch(rb -> routeProduct.getItemId() != null
-                && routeProduct.getItemId().equals(rb.getProductId()));
     }
 
     /**
@@ -1476,6 +1583,14 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         try
         {
             List<Map<String, Object>> rows = checkMaterialReadiness(workorderId);
+            if (rows.isEmpty())
+            {
+                // 无 BOM 工单不做齐套校验（允许成品采购/无物料需求直接开工）
+                step.put("status", "PASS");
+                step.put("message", "工单无物料清单（BOM），无需齐套检查，可直接开工");
+                step.put("details", rows);
+                return step;
+            }
             boolean allSufficient = rows.stream().allMatch(r -> Boolean.TRUE.equals(r.get("sufficient")));
             step.put("status", allSufficient ? "PASS" : "FAIL");
             step.put("message", allSufficient ? "所有物料齐套，可以开工" : "存在缺料物料，暂不可开工");
@@ -1579,8 +1694,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         List<ProWorkorderBom> bomList = proWorkorderBomService.selectProWorkorderBomByWorkorderId(wo.getWorkorderId());
         if (bomList == null || bomList.isEmpty())
         {
-            step.put("status", "FAIL");
-            step.put("message", "工单无BOM数据，无法生成领料单");
+            // 无 BOM 工单没有物料需求，跳过领料单生成，不阻断开工
+            step.put("status", "PASS");
+            step.put("message", "工单无物料清单（BOM），无需生成领料单");
             step.put("details", new ArrayList<>());
             return step;
         }

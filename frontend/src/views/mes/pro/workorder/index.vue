@@ -12,7 +12,7 @@
 
     <el-table v-loading="loading" :data="workorderList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="工单编码" align="center" prop="workorderCode" width="130">
+      <el-table-column label="工单编码" align="center" prop="workorderCode" width="170">
         <template #default="scope">
           <div>{{ scope.row.workorderCode }}</div>
           <el-tag v-if="openStateMap[String(scope.row.workorderId)]?.openCount" type="danger" size="small" effect="plain" class="mt2">
@@ -20,10 +20,10 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="工单名称" align="center" prop="workorderName"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
-      <el-table-column label="来源销售订单" align="center" prop="sourceCode" width="140" :show-overflow-tooltip="true" />
-      <el-table-column label="产品" align="center" prop="productName" :show-overflow-tooltip="true" />
-      <el-table-column label="产品线(工艺路线)" align="center" prop="routeName" min-width="140" :show-overflow-tooltip="true" />
+      <el-table-column label="工单名称" align="center" prop="workorderName" min-width="200" :show-overflow-tooltip="true"><template #default="scope"><el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:workorder:query']">{{ scope.row.workorderName }}</el-button></template></el-table-column>
+      <el-table-column label="来源销售订单" align="center" prop="sourceCode" width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="产品" align="center" prop="productName" min-width="200" :show-overflow-tooltip="true" />
+      <el-table-column label="产品线(工艺路线)" align="center" prop="routeName" min-width="200" :show-overflow-tooltip="true" />
       <el-table-column label="工单负责人" align="center" prop="ownerName" width="110" :show-overflow-tooltip="true" />
       <el-table-column label="计划数量" align="center" prop="quantity" width="90" :show-overflow-tooltip="true" />
       <el-table-column label="已生产" align="center" prop="quantityProduced" width="80" :show-overflow-tooltip="true" />
@@ -602,21 +602,17 @@ export default {
     handleQuery() { this.queryParams.pageNum=1; this.getList() },
     resetQuery() { this.$refs.queryForm?.resetFields(); this.handleQuery() },
     handleSelectionChange(sel) { this.ids=sel.map(i=>i.workorderId); this.single=sel.length!==1; this.multiple=!sel.length },
-    handleAdd() { this.reset(); this.viewExceptionSeq++; this.open=true; this.title='新增生产工单'; this.optType='add'; this.step=1; this.searchOwners('') },
-    // 查看：后端一次返回全部数据，前端直接展示
+    handleAdd() { this.$router.push({ path: '/mes/pro/workorder_edit', query: { mode: 'add' } }) },
+    // 查看：跳转独立开单页（只读）
     handleView(row) {
-      this.reset();
-      this.openExceptions = []
-      if (checkPermi(['mes:pro:exception:query'])) {
-        const seq = ++this.viewExceptionSeq
-        openExceptionByWorkorder(row.workorderId).then(r => {
-          if (seq === this.viewExceptionSeq) this.openExceptions = r.data || []
-        }).catch(() => {})
-      }
-      this.loadDetail(row.workorderId).then(() => { this.open=true; this.title='查看生产工单'; this.optType='view' })
+      this.$router.push({ path: '/mes/pro/workorder_edit', query: { workorderId: row.workorderId, mode: 'view' } })
     },
-    // 修改：后端一次返回全部数据，前端直接展示（step 由 reset 初始化为 1）
-    handleUpdate(row) { this.reset(); this.viewExceptionSeq++; const id=row.workorderId||this.ids[0]; this.loadDetail(id).then(() => { this.open=true; this.optType = this.form.status==='PREPARE' ? 'edit' : 'view'; this.title = this.optType==='edit' ? '修改生产工单' : '查看生产工单'; this.searchOwners('') }) },
+    // 修改：跳转独立开单页（非待生产仅可查看）
+    handleUpdate(row) {
+      const id = row.workorderId || this.ids[0]
+      const m = row.status === 'PREPARE' ? 'edit' : 'view'
+      this.$router.push({ path: '/mes/pro/workorder_edit', query: { workorderId: id, mode: m } })
+    },
     /** 工单负责人远程搜索（账号/手机号两路并发，按 userId 去重；保留已选回显项） */
     searchOwners(kw) {
       this.ownerLoading = true

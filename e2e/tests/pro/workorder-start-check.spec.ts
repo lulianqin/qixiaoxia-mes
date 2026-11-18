@@ -240,7 +240,7 @@ test.describe('生产工单 — startWithCheck 开工前4步检查', () => {
     await page.keyboard.press('Escape')
   })
 
-  test('API — 无 BOM 工单：Step 1 FAIL 消息为"工单无 BOM 数据"', async ({ page, playwright }) => {
+  test('API — 无 BOM 工单：Step 1 不再拦截（PASS，允许成品采购/直接开工）', async ({ page, playwright }) => {
     await page.goto('/mes/pro/workorder')
     await expect(page.locator('.el-table').first()).toBeVisible({ timeout: 15000 })
     const api = await createApiContext(page, playwright)
@@ -252,14 +252,9 @@ test.describe('生产工单 — startWithCheck 开工前4步检查', () => {
     for (const wo of rows.slice(0, 5)) {
       const r = await api.put(`/mes/pro/workorder/startWithCheck/${wo.workorderId}`)
       const steps = (await r.json()).data || []
-      if (steps[0]?.status === 'FAIL' && steps[0]?.message?.includes('无 BOM')) {
+      if (steps[0]?.status === 'PASS' && steps[0]?.message?.includes('无物料清单')) {
         found = true
         console.log(`  ✅ wo=${wo.workorderId}: "${steps[0].message}"`)
-        if (steps.length >= 4) {
-          expect(steps[1].status).toBe('SKIP')
-          expect(steps[2].status).toBe('SKIP')
-          expect(steps[3].status).toBe('SKIP')
-        }
         break
       }
     }

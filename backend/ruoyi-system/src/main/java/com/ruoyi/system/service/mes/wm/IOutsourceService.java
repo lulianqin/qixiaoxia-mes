@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.wm;
 
 import java.util.List;
 import com.ruoyi.system.domain.mes.wm.OutsourceRequest;
+import com.ruoyi.system.domain.mes.wm.OutsourceResultRequest;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
@@ -48,6 +49,12 @@ public interface IOutsourceService
      * 累计收货量达到发料量时自动 → FINISHED。
      */
     WmOutsourceOrder recordResult(Long orderId, List<WmOutsourceRecptLine> resultLines);
+
+    /**
+     * 按工序录入加工结果：回写各工序完成数量 + 按产出明细推进订单状态。
+     * 产出明细才参与收货入库，工序完成数量仅记录进度。
+     */
+    WmOutsourceOrder recordProcessResult(Long orderId, OutsourceResultRequest req);
 
     /**
      * 厂商签收：ISSUED→VENDOR_RCVD，记录签收人和时间。物料保管责任转移到厂商。

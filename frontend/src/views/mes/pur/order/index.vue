@@ -588,7 +588,7 @@ export default {
       // 触发编码预览
       this.handleAutoGenChange(true)
       this.open = true
-      this.title = "添加采购订单头"
+      this.title = "新增采购单"
     },
     /** 修改按钮操作 */
     handleUpdate(row) {

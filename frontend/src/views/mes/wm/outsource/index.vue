@@ -30,7 +30,7 @@
     <!-- 工具栏 -->
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" plain icon="Promotion" size="small" @click="handleCreate" v-hasPermi="['mes:wm:outsource:add']">外协发货</el-button>
+        <el-button type="primary" plain icon="Promotion" size="small" @click="handleCreate" v-hasPermi="['mes:wm:outsource:add']">新增加工单</el-button>
       </el-col>
       <el-col :span="1.5">
           <el-button type="warning" plain icon="Van" size="small" :disabled="draftRows.length === 0" :loading="batchLoading" @click="handleBatchExecute" v-hasPermi="['mes:wm:outsource:execute']">
@@ -80,24 +80,23 @@
       <el-table-column label="代操作人" align="center" prop="agentOperator" width="90" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.agentOperator || '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="470" fixed="right">
+      <el-table-column label="操作" align="center" width="200" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
           <el-button v-if="row.status === 'DRAFT'" link type="warning" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleExecute(row)" v-hasPermi="['mes:wm:outsource:execute']">执行发料</el-button>
-          <el-button v-if="row.status === 'DRAFT'" link type="danger" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleDelete(row)" v-hasPermi="['mes:wm:outsource:remove']">删除</el-button>
-          <el-button v-if="row.status === 'ISSUED'" link type="primary" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleVendorReceive(row)" v-hasPermi="['mes:wm:outsource:agentOps']">签收</el-button>
-          <el-button v-if="row.status === 'VENDOR_RCVD' || row.status === 'PROCESSING'" link type="primary" size="small" :disabled="actionLoadingId != null" @click="handleAgentResult(row)" v-hasPermi="['mes:wm:outsource:agentOps']">{{ row.status === 'VENDOR_RCVD' ? '录结果' : '补录' }}</el-button>
-          <el-button v-if="row.status === 'PROCESSING'" link type="warning" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleComplete(row)" v-hasPermi="['mes:wm:outsource:agentOps']">完成</el-button>
-          <el-button v-if="row.status === 'FINISHED'" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleShip(row)" v-hasPermi="['mes:wm:outsource:agentOps']">发货回厂</el-button>
-          <el-button v-if="canReceive(row.status)" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleReceive(row)" v-hasPermi="['mes:wm:outsource:receive']">收货</el-button>
-          <el-button link type="primary" size="small" @click="handleProcessLines(row)" v-hasPermi="['mes:wm:outsource:query']">工序</el-button>
-          <el-button link type="warning" size="small" @click="handleExport(row)" v-hasPermi="['mes:wm:outsource:export']">导出</el-button>
-          <el-dropdown @command="cmd => handleChangeStatus(row, cmd)" v-hasPermi="['mes:wm:outsource:changeStatus']">
-            <el-button link type="primary" size="small">改状态<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+          <el-button v-else-if="row.status === 'ISSUED'" link type="primary" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleVendorReceive(row)" v-hasPermi="['mes:wm:outsource:agentOps']">签收</el-button>
+          <el-button v-else-if="row.status === 'VENDOR_RCVD' || row.status === 'PROCESSING'" link type="primary" size="small" :disabled="actionLoadingId != null" @click="handleAgentResult(row)" v-hasPermi="['mes:wm:outsource:agentOps']">{{ row.status === 'VENDOR_RCVD' ? '录结果' : '补录' }}</el-button>
+          <el-button v-else-if="row.status === 'FINISHED'" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleShip(row)" v-hasPermi="['mes:wm:outsource:agentOps']">发货回厂</el-button>
+          <el-button v-else-if="canReceive(row.status)" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleReceive(row)" v-hasPermi="['mes:wm:outsource:receive']">收货</el-button>
+          <el-dropdown @command="cmd => handleMoreCommand(row, cmd)">
+            <el-button link type="primary" size="small">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item v-for="d in mes_outsource_status" :key="d.value" :command="d.value"
-                                  :disabled="d.value === row.status">{{ d.label }}</el-dropdown-item>
+                <el-dropdown-item v-if="row.status === 'DRAFT' && checkPermi(['mes:wm:outsource:remove'])" command="delete">删除</el-dropdown-item>
+                <el-dropdown-item v-if="row.status === 'PROCESSING' && checkPermi(['mes:wm:outsource:agentOps'])" command="complete">完成</el-dropdown-item>
+                <el-dropdown-item v-if="checkPermi(['mes:wm:outsource:query'])" command="process">工序</el-dropdown-item>
+                <el-dropdown-item v-if="checkPermi(['mes:wm:outsource:export'])" command="export">导出</el-dropdown-item>
+                <el-dropdown-item v-if="checkPermi(['mes:wm:outsource:changeStatus'])" command="status">改状态</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -107,12 +106,13 @@
 
     <pagination v-show="total > 0" :total="total" v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize" @pagination="getList" />
 
-    <!-- 外协发货弹窗 -->
+    <!-- 新增加工单弹窗 -->
     <OutsourceCreateDialog ref="createDialogRef" @success="getList" />
     <!-- 代厂商录入加工结果弹窗 -->
     <OutsourceAgentResultDialog ref="agentResultRef" @success="getList" />
     <!-- 加工单工序行弹窗 -->
-    <ProcessLineDialog v-model="processLineVisible" :order-id="processLineOrderId" @success="getList" />
+    <ProcessLineDialog v-model="processLineVisible" :order-id="processLineOrderId"
+      :workorder-id="processLineWorkorderId" :status="processLineStatus" @success="getList" />
 
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" title="外协单详情" width="800px" append-to-body>
@@ -146,6 +146,38 @@
           <el-table-column label="仓库" prop="warehouseName" width="100"  :show-overflow-tooltip="true" />
         </el-table>
       </template>
+      <template v-if="detail?.processLines?.length">
+        <el-divider content-position="left">工序明细</el-divider>
+        <el-table :data="detail.processLines" border size="small">
+          <el-table-column label="序号" prop="seq" width="60" align="center" />
+          <el-table-column label="工序" prop="processName" min-width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="计划数量" prop="planQty" width="100" align="center" />
+          <el-table-column label="完成数量" prop="doneQty" width="100" align="center" />
+          <el-table-column label="扩展属性" prop="extAttrs" min-width="160" :show-overflow-tooltip="true">
+            <template #default="{ row }">{{ row.extAttrs || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="备注" prop="remark" min-width="120" :show-overflow-tooltip="true" />
+        </el-table>
+      </template>
+    </el-dialog>
+
+    <!-- 人工改状态弹窗 -->
+    <el-dialog v-model="statusPickOpen" title="加工单改状态" width="450px" append-to-body>
+      <el-form label-width="90px">
+        <el-form-item label="目标状态" required>
+          <el-select v-model="statusPickValue" placeholder="请选择目标状态" style="width:100%">
+            <el-option v-for="d in mes_outsource_status" :key="d.value" :label="d.label" :value="d.value"
+              :disabled="d.value === statusPickRow?.status" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="变更原因">
+          <el-input v-model="statusPickRemark" placeholder="可空" maxlength="200" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="statusPickOpen = false">取 消</el-button>
+        <el-button type="primary" @click="confirmStatusPick">确 定</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -158,6 +190,7 @@ import OutsourceCreateDialog from './OutsourceCreateDialog.vue'
 import OutsourceAgentResultDialog from './OutsourceAgentResultDialog.vue'
 import ProcessLineDialog from './ProcessLineDialog.vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { checkPermi } from '@/utils/permission'
 import QcStatusTag from '../../qc/components/QcStatusTag.vue'
 import { showBatchResult } from './batchResult'
 import type { OutsourceIssueLineVO } from './types'
@@ -168,6 +201,7 @@ interface OutsourceOrderRow {
   sourceType: string
   vendorName: string
   workorderCode: string
+  workorderId?: number
   processName: string
   issueTotalQty: number | null
   recptTotalQty: number | null
@@ -181,6 +215,7 @@ interface OutsourceOrderRow {
   agentOperator?: string | null
   issueLines?: OutsourceIssueLineVO[]
   recptLines?: unknown[]
+  processLines?: any[]
 }
 
 interface OutsourceQuery {
@@ -209,6 +244,12 @@ const detailVisible = ref(false)
 const detail = ref<OutsourceOrderRow | null>(null)
 const processLineVisible = ref(false)
 const processLineOrderId = ref<number | undefined>(undefined)
+const processLineWorkorderId = ref<number | undefined>(undefined)
+const processLineStatus = ref<string | undefined>(undefined)
+const statusPickOpen = ref(false)
+const statusPickRow = ref<OutsourceOrderRow | null>(null)
+const statusPickValue = ref('')
+const statusPickRemark = ref('')
 const selectedRows = ref<OutsourceOrderRow[]>([])
 const draftRows = computed(() => selectedRows.value.filter(r => r.status === 'DRAFT'))
 const receivableRows = computed(() => selectedRows.value.filter(r => canReceive(r.status)))
@@ -268,7 +309,38 @@ async function handleReceive(row: OutsourceOrderRow) {
 // ── 一期：工序行 / 导出 / 人工改状态 ─────────────────
 function handleProcessLines(row: OutsourceOrderRow) {
   processLineOrderId.value = row.orderId
+  processLineWorkorderId.value = (row as any).workorderId
+  processLineStatus.value = row.status
   processLineVisible.value = true
+}
+
+/** 「更多」下拉命令分发 */
+function handleMoreCommand(row: OutsourceOrderRow, cmd: string) {
+  if (cmd === 'delete') handleDelete(row)
+  else if (cmd === 'complete') handleComplete(row)
+  else if (cmd === 'process') handleProcessLines(row)
+  else if (cmd === 'export') handleExport(row)
+  else if (cmd === 'status') openStatusPick(row)
+}
+
+function openStatusPick(row: OutsourceOrderRow) {
+  statusPickRow.value = row
+  statusPickValue.value = ''
+  statusPickRemark.value = ''
+  statusPickOpen.value = true
+}
+
+function confirmStatusPick() {
+  if (!statusPickRow.value || !statusPickValue.value) { ElMessage.warning('请选择目标状态'); return }
+  changeOutsourceStatus({
+    orderId: statusPickRow.value.orderId,
+    status: statusPickValue.value,
+    remark: statusPickRemark.value
+  }).then(() => {
+    ElMessage.success('状态已更新')
+    statusPickOpen.value = false
+    getList()
+  }).catch(() => {})
 }
 
 async function handleExport(row: OutsourceOrderRow) {

@@ -656,6 +656,27 @@ function handleExport() {
 if (route.query.taskCode) {
   queryParams.value.taskCode = String(route.query.taskCode)
 }
+
+// 工单看板「新增任务」入口：自动打开新增弹窗并预填工单
+if (route.query.add === '1') {
+  handleAdd()
+  const woId = Number(route.query.workorderId)
+  if (woId) {
+    getWorkorder(woId).then((r: any) => {
+      const wo = r.data
+      if (!wo) return
+      onWorkorderSelected({
+        workorderId: wo.workorderId,
+        workorderName: wo.workorderName,
+        productId: wo.productId,
+        productName: wo.productName,
+        productCode: wo.productCode,
+        unitOfMeasure: wo.unitOfMeasure,
+        unitName: wo.unitName
+      })
+    })
+  }
+}
 getList()
 </script>
 

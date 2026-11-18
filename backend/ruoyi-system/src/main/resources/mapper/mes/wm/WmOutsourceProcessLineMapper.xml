@@ -8,17 +8,25 @@
         <result property="orderId" column="order_id" />
         <result property="seq" column="seq" />
         <result property="taskId" column="task_id" />
+        <result property="vendorId" column="vendor_id" />
+        <result property="vendorCode" column="vendor_code" />
+        <result property="vendorName" column="vendor_name" />
         <result property="processId" column="process_id" />
         <result property="processCode" column="process_code" />
         <result property="processName" column="process_name" />
         <result property="planQty" column="plan_qty" />
         <result property="doneQty" column="done_qty" />
+        <result property="unitPrice" column="unit_price" />
+        <result property="amount" column="amount" />
+        <result property="expectedDate" column="expected_date" />
+        <result property="extAttrs" column="ext_attrs" />
         <result property="remark" column="remark" />
     </resultMap>
 
     <select id="selectByOrderId" resultMap="WmOutsourceProcessLineResult">
-        select line_id, factory_id, order_id, seq, task_id, process_id, process_code, process_name,
-               plan_qty, done_qty, remark
+        select line_id, factory_id, order_id, seq, task_id, vendor_id, vendor_code, vendor_name,
+               process_id, process_code, process_name, plan_qty, done_qty,
+               unit_price, amount, expected_date, ext_attrs, remark
         from qxx_wm_outsource_process_line
         where order_id = #{orderId}
         order by seq asc, line_id asc
@@ -30,12 +38,27 @@
 
     <insert id="insertBatch">
         insert into qxx_wm_outsource_process_line
-            (order_id, seq, task_id, process_id, process_code, process_name, plan_qty, done_qty, remark, create_by, create_time)
+            (order_id, seq, task_id, vendor_id, vendor_code, vendor_name,
+             process_id, process_code, process_name, plan_qty, done_qty,
+             unit_price, amount, expected_date, ext_attrs, remark, create_by, create_time)
         values
         <foreach collection="list" item="it" separator=",">
-            (#{it.orderId}, #{it.seq}, #{it.taskId}, #{it.processId}, #{it.processCode}, #{it.processName},
-             #{it.planQty}, #{it.doneQty}, #{it.remark}, #{it.createBy}, sysdate())
+            (#{it.orderId}, #{it.seq}, #{it.taskId}, #{it.vendorId}, #{it.vendorCode}, #{it.vendorName},
+             #{it.processId}, #{it.processCode}, #{it.processName}, #{it.planQty}, #{it.doneQty},
+             #{it.unitPrice}, #{it.amount}, #{it.expectedDate}, #{it.extAttrs}, #{it.remark}, #{it.createBy}, sysdate())
         </foreach>
     </insert>
+
+    <update id="updateDoneQty">
+        update qxx_wm_outsource_process_line
+        set done_qty = #{doneQty}
+        where order_id = #{orderId} and line_id = #{lineId}
+    </update>
+
+    <update id="addDoneQty">
+        update qxx_wm_outsource_process_line
+        set done_qty = ifnull(done_qty, 0) + #{qty}
+        where order_id = #{orderId} and line_id = #{lineId}
+    </update>
 
 </mapper>

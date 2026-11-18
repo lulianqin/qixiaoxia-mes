@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="factoryId"    column="factory_id"    />
         <result property="orderCode"    column="order_code"    />
         <result property="orderName"    column="order_name"    />
+        <result property="docTitle"    column="doc_title"    />
         <result property="vendorId"    column="vendor_id"    />
         <result property="vendorCode"    column="vendor_code"    />
         <result property="vendorName"    column="vendor_name"    />
@@ -21,6 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="totalAmount"    column="total_amount"    />
         <result property="currency"    column="currency"    />
         <result property="sourceOrderCode"    column="source_order_code"    />
+        <result property="deliveryAddress"    column="delivery_address"    />
         <result property="workorderId"    column="workorder_id"    />
         <result property="workorderCode"    column="workorder_code"    />
         <result property="status"    column="status"    />
@@ -48,12 +50,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectPurOrderVo">
-        select o.order_id, o.factory_id, o.order_code, o.order_name, o.vendor_id, o.vendor_code, o.vendor_name, o.purchase_type, o.order_date, o.expected_date, o.purchaser, o.approver, o.total_quantity,
+        select o.order_id, o.factory_id, o.order_code, o.order_name, o.doc_title, o.vendor_id, o.vendor_code, o.vendor_name, o.purchase_type, o.order_date, o.expected_date, o.purchaser, o.approver, o.total_quantity,
             (SELECT COALESCE(SUM(l.quantity_received), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id) AS received_quantity,
             (SELECT COALESCE(SUM(l.quantity_received * l.unit_price), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id) AS received_amount,
             (SELECT COALESCE(SUM(l.quantity_ordered), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id AND l.status = 'CANCEL') AS cancelled_quantity,
             (SELECT COALESCE(SUM(l.amount), 0) FROM qxx_pur_order_line l WHERE l.order_id = o.order_id AND l.status = 'CANCEL') AS cancelled_amount,
-            o.total_amount, o.currency, o.source_order_code, o.workorder_id, o.workorder_code, o.status, o.cancel_reason, o.cancel_time, o.cancel_by, o.close_reason, o.close_time, o.close_by, o.reject_reason, o.reject_by, o.reject_time, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
+            o.total_amount, o.currency, o.source_order_code, o.delivery_address, o.workorder_id, o.workorder_code, o.status, o.cancel_reason, o.cancel_time, o.cancel_by, o.close_reason, o.close_time, o.close_by, o.reject_reason, o.reject_by, o.reject_time, o.remark, o.create_by, o.create_time, o.update_by, o.update_time from qxx_pur_order o
     </sql>
 
     <select id="selectPurOrderList" parameterType="PurOrder" resultMap="PurOrderVOResult">
@@ -95,6 +97,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         insert into qxx_pur_order
         <trim prefix="(" suffix=")" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">order_code,</if>
             <if test="orderName != null">order_name,</if>
+            <if test="docTitle != null">doc_title,</if>
             <if test="vendorId != null">vendor_id,</if>
             <if test="vendorCode != null">vendor_code,</if>
             <if test="vendorName != null">vendor_name,</if>
@@ -107,6 +110,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null">total_amount,</if>
             <if test="currency != null">currency,</if>
             <if test="sourceOrderCode != null">source_order_code,</if>
+            <if test="deliveryAddress != null">delivery_address,</if>
             <if test="workorderId != null">workorder_id,</if>
             <if test="workorderCode != null">workorder_code,</if>
             <if test="status != null">status,</if>
@@ -127,6 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">#{orderCode},</if>
             <if test="orderName != null">#{orderName},</if>
+            <if test="docTitle != null">#{docTitle},</if>
             <if test="vendorId != null">#{vendorId},</if>
             <if test="vendorCode != null">#{vendorCode},</if>
             <if test="vendorName != null">#{vendorName},</if>
@@ -139,6 +144,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null">#{totalAmount},</if>
             <if test="currency != null">#{currency},</if>
             <if test="sourceOrderCode != null">#{sourceOrderCode},</if>
+            <if test="deliveryAddress != null">#{deliveryAddress},</if>
             <if test="workorderId != null">#{workorderId},</if>
             <if test="workorderCode != null">#{workorderCode},</if>
             <if test="status != null">#{status},</if>
@@ -170,6 +176,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update qxx_pur_order
         <trim prefix="SET" suffixOverrides=",">            <if test="orderCode != null and orderCode != ''">order_code = #{orderCode},</if>
             <if test="orderName != null">order_name = #{orderName},</if>
+            <if test="docTitle != null">doc_title = #{docTitle},</if>
             <if test="vendorId != null">vendor_id = #{vendorId},</if>
             <if test="vendorCode != null">vendor_code = #{vendorCode},</if>
             <if test="vendorName != null">vendor_name = #{vendorName},</if>
@@ -182,6 +189,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="currency != null">currency = #{currency},</if>
             <if test="sourceOrderCode != null">source_order_code = #{sourceOrderCode},</if>
+            <if test="deliveryAddress != null">delivery_address = #{deliveryAddress},</if>
             <if test="workorderId != null">workorder_id = #{workorderId},</if>
             <if test="workorderCode != null">workorder_code = #{workorderCode},</if>
             <if test="status != null">status = #{status},</if>

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,7 @@ import com.ruoyi.common.enums.WmIssueConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdVendor;
 import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
@@ -36,6 +38,7 @@ import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.system.domain.mes.wm.OutsourceRequest;
+import com.ruoyi.system.domain.mes.wm.OutsourceResultRequest;
 import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
@@ -155,37 +158,142 @@ public class OutsourceServiceImpl implements IOutsourceService
     public WmOutsourceOrder createOutsource(OutsourceRequest req)
     {
         validateCreate(req);
+        MdVendor vendor = loadSupplier(req);
+        return lockTemplate.executeWithResult(resolveCreateLockKey(req), 10,
+                () -> tx().execute(status -> doCreate(req, vendor)));
+    }
+
+    /** 加工类型是否为厂内加工 */
+    private boolean isInside(OutsourceRequest req)
+    {
+        return "INSIDE".equalsIgnoreCase(req.getSupplierType());
+    }
+
+    /** 加载/校验加工商：外协必填且启用；厂内不校验并清空厂商信息 */
+    private MdVendor loadSupplier(OutsourceRequest req)
+    {
+        if (isInside(req))
+        {
+            req.setSupplierType("INSIDE");
+            req.setVendorId(null);
+            req.setVendorCode(null);
+            req.setVendorName(null);
+            return null;
+        }
+        req.setSupplierType("OUTSIDE");
         MdVendor vendor = vendorMapper.selectMdVendorByVendorId(req.getVendorId());
         if (vendor == null) throw new ServiceException("外协厂商不存在: " + req.getVendorId());
         req.setVendorCode(vendor.getVendorCode());
         req.setVendorName(vendor.getVendorName());
+        return vendor;
+    }
 
-        // 锁键按唯一约束域 (workorderId, processId) 加锁，与 uk_wo_process 一致；
-        // 手工单(无工单/工序)退回 vendor 维度（同一厂商不并发建手工单）
-        String lockKey;
-        if (req.getWorkorderId() != null && req.getProcessId() != null) {
-            lockKey = "wm:outsource:create:" + req.getWorkorderId() + ":" + req.getProcessId();
-        } else {
-            lockKey = "wm:outsource:create:vendor:" + req.getVendorId();
+    /** 多工序按工单加锁（同工单串行建单）；旧单工序/手工单沿用原锁键 */
+    private String resolveCreateLockKey(OutsourceRequest req)
+    {
+        if (req.getProcessLines() != null && !req.getProcessLines().isEmpty() && req.getWorkorderId() != null)
+        {
+            return "wm:outsource:create:wo:" + req.getWorkorderId();
         }
-        return lockTemplate.executeWithResult(lockKey, 10,
-                () -> tx().execute(status -> doCreate(req, vendor)));
+        if (req.getWorkorderId() != null && req.getProcessId() != null)
+        {
+            return "wm:outsource:create:" + req.getWorkorderId() + ":" + req.getProcessId();
+        }
+        return "wm:outsource:create:vendor:" + req.getVendorId();
     }
 
     private void validateCreate(OutsourceRequest req)
     {
-        if (req.getVendorId() == null) throw new ServiceException("外协厂商不能为空");
-        if (req.getIssueLines() == null || req.getIssueLines().isEmpty())
+        if (!isInside(req) && req.getVendorId() == null)
+            throw new ServiceException("外协厂商不能为空");
+        // 草稿允许先建单后补发料（工单开单页只配置工序/供应商/交期，发料在发料环节补录）
+        if (!req.isDraft() && (req.getIssueLines() == null || req.getIssueLines().isEmpty()))
             throw new ServiceException("发料行不能为空");
         if (SecurityUtils.getVendorId() != null)
             throw new ServiceException("外协厂商账号不能创建发货单，仅我方员工可操作");
-        for (WmOutsourceIssueLine line : req.getIssueLines())
+        if (req.getIssueLines() != null)
         {
-            if (line.getItemId() == null) throw new ServiceException("发料行物料不能为空");
-            if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
-                throw new ServiceException("发料数量必须大于0");
+            for (WmOutsourceIssueLine line : req.getIssueLines())
+            {
+                if (line.getItemId() == null) throw new ServiceException("发料行物料不能为空");
+                if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
+                    throw new ServiceException("发料数量必须大于0");
+            }
         }
-        validateProcessAttrs(req);
+        if (req.getProcessLines() != null && !req.getProcessLines().isEmpty())
+        {
+            validateProcessLines(req.getWorkorderId(), req.getRouteId(), req.getProcessLines());
+            // 单头工序取第一道，兼容旧列表/报工/流转卡字段
+            WmOutsourceProcessLine first = req.getProcessLines().get(0);
+            req.setProcessId(first.getProcessId());
+            req.setProcessCode(first.getProcessCode());
+            req.setProcessName(first.getProcessName());
+        }
+        else
+        {
+            validateProcessAttrs(req);
+        }
+    }
+
+    /**
+     * 多工序行校验：必须关联工单、工序不重复且属于工单路线、计划量非负、
+     * 按各工序属性模板校验扩展属性必填项并规范化 JSON。
+     */
+    private void validateProcessLines(Long workorderId, Long routeId, List<WmOutsourceProcessLine> lines)
+    {
+        if (workorderId == null) throw new ServiceException("多工序加工单必须关联生产工单");
+        Set<Long> routeProcessIds = loadRouteProcessIds(routeId);
+        Set<Long> seen = new HashSet<>();
+        for (WmOutsourceProcessLine line : lines)
+        {
+            if (line.getProcessId() == null) throw new ServiceException("工序不能为空");
+            if (!seen.add(line.getProcessId()))
+                throw new ServiceException("工序「" + line.getProcessName() + "」重复，不能添加多次");
+            if (routeProcessIds != null && !routeProcessIds.contains(line.getProcessId()))
+                throw new ServiceException("工序「" + line.getProcessName() + "」不属于该工单工艺路线");
+            if (line.getPlanQty() != null && line.getPlanQty().compareTo(BigDecimal.ZERO) < 0)
+                throw new ServiceException("工序「" + line.getProcessName() + "」计划数量不能小于0");
+            validateProcessLineAttrs(line);
+        }
+    }
+
+    /** 工单路线工序ID集合；路线为空时返回 null（跳过路线归属校验） */
+    private Set<Long> loadRouteProcessIds(Long routeId)
+    {
+        if (routeId == null) return null;
+        List<ProRouteProcess> processes = routeProcessMapper.selectProRouteProcessByRouteId(routeId);
+        if (processes == null || processes.isEmpty()) return null;
+        Set<Long> ids = new HashSet<>();
+        for (ProRouteProcess rp : processes)
+        {
+            if (rp.getProcessId() != null) ids.add(rp.getProcessId());
+        }
+        return ids;
+    }
+
+    /** 工序行扩展属性校验：按工序模板校验必填项，非法 JSON 拒绝 */
+    private void validateProcessLineAttrs(WmOutsourceProcessLine line)
+    {
+        if (SOURCE_TYPE_SLITTING.equals(line.getProcessCode())) return;
+        List<WmOutsourceProcessAttr> schema = processAttrMapper.selectByProcessId(
+                SecurityUtils.getFactoryId(), line.getProcessId());
+        if (schema == null || schema.isEmpty())
+        {
+            line.setExtAttrs(null);
+            return;
+        }
+        JSONObject attrs = parseExtAttrs(line.getExtAttrs());
+        for (WmOutsourceProcessAttr attr : schema)
+        {
+            Object v = attrs.get(attr.getAttrCode());
+            if ("1".equals(attr.getRequired())
+                    && (v == null || String.valueOf(v).trim().isEmpty()))
+            {
+                throw new ServiceException("工序「" + line.getProcessName() + "」的「"
+                        + attr.getAttrName() + "」不能为空");
+            }
+        }
+        line.setExtAttrs(attrs.isEmpty() ? null : attrs.toJSONString());
     }
 
     /**
@@ -239,6 +347,8 @@ public class OutsourceServiceImpl implements IOutsourceService
     {
         String operator = SecurityUtils.getUsername();
         boolean draft = req.isDraft();
+        // 多工序：先校验同工单内工序是否已有加工单（uk_wo_process 只覆盖单头第一道）
+        validateProcessConflict(req);
         WmOutsourceOrder order = buildOrderHeader(req, vendor, operator, draft);
         try
         {
@@ -250,11 +360,78 @@ public class OutsourceServiceImpl implements IOutsourceService
             throw new ServiceException("该工单工序已存在外协单，不能重复创建");
         }
         persistIssueLines(req, order, operator, draft);
+        persistProcessLines(req, order, operator);
         if (!draft) markCardOutsourcing(order);
-        log.info("外协{}单创建: orderCode={}, vendor={}, 行数={}, 总量={}",
+        log.info("外协{}单创建: orderCode={}, vendor={}, 工序数={}, 行数={}, 总量={}",
                 draft ? "发料草稿" : "发货", order.getOrderCode(), req.getVendorName(),
-                req.getIssueLines().size(), order.getIssueTotalQty());
+                req.getProcessLines() == null ? 0 : req.getProcessLines().size(),
+                req.getIssueLines() == null ? 0 : req.getIssueLines().size(), order.getIssueTotalQty());
         return order;
+    }
+
+    /** 同工单内工序唯一性校验：任意已有加工单（单头或工序行）覆盖的工序不允许重复建单 */
+    private void validateProcessConflict(OutsourceRequest req)
+    {
+        if (req.getProcessLines() == null || req.getProcessLines().isEmpty() || req.getWorkorderId() == null) return;
+        List<WmOutsourceOrder> existingOrders = orderMapper.selectByWorkorderId(req.getWorkorderId());
+        if (existingOrders == null || existingOrders.isEmpty()) return;
+        Map<Long, String> existingByProcess = new HashMap<>();
+        for (WmOutsourceOrder existing : existingOrders)
+        {
+            String info = existing.getOrderCode() + "(" + existing.getStatus() + ")";
+            if (existing.getProcessId() != null) existingByProcess.putIfAbsent(existing.getProcessId(), info);
+            List<WmOutsourceProcessLine> lines = processLineMapper.selectByOrderId(existing.getOrderId());
+            if (lines == null) continue;
+            for (WmOutsourceProcessLine line : lines)
+            {
+                if (line.getProcessId() != null) existingByProcess.putIfAbsent(line.getProcessId(), info);
+            }
+        }
+        for (WmOutsourceProcessLine line : req.getProcessLines())
+        {
+            String info = existingByProcess.get(line.getProcessId());
+            if (info != null)
+                throw new ServiceException("工序「" + line.getProcessName() + "」已存在加工单 " + info + "，不能重复创建");
+        }
+    }
+
+    /** 持久化工序行（多工序加工单）；单工序旧请求为空直接跳过 */
+    private void persistProcessLines(OutsourceRequest req, WmOutsourceOrder order, String operator)
+    {
+        List<WmOutsourceProcessLine> lines = req.getProcessLines();
+        if (lines == null || lines.isEmpty()) return;
+        int seq = 1;
+        for (WmOutsourceProcessLine line : lines)
+        {
+            line.setOrderId(order.getOrderId());
+            line.setSeq(seq++);
+            line.setCreateBy(operator);
+            line.setTaskId(resolveProcessTaskId(order.getWorkorderId(), line.getProcessId()));
+        }
+        processLineMapper.insertBatch(lines);
+    }
+
+    /** 解析工序对应的排产任务（优先生产中，其次非取消任务） */
+    private Long resolveProcessTaskId(Long workorderId, Long processId)
+    {
+        ProTask task = findProcessTask(workorderId, processId);
+        return task != null ? task.getTaskId() : null;
+    }
+
+    private ProTask findProcessTask(Long workorderId, Long processId)
+    {
+        if (workorderId == null || processId == null) return null;
+        ProTask query = new ProTask();
+        query.setWorkorderId(workorderId);
+        query.setProcessId(processId);
+        List<ProTask> tasks = proTaskMapper.selectProTaskList(query);
+        if (tasks == null || tasks.isEmpty()) return null;
+        return tasks.stream()
+                .filter(t -> ProConstants.TASK_STATUS_PRODUCING.equals(t.getStatus()))
+                .findFirst()
+                .orElseGet(() -> tasks.stream()
+                        .filter(t -> !ProConstants.TASK_STATUS_CANCEL.equals(t.getStatus()))
+                        .findFirst().orElse(null));
     }
 
     /** 构建外协单头（不含发料行） */
@@ -262,6 +439,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     {
         WmOutsourceOrder order = new WmOutsourceOrder();
         order.setOrderCode(autoCodeGenerator.genSerialCode("OUTSOURCE_CODE", null));
+        order.setSupplierType(req.getSupplierType() != null ? req.getSupplierType() : "OUTSIDE");
         order.setVendorId(req.getVendorId());
         order.setVendorCode(req.getVendorCode());
         order.setVendorName(req.getVendorName());
@@ -281,6 +459,12 @@ public class OutsourceServiceImpl implements IOutsourceService
         order.setProcessName(req.getProcessName());
         order.setSourceType(resolveSourceType(req.getSourceType(), req.getProcessCode()));
         order.setSourceRefId(req.getSourceRefId());
+        order.setDocTitle(req.getDocTitle());
+        order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
+        order.setExpectedDate(req.getExpectedDate());
+        order.setPurchaser(StringUtils.isEmpty(req.getPurchaser()) ? operator : req.getPurchaser());
+        order.setSourceOrderCode(req.getSourceOrderCode());
+        order.setDeliveryAddress(req.getDeliveryAddress());
         order.setStatus(draft ? STATUS_DRAFT : STATUS_ISSUED);
         order.setOperator(operator);
         if (!draft) order.setIssueTime(DateUtils.getNowDate());
@@ -288,9 +472,12 @@ public class OutsourceServiceImpl implements IOutsourceService
         order.setCreateBy(operator);
         order.setCreateTime(DateUtils.getNowDate());
         BigDecimal totalQty = BigDecimal.ZERO;
-        for (WmOutsourceIssueLine line : req.getIssueLines())
+        if (req.getIssueLines() != null)
         {
-            totalQty = totalQty.add(nvl(line.getQuantity()));
+            for (WmOutsourceIssueLine line : req.getIssueLines())
+            {
+                totalQty = totalQty.add(nvl(line.getQuantity()));
+            }
         }
         order.setIssueTotalQty(totalQty);
         return order;
@@ -299,6 +486,10 @@ public class OutsourceServiceImpl implements IOutsourceService
     /** 持久化发料行；非草稿模式同时扣库存写追溯 */
     private void persistIssueLines(OutsourceRequest req, WmOutsourceOrder order, String operator, boolean draft)
     {
+        if (req.getIssueLines() == null || req.getIssueLines().isEmpty())
+        {
+            return;
+        }
         for (WmOutsourceIssueLine line : req.getIssueLines())
         {
             line.setOrderId(order.getOrderId());
@@ -485,6 +676,8 @@ public class OutsourceServiceImpl implements IOutsourceService
     private WmOutsourceOrder doExecute(Long orderId)
     {
         WmOutsourceOrder order = loadAndCheck(orderId, STATUS_DRAFT);
+        // 多工序：以路线最靠后工序作为单头工序上下文（流转卡/追溯指向加工终点）
+        applyLastProcessContext(order);
         validateWorkorderStarted(order);
         // 草稿可能在开工前自动生成（cardId 为空），执行时卡已建好，补填 cardId
         // 确保 writeIssueTrace 能写出 MATERIAL_STOCK→CARD 边，避免追溯断链
@@ -574,6 +767,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         if (!STATUS_DRAFT.equals(order.getStatus()))
             throw new ServiceException("仅草稿状态外协单可删除，当前状态：" + order.getStatus());
         lineMapper.deleteIssueLinesByOrderId(orderId);
+        processLineMapper.deleteByOrderId(orderId);
         orderMapper.deleteOutsourceOrderByOrderId(orderId);
         log.info("外协草稿单已删除: orderId={}, orderCode={}", orderId, order.getOrderCode());
     }
@@ -613,6 +807,37 @@ public class OutsourceServiceImpl implements IOutsourceService
         String lockKey = "wm:outsource:" + orderId;
         return lockTemplate.executeWithResult(lockKey, 10,
                 () -> tx().execute(status -> doRecordResult(orderId, resultLines, agent)));
+    }
+
+    @Override
+    public WmOutsourceOrder recordProcessResult(Long orderId, OutsourceResultRequest req)
+    {
+        if (req == null || req.getLines() == null || req.getLines().isEmpty())
+            throw new ServiceException("至少录入一条加工结果");
+        final boolean agent = assertVendorOrAgent("录入加工结果");
+        String lockKey = "wm:outsource:" + orderId;
+        return lockTemplate.executeWithResult(lockKey, 10,
+                () -> tx().execute(status -> {
+                    applyProcessResults(orderId, req.getProcessResults());
+                    return doRecordResult(orderId, req.getLines(), agent);
+                }));
+    }
+
+    /** 回写工序完成数量（仅进度，不参与库存/收货数量） */
+    private void applyProcessResults(Long orderId, List<OutsourceResultRequest.ProcessResult> items)
+    {
+        if (items == null || items.isEmpty()) return;
+        Map<Long, WmOutsourceProcessLine> lineMap = new HashMap<>();
+        for (WmOutsourceProcessLine line : processLineMapper.selectByOrderId(orderId))
+            lineMap.put(line.getLineId(), line);
+        for (OutsourceResultRequest.ProcessResult item : items)
+        {
+            if (item == null || item.getProcessLineId() == null) continue;
+            if (item.getQuantity() == null || item.getQuantity().compareTo(BigDecimal.ZERO) <= 0) continue;
+            if (!lineMap.containsKey(item.getProcessLineId()))
+                throw new ServiceException("工序行不属于当前加工单: " + item.getProcessLineId());
+            processLineMapper.addDoneQty(orderId, item.getProcessLineId(), item.getQuantity());
+        }
     }
 
     private WmOutsourceOrder doRecordResult(Long orderId, List<WmOutsourceRecptLine> resultLines, boolean agent)
@@ -981,6 +1206,8 @@ public class OutsourceServiceImpl implements IOutsourceService
     {
         // 严格状态机：必须厂商完工+发货（SHIPPED）后我方才能收货
         WmOutsourceOrder order = loadAndCheck(orderId, STATUS_SHIPPED);
+        // 多工序：报工/流转卡以路线最靠后工序为上下文，其余工序通过工序行逐道推进
+        applyLastProcessContext(order);
         String operator = SecurityUtils.getUsername();
 
         // cardId 补填：外协发料时卡可能还没建（工单未开工），收货时卡应已存在
@@ -1041,7 +1268,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         }
 
         // 推进任务状态：外协收货 → 任务 COMPLETED + 累加产量（失败将回滚收货事务）
-        advanceTask(order, recptLines, operator);
+        advanceProcessTasks(order, recptLines, operator);
 
         // 流转卡恢复/推进（只前进不回退）。
         // 外协单创建早于开工建卡时单上 cardId 为空，发料标记与收货推进都会被跳过：
@@ -1124,6 +1351,7 @@ public class OutsourceServiceImpl implements IOutsourceService
             throw new ServiceException("无权查看此外协单");
         order.setIssueLines(lineMapper.selectIssueLinesByOrderId(orderId));
         order.setRecptLines(lineMapper.selectRecptLinesByOrderId(orderId));
+        order.setProcessLines(processLineMapper.selectByOrderId(orderId));
         return order;
     }
 
@@ -1162,11 +1390,23 @@ public class OutsourceServiceImpl implements IOutsourceService
 
     /** 覆盖保存工序行：先删后插，首道工序回写单头 process_id/name 兼容旧逻辑 */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void saveProcessLines(Long orderId, java.util.List<WmOutsourceProcessLine> lines)
+    {
+        lockTemplate.execute("wm:outsource:" + orderId, () ->
+                tx().execute(status -> { doSaveProcessLines(orderId, lines); return null; }));
+    }
+
+    private void doSaveProcessLines(Long orderId, List<WmOutsourceProcessLine> lines)
     {
         WmOutsourceOrder order = orderMapper.selectOutsourceOrderByOrderId(orderId);
         if (order == null) throw new ServiceException("加工单不存在");
+        if (!STATUS_DRAFT.equals(order.getStatus()))
+            throw new ServiceException("仅草稿状态的加工单可编辑工序明细");
+
+        if (lines != null && !lines.isEmpty())
+        {
+            validateProcessLines(order.getWorkorderId(), order.getRouteId(), lines);
+        }
 
         processLineMapper.deleteByOrderId(orderId);
         if (lines == null || lines.isEmpty()) return;
@@ -1177,6 +1417,7 @@ public class OutsourceServiceImpl implements IOutsourceService
             line.setOrderId(orderId);
             line.setSeq(seq++);
             line.setCreateBy(SecurityUtils.getUsername());
+            line.setTaskId(resolveProcessTaskId(order.getWorkorderId(), line.getProcessId()));
         }
         processLineMapper.insertBatch(lines);
 
@@ -1764,6 +2005,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         {
             order.setIssueLines(lineMapper.selectIssueLinesByOrderId(orderId));
             order.setRecptLines(lineMapper.selectRecptLinesByOrderId(orderId));
+            order.setProcessLines(processLineMapper.selectByOrderId(orderId));
         }
         return order;
     }
@@ -1798,6 +2040,89 @@ public class OutsourceServiceImpl implements IOutsourceService
         int rows = proTaskMapper.completeTaskFromOutsource(target.getTaskId(), operator);
         if (rows > 0)
             log.info("外协收货推进任务完成: taskId={}, 收货量={}", target.getTaskId(), totalQty);
+    }
+
+    /**
+     * 多工序收货：逐工序行推进对应任务（完成/补齐产量），并回写工序行完成数量。
+     * 无工序行的旧单回退到 {@link #advanceTask}。
+     */
+    private void advanceProcessTasks(WmOutsourceOrder order, List<WmOutsourceRecptLine> recptLines, String operator)
+    {
+        List<WmOutsourceProcessLine> processLines = processLineMapper.selectByOrderId(order.getOrderId());
+        if (processLines == null || processLines.isEmpty())
+        {
+            advanceTask(order, recptLines, operator);
+            return;
+        }
+        if (order.getWorkorderId() == null) return;
+        BigDecimal totalQty = recptLines.stream()
+                .map(l -> nvl(l.getQuantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        Set<Long> doneTaskIds = new HashSet<>();
+        for (WmOutsourceProcessLine line : processLines)
+        {
+            if (line.getProcessId() == null) continue;
+            ProTask target = resolveProcessLineTask(order.getWorkorderId(), line);
+            if (target == null || !doneTaskIds.add(target.getTaskId())) continue;
+            if (ProConstants.TASK_STATUS_CANCEL.equals(target.getStatus())
+                    || ProConstants.TASK_STATUS_COMPLETED.equals(target.getStatus())) continue;
+            proTaskMapper.completeTaskFromOutsource(target.getTaskId(), operator);
+            // 按工序录入的完成数量优先保留；未按工序录入时回退为计划量
+            BigDecimal doneQty = nvl(line.getDoneQty()).compareTo(BigDecimal.ZERO) > 0
+                    ? line.getDoneQty()
+                    : (line.getPlanQty() != null ? line.getPlanQty() : totalQty);
+            processLineMapper.updateDoneQty(order.getOrderId(), line.getLineId(), doneQty);
+            log.info("多工序收货推进任务完成: orderId={}, processId={}, taskId={}",
+                    order.getOrderId(), line.getProcessId(), target.getTaskId());
+        }
+    }
+
+    /** 工序行对应任务：优先行上 taskId，其次按工单+工序回查（优先生产中/非终态） */
+    private ProTask resolveProcessLineTask(Long workorderId, WmOutsourceProcessLine line)
+    {
+        if (line.getTaskId() != null)
+        {
+            ProTask task = proTaskMapper.selectProTaskByTaskId(line.getTaskId());
+            if (task != null) return task;
+        }
+        return findProcessTask(workorderId, line.getProcessId());
+    }
+
+    /**
+     * 多工序单头工序上下文对齐到路线最靠后工序：
+     * 报工/流转卡/末工序判定均基于单头 processId，加工终点才是本单的交付工序。
+     */
+    private void applyLastProcessContext(WmOutsourceOrder order)
+    {
+        List<WmOutsourceProcessLine> lines = processLineMapper.selectByOrderId(order.getOrderId());
+        if (lines == null || lines.isEmpty()) return;
+        WmOutsourceProcessLine last = pickLastProcessLine(order.getRouteId(), lines);
+        if (last == null || last.getProcessId() == null) return;
+        order.setProcessId(last.getProcessId());
+        order.setProcessCode(last.getProcessCode());
+        order.setProcessName(last.getProcessName());
+    }
+
+    /** 按路线顺序取最靠后的工序行；无路线顺序时取最后一行 */
+    private WmOutsourceProcessLine pickLastProcessLine(Long routeId, List<WmOutsourceProcessLine> lines)
+    {
+        if (routeId != null)
+        {
+            List<ProRouteProcess> routeProcesses = routeProcessMapper.selectProRouteProcessByRouteId(routeId);
+            if (routeProcesses != null && !routeProcesses.isEmpty())
+            {
+                Map<Long, Integer> posByProcess = new HashMap<>();
+                for (int i = 0; i < routeProcesses.size(); i++)
+                {
+                    ProRouteProcess rp = routeProcesses.get(i);
+                    if (rp.getProcessId() != null)
+                        posByProcess.put(rp.getProcessId(), rp.getOrderNum() != null ? rp.getOrderNum() : i);
+                }
+                return lines.stream()
+                        .max(Comparator.comparingInt(l -> posByProcess.getOrDefault(l.getProcessId(), -1)))
+                        .orElse(lines.get(lines.size() - 1));
+            }
+        }
+        return lines.get(lines.size() - 1);
     }
 
     /** 收货时补填 cardId（发料时卡可能未建，收货时应已存在） */

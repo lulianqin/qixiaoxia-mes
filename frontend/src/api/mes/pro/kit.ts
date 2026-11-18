@@ -30,7 +30,7 @@ export function loadPurOrderWizard(workorderId: number) {
   return request({ url: '/mes/pro/workorder/purOrderWizard/' + workorderId, method: 'get' })
 }
 
-// 采购向导 — 提交用户确认的物料行
-export function submitPurOrderWizard(workorderId: number, lines: any[]) {
-  return request({ url: '/mes/pro/workorder/purOrderWizard/' + workorderId + '/submit', method: 'post', data: lines })
+// 采购向导 — 提交采购单主表信息与用户确认的物料行
+export function submitPurOrderWizard(workorderId: number, data: any) {
+  return request({ url: '/mes/pro/workorder/purOrderWizard/' + workorderId + '/submit', method: 'post', data })
 }

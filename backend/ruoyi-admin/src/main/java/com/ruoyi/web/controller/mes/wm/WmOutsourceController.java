@@ -20,6 +20,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.wm.OutsourceRequest;
+import com.ruoyi.system.domain.mes.wm.OutsourceResultRequest;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
@@ -39,6 +40,12 @@ public class WmOutsourceController extends BaseController
 {
     @Autowired
     private IOutsourceService outsourceService;
+
+    @Autowired
+    private com.ruoyi.system.service.mes.pro.IProWorkorderService proWorkorderService;
+
+    @Autowired
+    private com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessAttrMapper processAttrMapper;
 
     /** 外协单列表（厂商账号自动按 vendorId 过滤） */
     @PreAuthorize("@ss.hasPermi('mes:wm:outsource:list')")
@@ -99,6 +106,191 @@ public class WmOutsourceController extends BaseController
             return;
         }
         WmOutsourceExporter.export(response, order);
+    }
+
+    /** 单据模板导出：单张加工单 Excel */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:export')")
+    @PostMapping("/doc/{orderId}/excel")
+    public void exportDocExcel(@PathVariable Long orderId, HttpServletResponse response) throws Exception
+    {
+        WmOutsourceOrder order = outsourceService.selectByOrderId(orderId);
+        if (order == null) throw new com.ruoyi.common.exception.ServiceException("加工单不存在");
+        writeDoc(response, buildDocModel(order), order.getOrderCode(), true);
+    }
+
+    /** 单据模板导出：单张加工单 PDF 打印 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:export')")
+    @PostMapping("/doc/{orderId}/pdf")
+    public void exportDocPdf(@PathVariable Long orderId, HttpServletResponse response) throws Exception
+    {
+        WmOutsourceOrder order = outsourceService.selectByOrderId(orderId);
+        if (order == null) throw new com.ruoyi.common.exception.ServiceException("加工单不存在");
+        writeDoc(response, buildDocModel(order), order.getOrderCode(), false);
+    }
+
+    /** 同加工商多张加工单合并导出 */
+    @PreAuthorize("@ss.hasPermi('mes:wm:outsource:export')")
+    @PostMapping("/docMerge/{format}")
+    public void exportDocMerge(@PathVariable String format, @RequestBody List<Long> orderIds,
+                               HttpServletResponse response) throws Exception
+    {
+        if (orderIds == null || orderIds.isEmpty())
+            throw new com.ruoyi.common.exception.ServiceException("请选择要合并的单据");
+        com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model m =
+                new com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model();
+        m.title = "合并加工单";
+        m.partyLabel = "加工商：";
+        m.headers.add("产品名称");
+        m.headers.add("业务单号");
+        m.headers.add("产品尺寸");
+        m.headers.add("工序");
+        m.headers.add("数量");
+        m.headers.add("单价");
+        m.headers.add("总金额(元)");
+        m.headers.add("送货日期");
+        m.headers.add("备注");
+        for (Long id : orderIds)
+        {
+            WmOutsourceOrder o = outsourceService.selectByOrderId(id);
+            if (o == null) continue;
+            if (m.partyName == null) m.partyName = o.getVendorName();
+            if (m.deliveryAddress == null) m.deliveryAddress = o.getDeliveryAddress();
+            if (m.purchaser == null) m.purchaser = o.getPurchaser();
+            if (m.orderDate == null) m.orderDate = com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmtDate(o.getOrderDate());
+            List<WmOutsourceProcessLine> lines = o.getProcessLines() != null ? o.getProcessLines()
+                    : outsourceService.selectProcessLines(id);
+            java.math.BigDecimal qty = java.math.BigDecimal.ZERO;
+            java.math.BigDecimal amt = java.math.BigDecimal.ZERO;
+            StringBuilder names = new StringBuilder();
+            for (WmOutsourceProcessLine l : lines)
+            {
+                if (l.getPlanQty() != null) qty = qty.add(l.getPlanQty());
+                if (l.getAmount() != null) amt = amt.add(l.getAmount());
+                if (names.length() > 0) names.append("、");
+                names.append(l.getProcessName() == null ? "" : l.getProcessName());
+            }
+            java.util.List<String> row = new java.util.ArrayList<>();
+            row.add(productName(o.getWorkorderId()));
+            row.add(o.getSourceOrderCode());
+            row.add(productSize(o.getWorkorderId()));
+            row.add(names.toString());
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(qty));
+            row.add(qty.signum() == 0 ? "" : amt.divide(qty, 4, java.math.RoundingMode.HALF_UP).toPlainString());
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(amt));
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmtDate(o.getExpectedDate()));
+            row.add(o.getRemark());
+            m.rows.add(row);
+            m.total = m.total.add(amt);
+        }
+        m.docCode = "共 " + m.rows.size() + " 张";
+        writeDoc(response, m, "合并加工单", "excel".equalsIgnoreCase(format));
+    }
+
+    @SuppressWarnings("unchecked")
+    private com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model buildDocModel(WmOutsourceOrder o)
+    {
+        com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model m =
+                new com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model();
+        m.title = o.getDocTitle() != null ? o.getDocTitle() : "加工单";
+        m.partyLabel = "加工商：";
+        m.partyName = o.getVendorName();
+        m.bizNo = o.getSourceOrderCode();
+        m.docCode = o.getOrderCode();
+        m.deliveryAddress = o.getDeliveryAddress();
+        m.purchaser = o.getPurchaser();
+        m.orderDate = com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmtDate(o.getOrderDate());
+        m.productImage = productImage(o.getWorkorderId());
+
+        List<WmOutsourceProcessLine> lines = o.getProcessLines() != null ? o.getProcessLines()
+                : outsourceService.selectProcessLines(o.getOrderId());
+        // 工序属性列（取所有工序属性模板的并集，标签用属性名）
+        java.util.LinkedHashMap<String, String> attrCols = new java.util.LinkedHashMap<>();
+        for (WmOutsourceProcessLine l : lines)
+        {
+            if (l.getProcessId() == null) continue;
+            List<com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr> schema =
+                    processAttrMapper.selectByProcessId(com.ruoyi.common.utils.SecurityUtils.getFactoryId(), l.getProcessId());
+            if (schema == null) continue;
+            for (com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr a : schema)
+            {
+                if (a.getAttrCode() != null) attrCols.put(a.getAttrCode(),
+                        a.getAttrName() != null ? a.getAttrName() : a.getAttrCode());
+            }
+        }
+        m.headers.add("产品名称");
+        m.headers.add("材料+工艺");
+        m.headers.add("成品尺寸mm");
+        m.headers.add("数量");
+        for (String label : attrCols.values()) m.headers.add(label);
+        m.headers.add("单价");
+        m.headers.add("总金额(元）");
+        m.headers.add("送货日期");
+        m.headers.add("备注");
+        String pname = productName(o.getWorkorderId());
+        String psize = productSize(o.getWorkorderId());
+        for (WmOutsourceProcessLine l : lines)
+        {
+            java.util.Map<String, Object> attrs =
+                    com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.parseAttrs(l.getExtAttrs());
+            java.util.List<String> row = new java.util.ArrayList<>();
+            row.add(pname);
+            row.add(l.getProcessName());
+            row.add(psize);
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getPlanQty()));
+            for (String code : attrCols.keySet())
+            {
+                Object v = attrs.get(code);
+                row.add(v == null ? "" : String.valueOf(v));
+            }
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getUnitPrice()));
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getAmount()));
+            row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmtDate(l.getExpectedDate()));
+            row.add(l.getRemark());
+            m.rows.add(row);
+            if (l.getAmount() != null) m.total = m.total.add(l.getAmount());
+        }
+        return m;
+    }
+
+    private String productName(Long workorderId)
+    {
+        if (workorderId == null) return "";
+        com.ruoyi.system.domain.mes.pro.ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        return wo != null && wo.getProductName() != null ? wo.getProductName() : "";
+    }
+
+    private String productSize(Long workorderId)
+    {
+        if (workorderId == null) return "";
+        com.ruoyi.system.domain.mes.pro.ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        return wo != null && wo.getProductSize() != null ? wo.getProductSize() : "";
+    }
+
+    private String productImage(Long workorderId)
+    {
+        if (workorderId == null) return null;
+        com.ruoyi.system.domain.mes.pro.ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        return wo != null ? wo.getProductImage() : null;
+    }
+
+    private void writeDoc(HttpServletResponse response,
+                          com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model m,
+                          String code, boolean excel) throws Exception
+    {
+        com.ruoyi.common.utils.file.FileUtils.setAttachmentResponseHeader(response,
+                "单据_" + code + (excel ? ".xlsx" : ".pdf"));
+        response.setContentType(excel
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : "application/pdf");
+        response.setCharacterEncoding("utf-8");
+        if (excel)
+        {
+            com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.writeExcel(m, response.getOutputStream());
+        }
+        else
+        {
+            com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.writePdf(m, response.getOutputStream());
+        }
     }
 
     /** Step1 创建外协发货单（我方操作，草稿模式不扣料） */
@@ -166,6 +358,16 @@ public class WmOutsourceController extends BaseController
                                    @RequestBody List<WmOutsourceRecptLine> resultLines)
     {
         return AjaxResult.success(outsourceService.recordResult(orderId, resultLines));
+    }
+
+    /** Step2 厂商录加工结果（按工序）：产出明细入库口径 + 工序完成数量回写 */
+    @PreAuthorize("@ss.hasAnyPermi('mes:wm:outsource:result,mes:wm:outsource:agentOps')")
+    @Log(title = "外协录结果(按工序)", businessType = BusinessType.UPDATE)
+    @PostMapping("/{orderId}/processResult")
+    public AjaxResult recordProcessResult(@PathVariable Long orderId,
+                                          @RequestBody OutsourceResultRequest req)
+    {
+        return AjaxResult.success(outsourceService.recordProcessResult(orderId, req));
     }
 
     /** Step2.5 厂商手动完成（PROCESSING → FINISHED，允许短交，厂商操作） */

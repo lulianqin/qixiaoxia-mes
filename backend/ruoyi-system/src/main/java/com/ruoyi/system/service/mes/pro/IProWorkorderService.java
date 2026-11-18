@@ -168,6 +168,15 @@ public interface IProWorkorderService
     public ProOutsourceWorkorderInfoVO getOutsourceInfoByCode(String workorderCode);
 
     /**
+     * 查询工单工艺路线全部工序信息（新增加工单入口）：厂内/外协工序全部返回，
+     * 含 BOM 发料行、扩展属性模板、已有加工单。
+     *
+     * @param workorderId 生产工单主键
+     * @return 工序信息 VO（processes 字段）
+     */
+    public ProOutsourceWorkorderInfoVO getProcessInfoByWorkorderId(Long workorderId);
+
+    /**
      * 修改生产工单（含BOM和工序参数）
      * 在一个事务中完成：工单头更新 → 旧BOM删除 + 新BOM插入 → 工序参数upsert
      *

@@ -13,6 +13,8 @@
           <el-button v-if="canStart" type="primary" size="small" @click="quickStatus('START')" v-hasPermi="['mes:pro:task:edit']">开工</el-button>
           <el-button v-if="canStop" type="warning" size="small" @click="quickStatus('PAUSE')" v-hasPermi="['mes:pro:task:edit']">停止</el-button>
           <el-button v-if="canComplete" type="success" size="small" @click="quickStatus('COMPLETE')" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+          <el-button v-if="canReport" type="success" size="small" @click="goFeedback" v-hasPermi="['mes:pro:feedback:add']">报工</el-button>
+          <el-button type="primary" size="small" @click="qrOpen = true" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
         </div>
       </template>
     </el-page-header>
@@ -90,6 +92,8 @@
         </el-collapse>
       </el-card>
     </div>
+
+    <CardQrDialog v-model="qrOpen" :workorder-id="wo.workorderId" />
   </div>
 </template>
 
@@ -98,6 +102,7 @@ import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProcessBoard } from '@/api/mes/pro/workorder'
 import { quickTaskStatus } from '@/api/mes/pro/task'
+import CardQrDialog from './components/CardQrDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_wm_issue_status } = proxy.useDict('mes_wm_issue_status')
@@ -110,6 +115,7 @@ const task = ref<any>({})
 const wo = ref<any>({})
 const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, issue: {} })
 const activeDims = ref<string[]>([])
+const qrOpen = ref(false)
 
 const TASK_STATUS = { NORMAL: '未开工', PREPARE: '未开工', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 const FB_STATUS = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
@@ -139,6 +145,12 @@ function goWorkorder() { router.push({ path: '/mes/pro/workorder_board', query: 
 const canStart = computed(() => ['NORMAL', 'PREPARE', 'PAUSED'].includes(task.value.status))
 const canStop = computed(() => task.value.status === 'PRODUCING')
 const canComplete = computed(() => !['COMPLETED', 'CANCEL'].includes(task.value.status))
+const canReport = computed(() => task.value.status === 'PRODUCING' && !task.value.qcBlocked)
+
+/** 跳转报工页并自动带入当前工序任务 */
+function goFeedback() {
+  router.push({ path: '/mes/pro/feedback', query: { add: '1', taskId: task.value.taskId } })
+}
 
 /** 工序快捷状态（弱流程记录） */
 function quickStatus(action: string) {

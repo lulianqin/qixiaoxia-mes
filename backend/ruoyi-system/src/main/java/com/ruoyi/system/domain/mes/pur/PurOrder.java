@@ -34,6 +34,10 @@ public class PurOrder extends BaseEntity
     @Excel(name = "采购订单名称")
     private String orderName;
 
+    /** 单据标题（如 纸张采购单/绳子采购单；为空时按采购类型推导） */
+    @Excel(name = "单据标题")
+    private String docTitle;
+
     /** 供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL) */
     @Excel(name = "供应商ID(关联qxx_md_vendor,vendor_type=MATERIAL)")
     private Long vendorId;
@@ -83,6 +87,10 @@ public class PurOrder extends BaseEntity
     /** 关联客户订单号(如PO#ORD66003MT) */
     @Excel(name = "关联客户订单号(如PO#ORD66003MT)")
     private String sourceOrderCode;
+
+    /** 送货地址 */
+    @Excel(name = "送货地址")
+    private String deliveryAddress;
 
     /** 关联工单ID */
     private Long workorderId;
@@ -162,6 +170,26 @@ public class PurOrder extends BaseEntity
     public String getOrderName() 
     {
         return orderName;
+    }
+
+    public String getDocTitle()
+    {
+        return docTitle;
+    }
+
+    public void setDocTitle(String docTitle)
+    {
+        this.docTitle = docTitle;
+    }
+
+    public String getDeliveryAddress()
+    {
+        return deliveryAddress;
+    }
+
+    public void setDeliveryAddress(String deliveryAddress)
+    {
+        this.deliveryAddress = deliveryAddress;
     }
 
     public void setVendorId(Long vendorId) 

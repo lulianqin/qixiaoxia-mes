@@ -16,6 +16,12 @@ public class WmOutsourceRecptLine extends BaseEntity
     private Long lineId;
     private Long factoryId;
     private Long orderId;
+    /** 对应加工单工序行ID（多工序按工序录入时使用） */
+    private Long processLineId;
+    /** 工序ID */
+    private Long processId;
+    /** 工序名称 */
+    private String processName;
     private Long itemId;
     private String itemCode;
     private String itemName;
@@ -49,6 +55,12 @@ public class WmOutsourceRecptLine extends BaseEntity
     public void setFactoryId(Long v) { this.factoryId = v; }
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long v) { this.orderId = v; }
+    public Long getProcessLineId() { return processLineId; }
+    public void setProcessLineId(Long v) { this.processLineId = v; }
+    public Long getProcessId() { return processId; }
+    public void setProcessId(Long v) { this.processId = v; }
+    public String getProcessName() { return processName; }
+    public void setProcessName(String v) { this.processName = v; }
     public Long getItemId() { return itemId; }
     public void setItemId(Long v) { this.itemId = v; }
     public String getItemCode() { return itemCode; }

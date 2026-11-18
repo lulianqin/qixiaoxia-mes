@@ -87,6 +87,9 @@ public class ProWorkorderController extends BaseController
     private IProWorkorderService proWorkorderService;
 
     @Autowired
+    private com.ruoyi.system.service.mes.pro.IProWorkorderFullService proWorkorderFullService;
+
+    @Autowired
     private IMdItemService mdItemService;
 
     @Autowired
@@ -333,6 +336,46 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
+     * 新增生产工单（独立开单页）：主工单 + BOM + 参数 + 工序调整 + 采购单/加工单草稿，一次事务提交
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:add')")
+    @Log(title = "生产工单(开单页)", businessType = BusinessType.INSERT)
+    @PostMapping("/createFull")
+    public AjaxResult createFull(
+            @RequestBody com.ruoyi.system.domain.mes.pro.WorkorderFullSubmitVO request)
+    {
+        ProWorkorder workorder = proWorkorderFullService.createFull(request);
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); }
+        catch (Exception e) { log.warn("自动排产失败: workorderId={}, error={}", workorder.getWorkorderId(), e.toString()); }
+        return success(workorder);
+    }
+
+    /**
+     * 修改生产工单（独立开单页）：重建工序快照与草稿单据
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @Log(title = "生产工单(开单页)", businessType = BusinessType.UPDATE)
+    @PutMapping("/updateFull/{workorderId}")
+    public AjaxResult updateFull(@PathVariable Long workorderId,
+            @RequestBody com.ruoyi.system.domain.mes.pro.WorkorderFullSubmitVO request)
+    {
+        ProWorkorder workorder = proWorkorderFullService.updateFull(workorderId, request);
+        try { scheduleService.scheduleWorkOrder(workorder.getWorkorderId()); }
+        catch (Exception e) { log.warn("自动排产失败: workorderId={}", e.getMessage()); }
+        return success(workorder);
+    }
+
+    /**
+     * 开单页回显：主工单 + BOM + 参数 + 工序 + 已生成采购单/加工单
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @GetMapping("/fullDetail/{workorderId}")
+    public AjaxResult fullDetail(@PathVariable Long workorderId)
+    {
+        return success(proWorkorderFullService.getFullDetail(workorderId));
+    }
+
+    /**
      * 偏离检测：比较提交的 BOM/参数 与 路线标准。
      * 纯计算，不持久化。前端据此弹窗询问用户是否创建变体。
      * 新增/编辑向导共用此接口，add 或 edit 权限任一即可（手工新增入口回收后，
@@ -489,15 +532,15 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
-     * 采购向导弹窗确认提交 — 接收用户勾选/修改后的物料行，按供应商分组生成采购单
+     * 采购向导弹窗确认提交 — 接收主表信息与用户勾选/修改后的物料行，按统一供应商生成一张采购单
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
     @Log(title = "采购向导生成采购单", businessType = BusinessType.INSERT)
     @PostMapping("/purOrderWizard/{workorderId}/submit")
     public AjaxResult submitPurOrderWizard(@PathVariable Long workorderId,
-            @RequestBody java.util.List<com.ruoyi.system.domain.mes.pro.PurOrderWizardLineVO> lines)
+            @RequestBody com.ruoyi.system.domain.mes.pro.PurOrderWizardSubmitVO body)
     {
-        return success(proWorkorderDocService.submitPurOrderWizard(workorderId, lines));
+        return success(proWorkorderDocService.submitPurOrderWizard(workorderId, body));
     }
 
     /**
@@ -922,6 +965,16 @@ public class ProWorkorderController extends BaseController
     {
         ProOutsourceWorkorderInfoVO info = proWorkorderService.getOutsourceInfoByCode(workorderCode);
         return success(info);
+    }
+
+    /**
+     * 新增加工单入口：按工单查询工艺路线全部工序（含厂内/外协）、BOM 发料行、扩展属性模板、已有加工单。
+     */
+    @PreAuthorize("@ss.hasAnyPermi('mes:pro:task:list,mes:wm:outsource:add')")
+    @GetMapping("/processInfo/{workorderId}")
+    public AjaxResult processInfo(@PathVariable Long workorderId)
+    {
+        return success(proWorkorderService.getProcessInfoByWorkorderId(workorderId));
     }
 
     /** 批量查询每个 task 的待审核(PREPARE)报工数，设置到 pendingFeedbackCount */

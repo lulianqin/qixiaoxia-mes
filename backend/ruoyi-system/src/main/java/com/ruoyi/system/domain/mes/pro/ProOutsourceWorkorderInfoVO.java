@@ -3,6 +3,8 @@ package com.ruoyi.system.domain.mes.pro;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr;
+
 /**
  * 工单外协发料信息 VO — App 端"外协按工单发料"入口：扫码/输工单号后，
  * 一次返回该工单所有外协工序(is_outsource=1)及其 BOM 发料行、默认厂商、
@@ -30,13 +32,18 @@ public class ProOutsourceWorkorderInfoVO
 
     private List<OutsourceProcessItem> outsourceProcesses;
 
-    /** 外协工序节点：含默认厂商、已有外协单、该工序 BOM 发料行 */
+    /** 工艺路线全部工序（新增加工单入口；含厂内/外协） */
+    private List<OutsourceProcessItem> processes;
+
+    /** 加工单工序节点：含默认厂商、已有外协单、该工序 BOM 发料行 */
     public static class OutsourceProcessItem
     {
         private Long processId;
         private String processCode;
         private String processName;
         private Integer orderNum;
+        /** 是否外协工序(1-是,0-否) */
+        private String isOutsource;
         private Long vendorId;
         private String vendorCode;
         private String vendorName;
@@ -48,6 +55,9 @@ public class ProOutsourceWorkorderInfoVO
 
         private List<OutsourceBomLine> bomLines;
 
+        /** 工序扩展属性模板（按工序配置，新增加工单逐工序填写） */
+        private List<WmOutsourceProcessAttr> attrSchema;
+
         public Long getProcessId() { return processId; }
         public void setProcessId(Long v) { this.processId = v; }
         public String getProcessCode() { return processCode; }
@@ -56,6 +66,8 @@ public class ProOutsourceWorkorderInfoVO
         public void setProcessName(String v) { this.processName = v; }
         public Integer getOrderNum() { return orderNum; }
         public void setOrderNum(Integer v) { this.orderNum = v; }
+        public String getIsOutsource() { return isOutsource; }
+        public void setIsOutsource(String v) { this.isOutsource = v; }
         public Long getVendorId() { return vendorId; }
         public void setVendorId(Long v) { this.vendorId = v; }
         public String getVendorCode() { return vendorCode; }
@@ -70,6 +82,8 @@ public class ProOutsourceWorkorderInfoVO
         public void setExistingStatus(String v) { this.existingStatus = v; }
         public List<OutsourceBomLine> getBomLines() { return bomLines; }
         public void setBomLines(List<OutsourceBomLine> v) { this.bomLines = v; }
+        public List<WmOutsourceProcessAttr> getAttrSchema() { return attrSchema; }
+        public void setAttrSchema(List<WmOutsourceProcessAttr> v) { this.attrSchema = v; }
     }
 
     /** BOM 发料行（数量取预计总用量 totalQuantity，为空回退单位用量 quantity） */
@@ -125,4 +139,6 @@ public class ProOutsourceWorkorderInfoVO
     public void setActiveCardId(Long v) { this.activeCardId = v; }
     public List<OutsourceProcessItem> getOutsourceProcesses() { return outsourceProcesses; }
     public void setOutsourceProcesses(List<OutsourceProcessItem> v) { this.outsourceProcesses = v; }
+    public List<OutsourceProcessItem> getProcesses() { return processes; }
+    public void setProcesses(List<OutsourceProcessItem> v) { this.processes = v; }
 }

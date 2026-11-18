@@ -55,7 +55,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMdClientAllEnabled" resultMap="MdClientResult">
         <include refid="selectMdClientVo"/>
-        where enable_flag = 'Y'
+        where enable_flag = '1'
     </select>
 
     <select id="checkClientCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdClient" resultMap="MdClientResult">

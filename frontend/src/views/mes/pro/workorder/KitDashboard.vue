@@ -30,7 +30,7 @@
       >
         仅生成领料单
       </el-button>
-      <el-button @click="handleGeneratePurOrder" :loading="genLoading" :disabled="!canGenPurOrder">
+      <el-button @click="handleGeneratePurOrder" :loading="genLoading">
         仅生成采购单
       </el-button>
       <el-tooltip content="需已报工审核后自动或手动触发" :disabled="isCompleted">
@@ -379,8 +379,6 @@ const receiptStatusLabel = computed(() => {
   if (rec?.recommended) return `可入库：${rec.qualifiedQty}`
   return '暂无'
 })
-
-const canGenPurOrder = computed(() => dashboard.value?.hasPurchaseRecommend)
 
 // 「仅生成领料单」禁用条件：无物料需求 或 已存在领料单（齐套时也允许生成）
 const issueDisabled = computed(() => {

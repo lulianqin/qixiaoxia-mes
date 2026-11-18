@@ -13,7 +13,9 @@ import java.util.List;
  */
 public class OutsourceRequest
 {
-    /** 外协厂商ID（必填） */
+    /** 加工类型：INSIDE-厂内 / OUTSIDE-外协 */
+    private String supplierType = "OUTSIDE";
+    /** 外协厂商ID（OUTSIDE 时必填） */
     private Long vendorId;
     private String vendorCode;
     private String vendorName;
@@ -35,14 +37,32 @@ public class OutsourceRequest
     /** 来源业务单ID（如 slitting_record.slit_id） */
     private Long sourceRefId;
 
+    /** 单据标题（如 印刷加工单/后道加工单） */
+    private String docTitle;
+    /** 下单日期 */
+    private java.util.Date orderDate;
+    /** 交货日期 */
+    private java.util.Date expectedDate;
+    /** 申购人 */
+    private String purchaser;
+    /** 业务单号（客户订单号） */
+    private String sourceOrderCode;
+    /** 送货地址 */
+    private String deliveryAddress;
+
     /** 发料行（必填，至少一行） */
     private List<WmOutsourceIssueLine> issueLines;
+
+    /** 工序明细行（多工序加工单；为空时按旧单工序流程处理） */
+    private List<WmOutsourceProcessLine> processLines;
 
     private String remark;
 
     /** 草稿模式：true=只建单不扣料（DRAFT），false=直接发料扣料（ISSUED） */
     private boolean draft = false;
 
+    public String getSupplierType() { return supplierType; }
+    public void setSupplierType(String v) { this.supplierType = v; }
     public Long getVendorId() { return vendorId; }
     public void setVendorId(Long v) { this.vendorId = v; }
     public String getVendorCode() { return vendorCode; }
@@ -67,8 +87,22 @@ public class OutsourceRequest
     public void setSourceType(String v) { this.sourceType = v; }
     public Long getSourceRefId() { return sourceRefId; }
     public void setSourceRefId(Long v) { this.sourceRefId = v; }
+    public String getDocTitle() { return docTitle; }
+    public void setDocTitle(String v) { this.docTitle = v; }
+    public java.util.Date getOrderDate() { return orderDate; }
+    public void setOrderDate(java.util.Date v) { this.orderDate = v; }
+    public java.util.Date getExpectedDate() { return expectedDate; }
+    public void setExpectedDate(java.util.Date v) { this.expectedDate = v; }
+    public String getPurchaser() { return purchaser; }
+    public void setPurchaser(String v) { this.purchaser = v; }
+    public String getSourceOrderCode() { return sourceOrderCode; }
+    public void setSourceOrderCode(String v) { this.sourceOrderCode = v; }
+    public String getDeliveryAddress() { return deliveryAddress; }
+    public void setDeliveryAddress(String v) { this.deliveryAddress = v; }
     public List<WmOutsourceIssueLine> getIssueLines() { return issueLines; }
     public void setIssueLines(List<WmOutsourceIssueLine> v) { this.issueLines = v; }
+    public List<WmOutsourceProcessLine> getProcessLines() { return processLines; }
+    public void setProcessLines(List<WmOutsourceProcessLine> v) { this.processLines = v; }
     public String getRemark() { return remark; }
     public void setRemark(String v) { this.remark = v; }
     public boolean isDraft() { return draft; }

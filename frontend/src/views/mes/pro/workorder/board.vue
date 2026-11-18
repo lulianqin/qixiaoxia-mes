@@ -33,37 +33,16 @@
         </el-descriptions>
       </el-card>
 
-      <!-- 工序任务 -->
+      <!-- 工序进度（融合进度弹窗：计划/实际时间、完成率、延期） -->
       <el-card shadow="never" class="mb16">
-        <template #header><span>工序进度（{{ tasks.length }}）</span></template>
-        <el-table :data="tasks" size="small" border @row-click="goProcess">
-          <el-table-column label="序" align="center" type="index" width="50" />
-          <el-table-column label="工序名称" align="center" prop="processName" min-width="120" :show-overflow-tooltip="true">
-            <template #default="s">
-              <el-button link type="primary" @click.stop="goProcess(s.row)">{{ s.row.processName || '-' }}</el-button>
-              <el-tag v-if="s.row.isOutsource === '1'" size="small" type="warning" class="ml8">外协</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" align="center" width="90">
-            <template #default="s"><el-tag :type="taskTagType(s.row)" size="small">{{ taskStatusText(s.row) }}</el-tag></template>
-          </el-table-column>
-          <el-table-column label="负责人" align="center" prop="leaderNick" width="90" :show-overflow-tooltip="true"><template #default="s">{{ s.row.leaderNick || '-' }}</template></el-table-column>
-          <el-table-column label="报工人" align="center" prop="workerNick" width="90" :show-overflow-tooltip="true"><template #default="s">{{ s.row.workerNick || '-' }}</template></el-table-column>
-          <el-table-column label="排产" align="center" prop="quantity" width="80"  :show-overflow-tooltip="true" />
-          <el-table-column label="已产" align="center" prop="quantityProduced" width="80"  :show-overflow-tooltip="true" />
-          <el-table-column label="合格" align="center" prop="quantityQualified" width="80"  :show-overflow-tooltip="true" />
-          <el-table-column label="不合格" align="center" prop="quantityUnqualified" width="80"  :show-overflow-tooltip="true" />
-          <el-table-column label="上机" align="center" width="110"><template #default="s">{{ fmtTime(s.row.startTime) }}</template></el-table-column>
-          <el-table-column label="完工" align="center" width="110"><template #default="s">{{ fmtTime(s.row.finishDate) }}</template></el-table-column>
-          <el-table-column label="操作" align="center" width="230" fixed="right">
-            <template #default="s">
-              <el-button v-if="canStartTask(s.row)" link type="primary" size="small" @click.stop="quickStatus(s.row,'START')" v-hasPermi="['mes:pro:task:edit']">开工</el-button>
-              <el-button v-if="s.row.status==='PRODUCING'" link type="warning" size="small" @click.stop="quickStatus(s.row,'PAUSE')" v-hasPermi="['mes:pro:task:edit']">停止</el-button>
-              <el-button v-if="s.row.status!=='COMPLETED' && s.row.status!=='CANCEL'" link type="success" size="small" @click.stop="quickStatus(s.row,'COMPLETE')" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
-              <el-button link type="primary" size="small" @click.stop="goProcess(s.row)">工序看板</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <template #header>
+          <div class="card-head">
+            <span>工序进度（{{ tasks.length }}）</span>
+            <el-button link type="primary" icon="Plus" size="small" @click="goAddTask" v-hasPermi="['mes:pro:task:add']">新增任务</el-button>
+          </div>
+        </template>
+        <WorkorderProcessProgress :rows="tasks"
+          @edit="openTaskEdit" @report="goFeedback" @action="quickStatus" @process-board="goProcess" @qrcode="openCardQr" />
       </el-card>
 
       <!-- 关联单据汇总 -->
@@ -159,7 +138,10 @@
     </div>
 
     <PurOrderWizard v-model="purWizOpen" :workorder-id="workorderId" @refresh="load" />
-    <OutsourceCreateDialog ref="outsourceRef" @success="load" />
+    <OutsourceOrderCreateDialog v-model="outsourceOpen" :workorder-id="workorderId" @success="load" />
+    <TaskQuickEditDialog ref="taskEditRef" v-model="taskEditOpen" @success="load" />
+    <CardQrDialog v-model="qrOpen" :workorder-id="workorderId" />
+    <ExceptionCreateDialog ref="exceptionRef" @success="load" />
   </div>
 </template>
 
@@ -167,9 +149,14 @@
 import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getWorkorderBoard } from '@/api/mes/pro/workorder'
-import { quickTaskStatus } from '@/api/mes/pro/task'
+import { getWorkorderProgress } from '@/api/mes/pro/progress'
+import { quickTaskStatus, dispatchTask, cancelTask } from '@/api/mes/pro/task'
 import PurOrderWizard from './PurOrderWizard.vue'
-import OutsourceCreateDialog from '@/views/mes/wm/outsource/OutsourceCreateDialog.vue'
+import OutsourceOrderCreateDialog from '@/views/mes/wm/outsource/OutsourceOrderCreateDialog.vue'
+import WorkorderProcessProgress from './components/WorkorderProcessProgress.vue'
+import TaskQuickEditDialog from './components/TaskQuickEditDialog.vue'
+import CardQrDialog from './components/CardQrDialog.vue'
+import ExceptionCreateDialog from '../exception/components/ExceptionCreateDialog.vue'
 
 const { proxy } = getCurrentInstance() as any
 const { mes_wm_issue_status } = proxy.useDict('mes_wm_issue_status')
@@ -184,11 +171,14 @@ const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, purchase: {
 const activeDims = ref<string[]>([])
 const activeDim = ref('')
 const purWizOpen = ref(false)
-const outsourceRef = ref()
+const outsourceOpen = ref(false)
+const taskEditOpen = ref(false)
+const taskEditRef = ref()
+const qrOpen = ref(false)
+const exceptionRef = ref()
 
 const WO_STATUS = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
 const WO_TAG = { PREPARE: 'info', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'danger', CLOSED: 'info' }
-const TASK_STATUS = { NORMAL: '未开工', PREPARE: '未开工', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 const FB_STATUS = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
 
 const woStatusText = computed(() => WO_STATUS[wo.value.status] || wo.value.status || '')
@@ -208,49 +198,64 @@ const dimCards = computed(() => [
   { key: 'productRecpt', label: '入库', total: dims.value.productRecpt.total ?? 0 },
 ])
 
-function taskStatusText(t: any) { return t.qcBlocked ? '不可开工' : (TASK_STATUS[t.status] || t.status || '') }
-function taskTagType(t: any) { if (t.qcBlocked) return 'error'; return ({ COMPLETED: 'success', PRODUCING: 'warning', PAUSED: 'info', CANCEL: 'error' })[t.status] || 'info' }
-function canStartTask(t: any) { return ['NORMAL', 'PREPARE', 'PAUSED'].includes(t.status) }
 /** 工序快捷状态（弱流程记录，不校验机台/负责人/质检） */
 function quickStatus(t: any, action: string) {
-  const label = ({ START: '开工', PAUSE: '停止', COMPLETE: '完成' } as Record<string, string>)[action]
-  const run = () => quickTaskStatus(t.taskId, action).then(() => {
-    proxy.$modal.msgSuccess(label + '成功')
-    load()
-  }).catch(() => {})
+  if (action === 'EXCEPTION') {
+    exceptionRef.value?.open(t)
+    return
+  }
+  const label = ({ START: '开工', PAUSE: '停止', COMPLETE: '完成', DISPATCH: '下发', CANCEL: '取消' } as Record<string, string>)[action]
+  const run = () => {
+    const req = action === 'DISPATCH' ? dispatchTask(t.taskId)
+      : action === 'CANCEL' ? cancelTask(t.taskId)
+      : quickTaskStatus(t.taskId, action)
+    req.then(() => {
+      proxy.$modal.msgSuccess(label + '成功')
+      load()
+    }).catch(() => {})
+  }
   if (action === 'START') run()
   else proxy.$modal.confirm(`确认${label}工序「${t.processName || ''}」？`).then(run).catch(() => {})
 }
 function fbStatusText(s: string) { return FB_STATUS[s] || s || '-' }
 function fbTagType(s: string) { return ({ AUDITED: 'success', CONFIRMED: 'warning', PREPARE: 'info' })[s] || 'info' }
 function fmtDate(v?: string) { return v ? proxy.parseTime(v, '{y}-{m}-{d}') : '-' }
-function fmtTime(v?: string) { return v ? proxy.parseTime(v, '{m}-{d} {h}:{i}') : '-' }
 function goBack() { router.push('/mes/pro/workorder') }
 function goProcess(t: any) { router.push({ path: '/mes/pro/process_board', query: { taskId: t.taskId } }) }
-function openOutsource() {
-  outsourceRef.value?.openWithWorkorder({
-    workorderId: workorderId.value,
-    workorderCode: wo.value.workorderCode,
-    routeId: wo.value.routeId
-  })
+function openOutsource() { outsourceOpen.value = true }
+function openTaskEdit(row: any) { taskEditRef.value?.open(row.taskId) }
+function openCardQr() { qrOpen.value = true }
+/** 跳转排产任务页并预填当前工单，新增工序任务 */
+function goAddTask() { router.push({ path: '/mes/pro/task', query: { add: '1', workorderId: String(workorderId.value) } }) }
+/** 跳转报工页并自动带入该工序任务 */
+function goFeedback(row: any) {
+  router.push({ path: '/mes/pro/feedback', query: { add: '1', taskId: row.taskId } })
 }
 
 function load() {
   if (!workorderId.value) return
   loading.value = true
-  getWorkorderBoard(workorderId.value).then(r => {
-    if (r.data) {
-      wo.value = r.data.workorder || {}
-      tasks.value = r.data.tasks || []
-      dims.value = {
-        feedback: r.data.feedback || {},
-        inspection: r.data.inspection || {},
-        outsource: r.data.outsource || {},
-        purchase: r.data.purchase || {},
-        issue: r.data.issue || {},
-        itemRecpt: r.data.itemRecpt || {},
-        productRecpt: r.data.productRecpt || {},
-      }
+  Promise.all([
+    getWorkorderBoard(workorderId.value),
+    getWorkorderProgress(workorderId.value).catch(() => null)
+  ]).then(([r, p]) => {
+    if (!r.data) return
+    wo.value = r.data.workorder || {}
+    // 合并进度数据（计划/实际时间、完成率、延期），按 taskId 对齐
+    const progressByTask = new Map<number, any>()
+    ;((p as any)?.data?.processes || []).forEach((row: any) => progressByTask.set(row.taskId, row))
+    tasks.value = (r.data.tasks || []).map((t: any) => {
+      const pr = progressByTask.get(t.taskId)
+      return pr ? { ...t, ...pr } : t
+    })
+    dims.value = {
+      feedback: r.data.feedback || {},
+      inspection: r.data.inspection || {},
+      outsource: r.data.outsource || {},
+      purchase: r.data.purchase || {},
+      issue: r.data.issue || {},
+      itemRecpt: r.data.itemRecpt || {},
+      productRecpt: r.data.productRecpt || {},
     }
   }).finally(() => { loading.value = false })
 }
@@ -265,6 +270,7 @@ load()
 .mt16 { margin-top: 16px; }
 .ml8 { margin-left: 8px; }
 .header-title { font-weight: bold; font-size: 16px; margin-right: 8px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; }
 .dim-card { text-align: center; cursor: pointer; border-left: 3px solid #ebeef5; }
 .dim-card.active { border-left-color: #409eff; }
 .dim-num { font-size: 26px; font-weight: bold; color: #1f2d3d; }
