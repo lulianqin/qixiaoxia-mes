@@ -1,5 +1,8 @@
 package com.ruoyi.system.domain.mes.pro;
 
+import java.math.BigDecimal;
+import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -307,6 +310,26 @@ public class ProRouteProcess extends BaseEntity
     {
         return outsourceFactoryId;
     }
+
+    // ---- 开单页工序配置（非路线主数据字段，仅工单开单时携带） ----
+    /** 开单类型：PROCESS-加工 / PURCHASE-采购 */
+    private String docType;
+    /** 计划数量 */
+    private BigDecimal planQty;
+    /** 工序单价 */
+    private BigDecimal unitPrice;
+    /** 送货日期 */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date expectedDate;
+
+    public String getDocType() { return docType; }
+    public void setDocType(String v) { this.docType = v; }
+    public BigDecimal getPlanQty() { return planQty; }
+    public void setPlanQty(BigDecimal v) { this.planQty = v; }
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal v) { this.unitPrice = v; }
+    public Date getExpectedDate() { return expectedDate; }
+    public void setExpectedDate(Date v) { this.expectedDate = v; }
 
     @Override
     public String toString() {

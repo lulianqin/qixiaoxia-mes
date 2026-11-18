@@ -118,7 +118,7 @@
           <el-row :gutter="12">
             <el-col :span="24">
               <el-form-item label="产品图片">
-                <image-upload v-model="form.productImage" :limit="1" :disabled="readonly" />
+                <image-upload v-model="form.productImage" :limit="1" :disabled="readonly" class="img-100" />
                 <span class="tip">导出采购单/加工单时作为单据底部图片</span>
               </el-form-item>
             </el-col>
@@ -129,14 +129,19 @@
             </el-col>
           </el-row>
 
-          <el-divider content-position="left">产品属性</el-divider>
-          <ExtAttrForm ref="extAttrRef" :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCT" />
-          <el-divider content-position="left">生产属性</el-divider>
-          <ExtAttrForm :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCTION" />
+          <template v-if="productAttrs.length">
+            <el-divider content-position="left">产品属性</el-divider>
+            <ExtAttrForm ref="extAttrRef" :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCT" :columns="3" sortable />
+          </template>
+          <template v-if="productionAttrs.length">
+            <el-divider content-position="left">生产属性</el-divider>
+            <ExtAttrForm :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCTION" :columns="3" sortable />
+          </template>
         </el-form>
 
-        <el-divider content-position="left">工艺路线与工序</el-divider>
-        <WorkorderRouteEditor v-model="routeProcesses" :process-options="processOptions" :readonly="readonly" />
+        <el-divider content-position="left">工艺路线与工序（开单配置）</el-divider>
+        <WorkorderRouteEditor v-model="routeProcesses" :process-options="processOptions"
+          :config="routeConfig" :default-qty="form.quantity" :readonly="readonly" />
       </el-tab-pane>
 
       <el-tab-pane name="docs">
@@ -144,6 +149,10 @@
           单据配置
           <el-badge v-if="docCount" :value="docCount" class="doc-badge" />
         </template>
+        <div class="doc-toolbar" v-if="!readonly">
+          <el-button type="primary" icon="MagicStick" @click="generateDocs">根据配置生成单据</el-button>
+          <span class="tip">按「开单类型 + 供应商」自动合并生成，生成后仍可手动调整</span>
+        </div>
         <WorkorderDocPanel v-model:purchase-docs="purchaseDocs" v-model:process-docs="processDocs"
           :process-options="routeProcesses" :readonly="readonly" />
       </el-tab-pane>
@@ -163,12 +172,15 @@ import {
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
+import { listRouteProductBomByRouteId } from '@/api/mes/pro/routeproductbom'
+import { listBom } from '@/api/mes/md/bom'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { listUser } from '@/api/system/user'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
 import { getDicts } from '@/api/system/dict/data'
+import useUserStore from '@/store/modules/user'
 import ItemSelect from '@/components/itemSelect/single.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import WorkorderRouteEditor from './components/WorkorderRouteEditor.vue'
@@ -199,6 +211,13 @@ const routeProductId = ref<number | null>(null)
 
 const purchaseDocs = ref<any[]>([])
 const processDocs = ref<any[]>([])
+const bomRows = ref<any[]>([])
+const routeConfig = reactive<any>({ productName: '', deliveryAddress: '', orderDate: today(), purchaser: '' })
+
+function today() {
+  const d = new Date()
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
 
 const form = reactive<any>({
   workorderCode: null, workorderName: null, workorderType: 'SELF', orderSource: 'MANUAL',
@@ -221,12 +240,16 @@ const readonly = computed(() => mode.value === 'view')
 const pageTitle = computed(() => (mode.value === 'add' ? '新增生产工单' : mode.value === 'edit' ? '编辑生产工单' : '查看生产工单'))
 const productLabel = computed(() => (form.productName ? `${form.productName} (${form.productCode || ''})` : ''))
 const docCount = computed(() => purchaseDocs.value.length + processDocs.value.length)
+/** 按属性域拆分，未配置则不展示对应版块 */
+const productAttrs = computed(() => (attrSchema.value || []).filter((a: any) => (a.attrScope || 'PRODUCT') === 'PRODUCT'))
+const productionAttrs = computed(() => (attrSchema.value || []).filter((a: any) => a.attrScope === 'PRODUCTION'))
 
 onMounted(() => {
   const id = route.query.workorderId ? Number(route.query.workorderId) : null
   mode.value = (route.query.mode as any) || (id ? 'edit' : 'add')
   workorderId.value = id
   loadProcessOptions()
+  routeConfig.purchaser = useUserStore().name || ''
   getDicts('mes_sal_order_type').then((r: any) => { orderTypeOptions.value = r.data || [] })
   searchOwners('')
   if (id) loadDetail(id)
@@ -262,6 +285,9 @@ function loadDetail(id: number) {
     if (!form.lineAttrs) form.lineAttrs = {}
     routeProductId.value = form.routeProductId
     routeProcesses.value = d.routeProcesses || []
+    bomRows.value = d.bomList || []
+    routeConfig.productName = form.productName || ''
+    routeConfig.orderDate = today()
     loadSchema(form.productId)
     onProductSelected({
       itemId: form.productId, itemCode: form.productCode, itemName: form.productName,
@@ -282,6 +308,7 @@ function onProductSelected(row: any, keepRoute = false) {
   form.productId = row.itemId
   form.productCode = row.itemCode
   form.productName = row.itemName
+  routeConfig.productName = row.itemName
   form.productSpc = row.specification
   form.unitOfMeasure = row.unitOfMeasure
   form.unitName = row.unitName
@@ -305,24 +332,73 @@ function loadSchema(productId: number) {
 }
 
 function loadRoutes(itemId: number) {
-  listRouteProduct({ itemId, pageSize: 100 }).then((r: any) => {
-    const rows = r.rows || []
-    if (!rows.length) return
-    listRoute({ pageSize: 1000 }).then((rr: any) => {
-      const map: Record<string, string> = {}
-      ;(rr.rows || []).forEach((rt: any) => { map[rt.routeId] = rt.routeName || rt.routeCode })
-      routeOptions.value = rows.map((rp: any) => ({ ...rp, _routeName: map[rp.routeId] }))
-    })
+  Promise.all([
+    listRouteProduct({ itemId, pageSize: 100 }),
+    listRoute({ pageSize: 1000 })
+  ]).then(([rpRes, rtRes]: any[]) => {
+    const map: Record<string, string> = {}
+    ;(rtRes.rows || []).forEach((rt: any) => { map[rt.routeId] = rt.routeName || rt.routeCode })
+    const bound = (rpRes.rows || []).map((rp: any) => ({ ...rp, _routeName: map[rp.routeId] }))
+    if (bound.length) {
+      routeOptions.value = bound
+      return
+    }
+    // 产品未绑定工艺路线：允许选择现有任意路线，保存时后端自动建立绑定
+    routeOptions.value = (rtRes.rows || []).map((rt: any) => ({
+      recordId: -rt.routeId, routeId: rt.routeId, itemId, itemName: '',
+      _routeName: map[rt.routeId] || ('路线#' + rt.routeId), __unbound: true
+    }))
   })
 }
 
 function onRouteChange(recordId: number) {
   const rp = routeOptions.value.find((r: any) => r.recordId === recordId)
   if (!rp) return
-  form.routeProductId = recordId
+  routeProductId.value = rp.__unbound ? null : recordId
+  form.routeProductId = rp.__unbound ? null : recordId
   listRouteProcessByRouteId(rp.routeId).then((res: any) => {
     const list = res.data || []
-    routeProcesses.value = list.map((p: any, i: number) => ({ ...p, orderNum: i + 1 }))
+    routeProcesses.value = list.map((p: any, i: number) => ({
+      ...p, routeId: rp.routeId, orderNum: i + 1, docType: 'PROCESS',
+      planQty: form.quantity || 0, unitPrice: 0, expectedDate: routeConfig.orderDate
+    }))
+    loadBomRows(rp.routeId, form.productId)
+  })
+}
+
+function getProcessName(pid: number) {
+  const p = processOptions.value.find((i: any) => i.processId === pid) || routeProcesses.value.find((i: any) => i.processId === pid)
+  return p ? p.processName : pid
+}
+
+/** 加载路线BOM + 产品BOM，作为工单物料明细提交 */
+function loadBomRows(routeId: number, itemId: number) {
+  if (!routeId || !itemId) return
+  const pids = new Set(routeProcesses.value.map((p: any) => p.processId))
+  Promise.all([
+    listRouteProductBomByRouteId(routeId),
+    listBom({ itemId, pageSize: 999 })
+  ]).then(([rb, pb]: any[]) => {
+    const rows = (rb.data || [])
+      .filter((b: any) => b.productId === itemId && pids.has(b.processId))
+      .map((b: any) => ({
+        processId: b.processId, processName: getProcessName(b.processId),
+        itemId: b.itemId, itemCode: b.itemCode, itemName: b.itemName,
+        unitOfMeasure: b.unitOfMeasure, unitName: b.unitName,
+        itemOrProduct: b.itemOrProduct || 'RAW', quantityMode: 'PER_UNIT',
+        bomSource: 'PROCESS', scrapRate: b.scrapRate || 0, quantity: b.quantity || 0
+      }))
+    const existing = new Set(rows.map((r: any) => r.itemId))
+    const prod = (pb.rows || [])
+      .filter((p: any) => !existing.has(p.bomItemId))
+      .map((p: any) => ({
+        processId: null, processName: '产品级原料',
+        itemId: p.bomItemId, itemCode: p.bomItemCode, itemName: p.bomItemName,
+        unitOfMeasure: p.unitOfMeasure, unitName: p.unitName,
+        itemOrProduct: 'RAW', quantityMode: 'PER_UNIT', bomSource: 'PRODUCT',
+        scrapRate: p.scrapRate || 0, quantity: p.quantity || 0
+      }))
+    bomRows.value = [...rows, ...prod]
   })
 }
 
@@ -333,13 +409,61 @@ function searchOwners(kw: string) {
     .finally(() => { ownerLoading.value = false })
 }
 
+/** 根据工序配置生成单据：按「开单类型 + 供应商」合并 */
+function generateDocs() {
+  const rows = routeProcesses.value.filter((r: any) => r.vendorId)
+  if (!rows.length) {
+    ElMessage.warning('请先在工序配置中选择供应商')
+    return
+  }
+  const purGroups: Record<string, any[]> = {}
+  const procGroups: Record<string, any[]> = {}
+  rows.forEach((r: any) => {
+    const key = String(r.vendorId)
+    const group = r.docType === 'PURCHASE' ? purGroups : procGroups
+    group[key] = group[key] || []
+    // 同一供应商下按工序去重，避免重复点击生成重复明细
+    if (!group[key].some((x: any) => x.processId === r.processId)) group[key].push(r)
+  })
+  purchaseDocs.value = Object.entries(purGroups).map(([, rs]) => ({
+    docTitle: (rs[0].processName || '') + '采购单', vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
+    purchaseType: 'OTHER', orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '',
+    deliveryAddress: routeConfig.deliveryAddress, remark: '',
+    lines: rs.map((r: any) => ({
+      // 采购的是工序服务（非库存物料），用负数伪物料ID避免同一单据内物料重复校验
+      itemId: -Math.abs(Number(r.processId) || 1), itemCode: 'PROC-' + (r.processCode || r.processId),
+      itemName: r.processName,
+      productName: routeConfig.productName || form.productName, specification: '',
+      unitOfMeasure: form.unitOfMeasure, unitName: form.unitName,
+      quantity: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
+      processId: r.processId, processCode: r.processCode, processName: r.processName,
+      lineAttrs: {}, remark: ''
+    }))
+  }))
+  processDocs.value = Object.entries(procGroups).map(([, rs]) => ({
+    docTitle: (rs[0].processName || '') + '加工单',
+    supplierType: rs[0].isOutsource === '1' ? 'OUTSIDE' : (rs[0].vendorId ? 'OUTSIDE' : 'INSIDE'),
+    vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
+    orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '', deliveryAddress: routeConfig.deliveryAddress, remark: '',
+    lines: rs.map((r: any) => ({
+      processId: r.processId, processCode: r.processCode, processName: r.processName,
+      productName: routeConfig.productName || form.productName,
+      planQty: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
+      vendorId: r.vendorId, vendorCode: r.vendorCode, vendorName: r.vendorName,
+      extAttrs: {}, attrSchema: [], remark: ''
+    }))
+  }))
+  activeTab.value = 'docs'
+  ElMessage.success(`已生成采购单 ${purchaseDocs.value.length} 张、加工单 ${processDocs.value.length} 张`)
+}
+
 function submit() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
     if (!routeProcesses.value.length) { ElMessage.warning('请选择工艺路线或添加工序'); return }
     const payload = {
       workorder: { ...form, routeProductId: routeProductId.value || form.routeProductId },
-      bomList: [],
+      bomList: bomRows.value,
       paramList: [],
       routeProcesses: routeProcesses.value,
       purchaseDocs: purchaseDocs.value.map((d: any) => ({ ...d, lines: d.lines || [] })),
@@ -366,5 +490,9 @@ function goBack() { router.push({ path: '/mes/pro/workorder' }) }
 .page-title { font-size: 16px; font-weight: 600; }
 .tip { color: #909399; font-size: 12px; margin-left: 8px; }
 .doc-badge { margin-left: 6px; }
+.doc-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.img-100 :deep(.el-upload--picture-card),
+.img-100 :deep(.el-upload-list--picture-card .el-upload-list__item) { width: 100px !important; height: 100px !important; }
+.img-100 :deep(.el-upload--picture-card) { line-height: 100px; }
 :deep(.el-form-item__label) { padding-right: 16px !important; }
 </style>

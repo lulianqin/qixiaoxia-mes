@@ -25,10 +25,14 @@ public class ProWorkorderProcess extends BaseEntity
     private String processName;
     private Integer orderNum;
     private String isOutsource;
+    /** 开单类型：PROCESS-加工 / PURCHASE-采购 */
+    private String docType;
     private Long vendorId;
     private String vendorCode;
     private String vendorName;
     private BigDecimal unitPrice;
+    /** 计划数量 */
+    private BigDecimal planQty;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date expectedDate;
 
@@ -48,6 +52,8 @@ public class ProWorkorderProcess extends BaseEntity
     public void setOrderNum(Integer v) { this.orderNum = v; }
     public String getIsOutsource() { return isOutsource; }
     public void setIsOutsource(String v) { this.isOutsource = v; }
+    public String getDocType() { return docType; }
+    public void setDocType(String v) { this.docType = v; }
     public Long getVendorId() { return vendorId; }
     public void setVendorId(Long v) { this.vendorId = v; }
     public String getVendorCode() { return vendorCode; }
@@ -56,6 +62,8 @@ public class ProWorkorderProcess extends BaseEntity
     public void setVendorName(String v) { this.vendorName = v; }
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal v) { this.unitPrice = v; }
+    public BigDecimal getPlanQty() { return planQty; }
+    public void setPlanQty(BigDecimal v) { this.planQty = v; }
     public Date getExpectedDate() { return expectedDate; }
     public void setExpectedDate(Date v) { this.expectedDate = v; }
 }

@@ -19,9 +19,7 @@
       <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="单据标题">
-            <el-select v-model="form.docTitle" style="width:100%" filterable allow-create default-first-option>
-              <el-option v-for="t in titles" :key="t" :label="t" :value="t" />
-            </el-select>
+            <el-input v-model="form.docTitle" placeholder="如 印刷加工单" />
           </el-form-item>
         </el-col>
         <el-col :span="8">
@@ -59,15 +57,19 @@
       </el-row>
     </el-form>
 
-    <el-table :data="form.lines" size="small" border class="mt8">
+    <el-table :data="form.lines" size="small" border class="mt8" row-key="__key"
+      :expand-row-keys="expandedKeys" @expand-change="onExpandChange">
       <el-table-column type="expand" width="36">
         <template #default="{ row }">
           <div class="attr-wrap">
             <el-empty v-if="!row.attrSchema || !row.attrSchema.length" description="该工序未配置属性模板" :image-size="40" />
-            <el-form v-else label-width="110px" size="small" :disabled="readonly">
+            <el-form v-else label-width="120px" size="small" :disabled="readonly">
               <el-row :gutter="12">
                 <el-col v-for="a in row.attrSchema" :key="a.attrId" :span="8">
-                  <el-form-item :label="a.attrName">
+                  <el-form-item>
+                    <template #label>
+                      <span v-if="a.required === '1'" class="req">*</span>{{ a.attrName }}
+                    </template>
                     <el-input :model-value="attrVal(row, a)" @update:model-value="(v: string) => setAttr(row, a, v)"
                       :placeholder="a.attrType === 'NUMBER' ? '数字' : '请输入'" />
                   </el-form-item>
@@ -76,6 +78,9 @@
             </el-form>
           </div>
         </template>
+      </el-table-column>
+      <el-table-column label="产品名称" min-width="150">
+        <template #default="{ row }"><el-input v-model="row.productName" /></template>
       </el-table-column>
       <el-table-column label="工序" min-width="160">
         <template #default="{ row }">
@@ -93,13 +98,6 @@
       <el-table-column label="金额" width="100" align="right">
         <template #default="{ row }">{{ money(row.planQty, row.unitPrice) }}</template>
       </el-table-column>
-      <el-table-column label="供应商" width="170">
-        <template #default="{ row }">
-          <el-input v-model="row.vendorName" readonly placeholder="默认取单头">
-            <template #append><el-button icon="Search" @click="pickLineVendor(row)" /></template>
-          </el-input>
-        </template>
-      </el-table-column>
       <el-table-column label="送货日期" width="140">
         <template #default="{ row }">
           <el-date-picker v-model="row.expectedDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
@@ -113,23 +111,56 @@
     </el-table>
 
     <VendorSelect ref="vendorRef" @onSelected="onVendorSelected" />
-    <VendorSelect ref="lineVendorRef" @onSelected="onLineVendorSelected" />
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import VendorSelect from '@/components/vendorSelect/single.vue'
 import { getOutsourceProcessAttr } from '@/api/mes/wm/outsourceProcessAttr'
 
 const props = defineProps<{ modelValue: any; processOptions: any[]; readonly?: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: any): void; (e: 'remove'): void }>()
 
-const titles = ['印刷加工单', '后道加工单', '覆膜加工单', '制袋加工单', '模切加工单']
 const form = props.modelValue
 const vendorRef = ref()
-const lineVendorRef = ref()
-let currentLine: any = null
+/** 当前展开的明细行（受控，避免编辑属性后自动收起） */
+const expandedKeys = ref<string[]>([])
+let keySeq = 0
+
+function hasAttrValue(row: any) {
+  const attrs = row?.extAttrs || {}
+  return Object.values(attrs).some((v: any) => v !== null && v !== undefined && String(v).trim() !== '')
+}
+
+/** 为每行生成稳定 row-key，并加载工序属性模板（生成单据时也能直接看到属性） */
+function syncRows() {
+  const lines = props.modelValue?.lines || []
+  const autoExpand: string[] = []
+  lines.forEach((l: any) => {
+    if (!l.__key) l.__key = 'line-' + (++keySeq)
+    if (!l.attrSchema || !l.attrSchema.length) {
+      if (l.processId && !l.__schemaLoading) {
+        l.__schemaLoading = true
+        getOutsourceProcessAttr(l.processId)
+          .then((r: any) => { l.attrSchema = r.data || [] })
+          .catch(() => {})
+          .finally(() => { l.__schemaLoading = false })
+      }
+    }
+    if (hasAttrValue(l)) autoExpand.push(l.__key)
+  })
+  if (autoExpand.length) {
+    expandedKeys.value = Array.from(new Set([...expandedKeys.value, ...autoExpand]))
+  }
+}
+
+watch(() => props.modelValue?.lines, () => { syncRows() }, { immediate: true })
+
+function onExpandChange(_row: any, expanded: any) {
+  const rows = Array.isArray(expanded) ? expanded : [expanded]
+  expandedKeys.value = rows.filter(Boolean).map((r: any) => r.__key)
+}
 
 function onVendorSelected(row: any) {
   if (!row) return
@@ -144,18 +175,6 @@ function onVendorSelected(row: any) {
       l.vendorName = row.vendorName
     }
   })
-}
-
-function pickLineVendor(row: any) {
-  currentLine = row
-  lineVendorRef.value?.open()
-}
-
-function onLineVendorSelected(row: any) {
-  if (!row || !currentLine) return
-  currentLine.vendorId = row.vendorId
-  currentLine.vendorCode = row.vendorCode
-  currentLine.vendorName = row.vendorName
 }
 
 function onProcessChange(row: any) {
@@ -175,8 +194,7 @@ function onProcessChange(row: any) {
 }
 
 function attrVal(row: any, a: any) {
-  if (!row.extAttrs) row.extAttrs = {}
-  return row.extAttrs[a.attrCode] ?? ''
+  return row.extAttrs?.[a.attrCode] ?? ''
 }
 
 function setAttr(row: any, a: any, v: string) {
@@ -187,7 +205,7 @@ function setAttr(row: any, a: any, v: string) {
 function addLine() {
   form.lines = form.lines || []
   form.lines.push({
-    planQty: 0, unitPrice: 0, vendorId: form.vendorId, vendorCode: form.vendorCode,
+    productName: '', planQty: 0, unitPrice: 0, vendorId: form.vendorId, vendorCode: form.vendorCode,
     vendorName: form.vendorName, extAttrs: {}, attrSchema: []
   })
 }
@@ -204,5 +222,6 @@ function money(q: any, p: any) {
 .ml8 { margin-left: 8px; }
 .mt8 { margin-top: 8px; }
 .attr-wrap { padding: 8px 16px; background: #fafafa; }
+.req { color: #f56c6c; margin-right: 2px; }
 :deep(.el-form-item__label) { padding-right: 12px !important; }
 </style>

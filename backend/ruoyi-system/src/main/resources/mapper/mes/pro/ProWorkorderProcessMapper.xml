@@ -11,17 +11,19 @@
         <result property="processName" column="process_name" />
         <result property="orderNum" column="order_num" />
         <result property="isOutsource" column="is_outsource" />
+        <result property="docType" column="doc_type" />
         <result property="vendorId" column="vendor_id" />
         <result property="vendorCode" column="vendor_code" />
         <result property="vendorName" column="vendor_name" />
         <result property="unitPrice" column="unit_price" />
+        <result property="planQty" column="plan_qty" />
         <result property="expectedDate" column="expected_date" />
         <result property="remark" column="remark" />
     </resultMap>
 
     <select id="selectByWorkorderId" resultMap="ProWorkorderProcessResult">
         select record_id, factory_id, workorder_id, process_id, process_code, process_name, order_num,
-               is_outsource, vendor_id, vendor_code, vendor_name, unit_price, expected_date, remark
+               is_outsource, doc_type, vendor_id, vendor_code, vendor_name, unit_price, plan_qty, expected_date, remark
         from qxx_pro_workorder_process
         where workorder_id = #{workorderId} and factory_id = #{factoryId}
         order by order_num asc, record_id asc
@@ -34,12 +36,12 @@
     <insert id="insertBatch">
         insert into qxx_pro_workorder_process
             (workorder_id, process_id, process_code, process_name, order_num,
-             is_outsource, vendor_id, vendor_code, vendor_name, unit_price, expected_date, remark,
+             is_outsource, doc_type, vendor_id, vendor_code, vendor_name, unit_price, plan_qty, expected_date, remark,
              create_by, create_time)
         values
         <foreach collection="list" item="it" separator=",">
             (#{it.workorderId}, #{it.processId}, #{it.processCode}, #{it.processName}, #{it.orderNum},
-             #{it.isOutsource}, #{it.vendorId}, #{it.vendorCode}, #{it.vendorName}, #{it.unitPrice}, #{it.expectedDate}, #{it.remark},
+             #{it.isOutsource}, #{it.docType}, #{it.vendorId}, #{it.vendorCode}, #{it.vendorName}, #{it.unitPrice}, #{it.planQty}, #{it.expectedDate}, #{it.remark},
              #{it.createBy}, sysdate())
         </foreach>
     </insert>

@@ -54,6 +54,10 @@ public class PurOrderLine extends BaseEntity
     @Excel(name = "物料名称")
     private String itemName;
 
+    /** 产品名称快照（开单页配置，导出用） */
+    @Excel(name = "产品名称")
+    private String productName;
+
     /** 规格型号 */
     @Excel(name = "规格型号")
     private String specification;
@@ -235,6 +239,16 @@ public class PurOrderLine extends BaseEntity
     public String getItemName() 
     {
         return itemName;
+    }
+
+    public String getProductName()
+    {
+        return productName;
+    }
+
+    public void setProductName(String productName)
+    {
+        this.productName = productName;
     }
 
     public void setSpecification(String specification) 

@@ -112,7 +112,7 @@
     </el-dialog>
 
     <!-- 扩展属性配置对话框 -->
-    <el-dialog :title="'扩展属性配置 - ' + (attrBindRow?.itemTypeName || '')" v-model="attrBindOpen" width="680px" append-to-body>
+    <el-dialog :title="'扩展属性配置 - ' + (attrBindRow?.itemTypeName || '')" v-model="attrBindOpen" width="760px" append-to-body>
       <el-alert type="info" :closable="false" style="margin-bottom: 12px">
         为本分类勾选需要填写的扩展属性。父分类已绑定的属性子类会自动继承，通常只需在大类配置。
       </el-alert>
@@ -154,8 +154,17 @@
       </el-table>
       <div style="margin-top:12px">
         <span style="font-size:13px;color:#606266">添加已有属性：</span>
-        <el-select v-model="addAttrId" placeholder="选择后自动加入列表（记得点保存）" size="small" style="width:300px" filterable @change="addAttrToBind">
-          <el-option v-for="a in attrDefOptions" :key="a.attrId" :label="`${a.attrName}(${a.attrCode})`" :value="a.attrId" />
+        <el-select v-model="addAttrId" placeholder="选择后自动加入列表（记得点保存）" size="small"
+          style="width:420px" filterable @change="addAttrToBind">
+          <el-option v-for="a in attrDefOptions" :key="a.attrId" :value="a.attrId"
+            :label="`${a.attrName}(${a.attrCode})`">
+            <div class="attr-opt">
+              <span class="attr-opt-name">{{ a.attrName }}（{{ a.attrCode }}）</span>
+              <el-tag size="small" :type="a.attrScope === 'PRODUCTION' ? 'warning' : 'info'" class="ml6">
+                {{ a.attrScope === 'PRODUCTION' ? '生产属性' : '产品属性' }}
+              </el-tag>
+            </div>
+          </el-option>
         </el-select>
         <el-button type="success" plain size="small" style="margin-left:16px" @click="toggleNewAttrForm">{{ newAttrOpen ? '收起新建' : '+ 新建属性' }}</el-button>
       </div>
@@ -164,20 +173,20 @@
       <el-card v-if="newAttrOpen" shadow="never" style="margin-top:12px">
         <template #header><span style="font-weight:600">新建属性（提交后自动绑定到当前分类）</span></template>
         <el-form :model="newAttrForm" label-width="90px" size="small">
-          <el-row :gutter="12">
-            <el-col :span="10">
+          <el-row :gutter="16">
+            <el-col :span="12">
               <el-form-item label="属性编码" required>
                 <el-input v-model="newAttrForm.attrCode" placeholder="大写+下划线，如 PRESSURE" />
               </el-form-item>
             </el-col>
-            <el-col :span="10">
+            <el-col :span="12">
               <el-form-item label="属性名称" required>
                 <el-input v-model="newAttrForm.attrName" placeholder="如 抗压强度" />
               </el-form-item>
             </el-col>
           </el-row>
-          <el-row :gutter="12">
-            <el-col :span="6">
+          <el-row :gutter="16">
+            <el-col :span="12">
               <el-form-item label="属性域">
                 <el-select v-model="newAttrForm.attrScope" style="width:100%">
                   <el-option label="产品属性" value="PRODUCT" />
@@ -185,17 +194,19 @@
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="12">
               <el-form-item label="控件类型">
                 <el-select v-model="newAttrForm.widgetType" style="width:100%">
                   <el-option v-for="w in widgetOptions" :key="w.value" :label="w.label" :value="w.value" />
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="6">
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
               <el-form-item label="单位"><el-input v-model="newAttrForm.attrUnit" placeholder="如 MPa" /></el-form-item>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="12">
               <el-form-item label="必填"><el-switch v-model="newAttrForm.required" /></el-form-item>
             </el-col>
           </el-row>
@@ -530,4 +541,7 @@ getList()
 
 <style scoped>
 :deep(.el-form-item__label) { padding-right: 16px !important; }
+.attr-opt { display: flex; align-items: center; }
+.attr-opt-name { flex: 0 0 auto; }
+.ml6 { margin-left: 6px; }
 </style>

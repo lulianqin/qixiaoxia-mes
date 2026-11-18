@@ -138,22 +138,20 @@
 
     <el-table v-loading="loading" :data="orderList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="50" align="center" />
-<el-table-column label="ID" align="center" prop="orderId" :show-overflow-tooltip="true" />      <el-table-column label="单据编号" align="center" prop="orderCode" :show-overflow-tooltip="true" />
-	      <el-table-column label="单据名称" align="center" prop="orderName" :show-overflow-tooltip="true" />
-      
-      
-      <el-table-column label="供应商名称" align="center" prop="vendorName" :show-overflow-tooltip="true" />
+      <el-table-column label="单据编号" align="center" prop="orderCode" width="170" :show-overflow-tooltip="true" />
+      <el-table-column label="单据名称" align="center" prop="orderName" min-width="180" :show-overflow-tooltip="true" />
+      <el-table-column label="供应商名称" align="center" prop="vendorName" min-width="200" :show-overflow-tooltip="true" />
       <el-table-column label="采购类型" align="center" prop="purchaseType" width="100" :show-overflow-tooltip="true">
           <template #default="scope">
             <span><dict-tag :options="mes_purchase_type" :value="scope.row.purchaseType" /></span>
           </template>
         </el-table-column>
-      <el-table-column label="下单日期" align="center" prop="orderDate" width="180" :show-overflow-tooltip="true">
+      <el-table-column label="下单日期" align="center" prop="orderDate" width="110" class-name="nowrap-cell" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.orderDate, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="预计到货" align="center" prop="expectedDate" width="180" :show-overflow-tooltip="true">
+      <el-table-column label="预计到货" align="center" prop="expectedDate" width="110" class-name="nowrap-cell" :show-overflow-tooltip="true">
         <template #default="scope">
           <span>{{ parseTime(scope.row.expectedDate, '{y}-{m}-{d}') }}</span>
         </template>
@@ -777,6 +775,9 @@ export default {
 </script>
 
 <style scoped>
+:deep(.nowrap-cell .cell) {
+  white-space: nowrap;
+}
 .amt-sub {
   font-size: 11px;
   color: #909399;

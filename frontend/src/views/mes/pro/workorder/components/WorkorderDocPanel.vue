@@ -3,7 +3,6 @@
     <el-row :gutter="10" class="mb8" v-if="!readonly">
       <el-col :span="1.5"><el-button type="primary" plain icon="Plus" size="small" @click="addPurDoc">新增采购单</el-button></el-col>
       <el-col :span="1.5"><el-button type="warning" plain icon="Plus" size="small" @click="addProcDoc">新增加工单</el-button></el-col>
-      <el-col :span="1.5"><el-button type="success" plain icon="Connection" size="small" @click="mergeByVendor">按供应商合并</el-button></el-col>
       <el-col :span="12"><span class="tip">采购单可挂工序也可只挂工单；加工单每道工序可指定供应商与交期</span></el-col>
     </el-row>
 
@@ -92,24 +91,6 @@ function addProcDoc() { emit('update:processDocs', [...props.processDocs, emptyP
 function today() {
   const d = new Date()
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-}
-
-/** 按供应商合并：把同一供应商的加工单工序行并入第一张，删除多余单据 */
-function mergeByVendor() {
-  const groups: Record<string, any[]> = {}
-  ;(props.processDocs || []).forEach((d: any) => {
-    const key = d.supplierType === 'INSIDE' ? '__inside__' : String(d.vendorId)
-    ;(groups[key] = groups[key] || []).push(d)
-  })
-  const merged: any[] = []
-  Object.values(groups).forEach((docs) => {
-    const first = docs[0]
-    docs.slice(1).forEach((d) => {
-      ;(d.lines || []).forEach((l: any) => first.lines.push(l))
-    })
-    merged.push(first)
-  })
-  emit('update:processDocs', merged)
 }
 
 function doExport(row: any, format: 'excel' | 'pdf') {

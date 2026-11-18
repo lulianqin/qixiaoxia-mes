@@ -18,9 +18,7 @@
       <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="单据标题">
-            <el-select v-model="form.docTitle" style="width:100%" filterable allow-create default-first-option>
-              <el-option v-for="t in titles" :key="t" :label="t" :value="t" />
-            </el-select>
+            <el-input v-model="form.docTitle" placeholder="如 原材料采购单" />
           </el-form-item>
         </el-col>
         <el-col :span="8">
@@ -65,6 +63,9 @@
     </el-form>
 
     <el-table :data="form.lines" size="small" border class="mt8">
+      <el-table-column label="产品名称" min-width="150">
+        <template #default="{ row }"><el-input v-model="row.productName" /></template>
+      </el-table-column>
       <el-table-column label="物料" min-width="180">
         <template #default="{ row }">
           <el-input v-model="row.itemName" readonly placeholder="选择物料">
@@ -127,7 +128,6 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: any): void; (e: 'remove')
 const { proxy } = getCurrentInstance() as any
 const { mes_purchase_type } = proxy.useDict('mes_purchase_type')
 const purchaseTypes = mes_purchase_type
-const titles = ['纸张采购单', '绳子采购单', '包材采购单', '辅料采购单', '原材料采购单']
 
 const form = props.modelValue
 const vendorRef = ref()
@@ -164,7 +164,7 @@ function onProcessChange(row: any) {
 
 function addLine() {
   form.lines = form.lines || []
-  form.lines.push({ quantity: 1, unitPrice: 0, unitName: '个', lineAttrs: {} })
+  form.lines.push({ quantity: 1, unitPrice: 0, unitName: '个', productName: '', lineAttrs: {} })
 }
 
 function brandOf(row: any) {

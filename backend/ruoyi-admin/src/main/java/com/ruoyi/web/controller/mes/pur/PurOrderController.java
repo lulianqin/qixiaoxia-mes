@@ -269,7 +269,7 @@ public class PurOrderController extends BaseController
         for (com.ruoyi.system.domain.mes.pur.PurOrderLine l : detail.getLines())
         {
             java.util.List<String> row = new java.util.ArrayList<>();
-            row.add(productName);
+            row.add(l.getProductName() != null && !l.getProductName().isBlank() ? l.getProductName() : productName);
             row.add(l.getItemName());
             if (!rope)
             {

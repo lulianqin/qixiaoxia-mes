@@ -76,6 +76,7 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         {
             throw new ServiceException("工单信息不能为空");
         }
+        ensureRouteProductBinding(body.getWorkorder(), body.getRouteProcesses());
         ProWorkorder wo = workorderService.createWorkorderWithBom(
                 body.getWorkorder(), body.getBomList(), body.getParamList());
         saveRouteSnapshot(wo.getWorkorderId(), body.getRouteProcesses());
@@ -102,6 +103,7 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
             throw new ServiceException("仅待生产工单可修改");
         }
         body.getWorkorder().setWorkorderId(workorderId);
+        ensureRouteProductBinding(body.getWorkorder(), body.getRouteProcesses());
         ProWorkorder wo = workorderService.updateWorkorderWithBom(
                 body.getWorkorder(), body.getBomList(), body.getParamList());
         wo = workorderService.selectProWorkorderByWorkorderId(workorderId);
@@ -143,6 +145,54 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
 
     // ────────────────────────── 工序快照 ──────────────────────────
 
+    /**
+     * 产品未绑定该工艺路线时，按所选路线自动建立「路线-产品」绑定，
+     * 保证排产能解析 routeId；已绑定则直接回填 recordId。
+     */
+    private void ensureRouteProductBinding(ProWorkorder wo, List<ProRouteProcess> routeProcesses)
+    {
+        if (wo == null || wo.getProductId() == null || wo.getRouteProductId() != null)
+        {
+            return;
+        }
+        Long routeId = null;
+        if (routeProcesses != null)
+        {
+            for (ProRouteProcess rp : routeProcesses)
+            {
+                if (rp.getRouteId() != null)
+                {
+                    routeId = rp.getRouteId();
+                    break;
+                }
+            }
+        }
+        if (routeId == null)
+        {
+            return;
+        }
+        ProRouteProduct q = new ProRouteProduct();
+        q.setRouteId(routeId);
+        q.setItemId(wo.getProductId());
+        List<ProRouteProduct> exists = routeProductService.selectProRouteProductList(q);
+        if (exists != null && !exists.isEmpty())
+        {
+            wo.setRouteProductId(exists.get(0).getRecordId());
+            return;
+        }
+        ProRouteProduct binding = new ProRouteProduct();
+        binding.setRouteId(routeId);
+        binding.setItemId(wo.getProductId());
+        binding.setItemCode(wo.getProductCode());
+        binding.setItemName(wo.getProductName());
+        binding.setSpecification(wo.getProductSpc());
+        binding.setUnitOfMeasure(wo.getUnitOfMeasure());
+        binding.setUnitName(wo.getUnitName());
+        binding.setIsDefault("0");
+        routeProductService.insertProRouteProduct(binding);
+        wo.setRouteProductId(binding.getRecordId());
+    }
+
     private void saveRouteSnapshot(Long workorderId, List<ProRouteProcess> routeProcesses)
     {
         if (routeProcesses == null || routeProcesses.isEmpty())
@@ -167,9 +217,13 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
             p.setProcessName(rp.getProcessName());
             p.setOrderNum(seq++);
             p.setIsOutsource(rp.getIsOutsource() != null ? rp.getIsOutsource() : "0");
+            p.setDocType(rp.getDocType() != null ? rp.getDocType() : "PROCESS");
             p.setVendorId(rp.getVendorId());
             p.setVendorCode(rp.getVendorCode());
             p.setVendorName(rp.getVendorName());
+            p.setUnitPrice(rp.getUnitPrice());
+            p.setPlanQty(rp.getPlanQty());
+            p.setExpectedDate(rp.getExpectedDate());
             p.setCreateBy(operator);
             rows.add(p);
         }
@@ -187,9 +241,13 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         rp.setProcessName(p.getProcessName());
         rp.setOrderNum(p.getOrderNum());
         rp.setIsOutsource(p.getIsOutsource());
+        rp.setDocType(p.getDocType());
         rp.setVendorId(p.getVendorId());
         rp.setVendorCode(p.getVendorCode());
         rp.setVendorName(p.getVendorName());
+        rp.setUnitPrice(p.getUnitPrice());
+        rp.setPlanQty(p.getPlanQty());
+        rp.setExpectedDate(p.getExpectedDate());
         return rp;
     }
 
@@ -265,6 +323,7 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         line.setItemId(l.getItemId());
         line.setItemCode(l.getItemCode());
         line.setItemName(l.getItemName());
+        line.setProductName(l.getProductName());
         line.setSpecification(l.getSpecification());
         line.setUnitOfMeasure(StringUtils.isEmpty(l.getUnitOfMeasure()) ? "PCS" : l.getUnitOfMeasure());
         line.setUnitName(StringUtils.isEmpty(l.getUnitName()) ? "个" : l.getUnitName());
@@ -386,6 +445,7 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
             line.setProcessId(l.getProcessId());
             line.setProcessCode(l.getProcessCode());
             line.setProcessName(l.getProcessName());
+            line.setProductName(l.getProductName());
             BigDecimal qty = nvl(l.getPlanQty());
             BigDecimal price = nvl(l.getUnitPrice());
             line.setPlanQty(qty);

@@ -2241,8 +2241,20 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         if (bom.getTotalQuantity() == null && workorder.getQuantity() != null)
             bom.setTotalQuantity(mesQuantityService.calcTotalQty(bom, workorder.getQuantity()));
         if (bom.getTotalQuantity() != null)
-            bom.setTotalQuantity2(mesQuantityService.toBaseQty(
-                    bom.getTotalQuantity(), bom.getUnitOfMeasure(), item));
+        {
+            // 主数据单位换算缺失时不阻断建单：降级按业务单位数量快照，并记录告警
+            try
+            {
+                bom.setTotalQuantity2(mesQuantityService.toBaseQty(
+                        bom.getTotalQuantity(), bom.getUnitOfMeasure(), item));
+            }
+            catch (ServiceException e)
+            {
+                bom.setTotalQuantity2(bom.getTotalQuantity());
+                log.warn("工单BOM单位换算失败，按业务单位快照: workorderId={}, item={}, msg={}",
+                        workorder.getWorkorderId(), bom.getItemCode(), e.getMessage());
+            }
+        }
         proWorkorderBomService.insertProWorkorderBom(bom);
     }
 

@@ -27,6 +27,8 @@ public class WmOutsourceProcessLine extends BaseEntity
     private Long processId;
     private String processCode;
     private String processName;
+    /** 产品名称快照（开单页配置，导出用） */
+    private String productName;
     private BigDecimal planQty;
     private BigDecimal doneQty;
     /** 工序单价 */
@@ -62,6 +64,8 @@ public class WmOutsourceProcessLine extends BaseEntity
     public void setProcessCode(String v) { this.processCode = v; }
     public String getProcessName() { return processName; }
     public void setProcessName(String v) { this.processName = v; }
+    public String getProductName() { return productName; }
+    public void setProductName(String v) { this.productName = v; }
     public BigDecimal getPlanQty() { return planQty; }
     public void setPlanQty(BigDecimal v) { this.planQty = v; }
     public BigDecimal getDoneQty() { return doneQty; }

@@ -29,55 +29,62 @@
         </span>
       </div>
     </div>
-    <el-form v-else ref="formRef" :model="formData" label-width="120px" class="ext-attr-inner">
-      <el-form-item
-        v-for="item in renderList"
-        :key="item.attrCode"
-        :label="labelText(item)"
-        :prop="item.attrCode"
-        :rules="item.required === '1' ? [{ required: true, message: `${item.attrName}不能为空`, trigger: 'blur' }] : undefined"
-      >
-        <!-- 文本 -->
-        <el-input v-if="widgetOf(item) === 'TEXT'"
-          v-model="formData[item.attrCode!]" placeholder="请输入" clearable :disabled="item.readonly" />
-        <!-- 多行文本 -->
-        <el-input v-else-if="widgetOf(item) === 'TEXTAREA'"
-          v-model="formData[item.attrCode!]" type="textarea" :rows="3" placeholder="请输入" :disabled="item.readonly" />
-        <!-- 数字 -->
-        <el-input-number v-else-if="widgetOf(item) === 'NUMBER'"
-          v-model="formData[item.attrCode!]" :controls="false" style="width: 100%"
-          placeholder="请输入" :disabled="item.readonly" />
-        <!-- 单选 -->
-        <el-select v-else-if="widgetOf(item) === 'SELECT'"
-          v-model="formData[item.attrCode!]" placeholder="请选择" clearable :disabled="item.readonly" style="width: 100%">
-          <el-option v-for="opt in parseOptions(item.optionsJson)" :key="opt" :label="opt" :value="opt" />
-        </el-select>
-        <!-- 多选 -->
-        <el-select v-else-if="widgetOf(item) === 'MULTI_SELECT'"
-          v-model="formData[item.attrCode!]" placeholder="请选择" multiple clearable collapse-tags
-          :disabled="item.readonly" style="width: 100%">
-          <el-option v-for="opt in parseOptions(item.optionsJson)" :key="opt" :label="opt" :value="opt" />
-        </el-select>
-        <!-- 开关 -->
-        <el-switch v-else-if="widgetOf(item) === 'BOOL'"
-          v-model="formData[item.attrCode!]" :disabled="item.readonly" />
-        <!-- 日期 -->
-        <el-date-picker v-else-if="widgetOf(item) === 'DATE'"
-          v-model="formData[item.attrCode!]" type="date" value-format="YYYY-MM-DD"
-          placeholder="请选择" :disabled="item.readonly" style="width: 100%" />
-        <!-- 图片 -->
-        <image-upload v-else-if="widgetOf(item) === 'IMAGE'"
-          v-model="formData[item.attrCode!]" :limit="1" :disabled="item.readonly" />
-        <!-- 附件 -->
-        <file-upload v-else-if="widgetOf(item) === 'FILE'"
-          v-model="formData[item.attrCode!]" :limit="5" :disabled="item.readonly" />
-      </el-form-item>
+    <el-form v-else ref="formRef" :model="formData" label-width="120px" class="ext-attr-inner" :class="{ 'is-grid': columns > 1 }">
+      <el-row :gutter="12">
+        <el-col v-for="(item, idx) in renderList" :key="item.attrCode" :span="colSpan">
+          <el-form-item
+            :label="labelText(item)"
+            :prop="item.attrCode"
+            :rules="item.required === '1' ? [{ required: true, message: `${item.attrName}不能为空`, trigger: 'blur' }] : undefined"
+          >
+            <template #label v-if="sortable && !readonly">
+              <span class="drag-handle" draggable="true" title="拖动排序"
+                @dragstart="onDragStart(idx)" @dragover.prevent @drop="onDrop(idx)">⋮⋮</span>
+              <span class="lbl-text">{{ labelText(item) }}</span>
+            </template>
+            <!-- 文本 -->
+            <el-input v-if="widgetOf(item) === 'TEXT'"
+              v-model="formData[item.attrCode!]" placeholder="请输入" clearable :disabled="item.readonly" />
+            <!-- 多行文本 -->
+            <el-input v-else-if="widgetOf(item) === 'TEXTAREA'"
+              v-model="formData[item.attrCode!]" type="textarea" :rows="3" placeholder="请输入" :disabled="item.readonly" />
+            <!-- 数字 -->
+            <el-input-number v-else-if="widgetOf(item) === 'NUMBER'"
+              v-model="formData[item.attrCode!]" :controls="false" style="width: 100%"
+              placeholder="请输入" :disabled="item.readonly" />
+            <!-- 单选 -->
+            <el-select v-else-if="widgetOf(item) === 'SELECT'"
+              v-model="formData[item.attrCode!]" placeholder="请选择" clearable :disabled="item.readonly" style="width: 100%">
+              <el-option v-for="opt in parseOptions(item.optionsJson)" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+            <!-- 多选 -->
+            <el-select v-else-if="widgetOf(item) === 'MULTI_SELECT'"
+              v-model="formData[item.attrCode!]" placeholder="请选择" multiple clearable collapse-tags
+              :disabled="item.readonly" style="width: 100%">
+              <el-option v-for="opt in parseOptions(item.optionsJson)" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+            <!-- 开关 -->
+            <el-switch v-else-if="widgetOf(item) === 'BOOL'"
+              v-model="formData[item.attrCode!]" :disabled="item.readonly" />
+            <!-- 日期 -->
+            <el-date-picker v-else-if="widgetOf(item) === 'DATE'"
+              v-model="formData[item.attrCode!]" type="date" value-format="YYYY-MM-DD"
+              placeholder="请选择" :disabled="item.readonly" style="width: 100%" />
+            <!-- 图片 -->
+            <image-upload v-else-if="widgetOf(item) === 'IMAGE'"
+              v-model="formData[item.attrCode!]" :limit="1" :disabled="item.readonly" />
+            <!-- 附件 -->
+            <file-upload v-else-if="widgetOf(item) === 'FILE'"
+              v-model="formData[item.attrCode!]" :limit="5" :disabled="item.readonly" />
+          </el-form-item>
+        </el-col>
+      </el-row>
     </el-form>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, watch, ref } from 'vue'
 import type { MdItemTypeAttr } from '@/types/api/mes/md/attr'
 
 /** 游离历史值（schema 中已删除但 lineAttrs 里残留的 key）的哨兵标记 */
@@ -93,6 +100,10 @@ const props = defineProps<{
   scope?: 'PRODUCT' | 'PRODUCTION'
   /** 只读展示形态：不渲染输入控件，按文本/图片/附件展示 */
   plain?: boolean
+  /** 每行列数（默认 1，开单页传 3） */
+  columns?: number
+  /** 是否允许拖动排序 */
+  sortable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -101,6 +112,30 @@ const emit = defineEmits<{
 
 // 内部可编辑数据副本
 const formData = reactive<Record<string, any>>({})
+
+/** 每列栅格宽度：3 列 = 8 */
+const colSpan = computed(() => Math.floor(24 / Math.max(1, props.columns || 1)))
+
+/** 属性展示顺序（拖动排序时维护；默认按 schema 顺序） */
+const orderKeys = ref<string[]>([])
+
+watch(() => props.schema, (list: any[]) => {
+  const keys = (list || []).map((s: any) => s.attrCode).filter(Boolean) as string[]
+  const kept = orderKeys.value.filter((k: string) => keys.includes(k))
+  const added = keys.filter((k: string) => !kept.includes(k))
+  orderKeys.value = [...kept, ...added]
+}, { immediate: true })
+
+let dragIdx: number | null = null
+function onDragStart(idx: number) { dragIdx = idx }
+function onDrop(idx: number) {
+  if (dragIdx === null || dragIdx === idx) return
+  const arr = [...orderKeys.value]
+  const [moved] = arr.splice(dragIdx, 1)
+  arr.splice(idx, 0, moved)
+  orderKeys.value = arr
+  dragIdx = null
+}
 
 /** 合并 schema 属性 + modelValue 中游离的历史 key（降级只读展示） */
 const renderList = computed<(MdItemTypeAttr & { readonly?: boolean })[]>(() => {
@@ -122,6 +157,12 @@ const renderList = computed<(MdItemTypeAttr & { readonly?: boolean })[]>(() => {
         })
       }
     }
+  }
+  if (orderKeys.value.length) {
+    const pos = new Map<string, number>(
+      orderKeys.value.map((k: string, i: number) => [k, i] as [string, number])
+    )
+    list.sort((a: any, b: any) => (pos.get(a.attrCode!) ?? 9999) - (pos.get(b.attrCode!) ?? 9999))
   }
   return list
 })
@@ -196,6 +237,12 @@ defineExpose({ validate })
 <style scoped>
 .ext-attr-form { width: 100%; }
 .ext-attr-inner { max-width: 600px; }
+.ext-attr-inner.is-grid { max-width: 100%; }
+/* 文本/数字控件统一左对齐 */
+.ext-attr-inner :deep(.el-input__inner),
+.ext-attr-inner :deep(.el-textarea__inner) { text-align: left; }
+.drag-handle { cursor: move; color: #c0c4cc; margin-right: 4px; font-size: 12px; user-select: none; }
+.lbl-text { white-space: nowrap; }
 .ext-attr-plain { border: 1px solid #ebeef5; border-radius: 4px; overflow: hidden; }
 .ext-attr-plain-row { display: flex; border-bottom: 1px solid #ebeef5; font-size: 13px; }
 .ext-attr-plain-row:last-child { border-bottom: none; }

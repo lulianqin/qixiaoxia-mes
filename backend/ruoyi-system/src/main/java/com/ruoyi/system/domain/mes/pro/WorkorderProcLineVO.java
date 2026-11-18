@@ -14,6 +14,8 @@ public class WorkorderProcLineVO
     private Long processId;
     private String processCode;
     private String processName;
+    /** 产品名称（导出第一列，可编辑） */
+    private String productName;
     private BigDecimal planQty;
     private BigDecimal unitPrice;
     private String expectedDate;
@@ -30,6 +32,8 @@ public class WorkorderProcLineVO
     public void setProcessCode(String v) { this.processCode = v; }
     public String getProcessName() { return processName; }
     public void setProcessName(String v) { this.processName = v; }
+    public String getProductName() { return productName; }
+    public void setProductName(String v) { this.productName = v; }
     public BigDecimal getPlanQty() { return planQty; }
     public void setPlanQty(BigDecimal v) { this.planQty = v; }
     public BigDecimal getUnitPrice() { return unitPrice; }

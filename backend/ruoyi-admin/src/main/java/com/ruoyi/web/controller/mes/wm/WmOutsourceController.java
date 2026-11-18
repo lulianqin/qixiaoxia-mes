@@ -233,7 +233,7 @@ public class WmOutsourceController extends BaseController
             java.util.Map<String, Object> attrs =
                     com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.parseAttrs(l.getExtAttrs());
             java.util.List<String> row = new java.util.ArrayList<>();
-            row.add(pname);
+            row.add(l.getProductName() != null && !l.getProductName().isBlank() ? l.getProductName() : pname);
             row.add(l.getProcessName());
             row.add(psize);
             row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getPlanQty()));

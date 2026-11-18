@@ -14,6 +14,8 @@ public class WorkorderPurLineVO
     private Long itemId;
     private String itemCode;
     private String itemName;
+    /** 产品名称（导出第一列，可编辑） */
+    private String productName;
     private String specification;
     private String unitOfMeasure;
     private String unitName;
@@ -35,6 +37,8 @@ public class WorkorderPurLineVO
     public void setItemCode(String v) { this.itemCode = v; }
     public String getItemName() { return itemName; }
     public void setItemName(String v) { this.itemName = v; }
+    public String getProductName() { return productName; }
+    public void setProductName(String v) { this.productName = v; }
     public String getSpecification() { return specification; }
     public void setSpecification(String v) { this.specification = v; }
     public String getUnitOfMeasure() { return unitOfMeasure; }

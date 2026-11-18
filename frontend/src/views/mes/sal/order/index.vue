@@ -42,10 +42,10 @@
       <el-table-column label="销售订单号" align="center" prop="orderCode" width="140" :show-overflow-tooltip="true">
         <template #default="s"><el-link type="primary" @click="handleView(s.row)">{{ s.row.orderCode }}</el-link></template>
       </el-table-column>
-      <el-table-column label="订单名称" align="center" prop="orderName" :show-overflow-tooltip="true" />
+      <el-table-column label="订单名称" align="center" prop="orderName" min-width="200" :show-overflow-tooltip="true" />
       <el-table-column label="订单类型" align="center" prop="orderType" width="90"><template #default="s"><el-tag :type="orderTypeMeta(s.row.orderType).type" size="small">{{ orderTypeMeta(s.row.orderType).text }}</el-tag></template></el-table-column>
-      <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" />
-      <el-table-column label="客户PO号" align="center" prop="clientOrderCode" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="客户" align="center" prop="clientName" min-width="200" :show-overflow-tooltip="true" />
+      <el-table-column label="客户PO号" align="center" prop="clientOrderCode" min-width="160" :show-overflow-tooltip="true" />
       <el-table-column label="业务线" align="center" prop="businessLine" width="80" :show-overflow-tooltip="true"><template #default="s">{{ businessLineText(s.row.businessLine) }}</template></el-table-column>
       <el-table-column label="来源" align="center" prop="source" width="90"><template #default="s"><el-tag :type="sourceTag(s.row.source)">{{ sourceText(s.row.source) }}</el-tag></template></el-table-column>
       <el-table-column label="ERP单号" align="center" prop="externalOrderNo" width="150" :show-overflow-tooltip="true" />

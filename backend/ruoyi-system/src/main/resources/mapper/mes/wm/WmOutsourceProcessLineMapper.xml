@@ -14,6 +14,7 @@
         <result property="processId" column="process_id" />
         <result property="processCode" column="process_code" />
         <result property="processName" column="process_name" />
+        <result property="productName" column="product_name" />
         <result property="planQty" column="plan_qty" />
         <result property="doneQty" column="done_qty" />
         <result property="unitPrice" column="unit_price" />
@@ -25,7 +26,7 @@
 
     <select id="selectByOrderId" resultMap="WmOutsourceProcessLineResult">
         select line_id, factory_id, order_id, seq, task_id, vendor_id, vendor_code, vendor_name,
-               process_id, process_code, process_name, plan_qty, done_qty,
+               process_id, process_code, process_name, product_name, plan_qty, done_qty,
                unit_price, amount, expected_date, ext_attrs, remark
         from qxx_wm_outsource_process_line
         where order_id = #{orderId}
@@ -39,12 +40,12 @@
     <insert id="insertBatch">
         insert into qxx_wm_outsource_process_line
             (order_id, seq, task_id, vendor_id, vendor_code, vendor_name,
-             process_id, process_code, process_name, plan_qty, done_qty,
+             process_id, process_code, process_name, product_name, plan_qty, done_qty,
              unit_price, amount, expected_date, ext_attrs, remark, create_by, create_time)
         values
         <foreach collection="list" item="it" separator=",">
             (#{it.orderId}, #{it.seq}, #{it.taskId}, #{it.vendorId}, #{it.vendorCode}, #{it.vendorName},
-             #{it.processId}, #{it.processCode}, #{it.processName}, #{it.planQty}, #{it.doneQty},
+             #{it.processId}, #{it.processCode}, #{it.processName}, #{it.productName}, #{it.planQty}, #{it.doneQty},
              #{it.unitPrice}, #{it.amount}, #{it.expectedDate}, #{it.extAttrs}, #{it.remark}, #{it.createBy}, sysdate())
         </foreach>
     </insert>
