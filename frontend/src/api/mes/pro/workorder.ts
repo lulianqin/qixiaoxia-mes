@@ -42,3 +42,8 @@ export function getFlowSheet(workorderId) { return request({ url: '/mes/pro/work
 export function exportFlowSheet(workorderId, qrDataUrl?) {
   return request({ url: '/mes/pro/workorder/flowSheet/export/' + workorderId, method: 'post', data: { qrDataUrl }, responseType: 'blob' })
 }
+
+// 保存生产流转单（独立权限 mes:pro:workorder:flowSheetSave，底层复用编辑工单逻辑）
+export function saveFlowSheet(workorderId: number, data: any) {
+  return request({ url: '/mes/pro/workorder/flowSheet/save/' + workorderId, method: 'put', data })
+}

@@ -67,9 +67,12 @@
       </el-table-column>
       <el-table-column label="库存数量" align="center" prop="quantityOnhand" width="100" sortable :show-overflow-tooltip="true" />
       <el-table-column label="可用库存" align="center" prop="quantityAvailable" width="100" sortable :show-overflow-tooltip="true" />
-      <el-table-column label="占用库存" align="center" width="100" sortable :sort-method="(a,b) => occupied(a) - occupied(b)">
+      <el-table-column label="锁定库存" align="center" prop="quantityLocked" width="110" sortable :show-overflow-tooltip="true">
         <template #default="scope">
-          <span :class="{ 'occu-pending': occupied(scope.row) > 0 }">{{ occupied(scope.row) }}</span>
+          <el-button v-if="Number(scope.row.quantityLocked) > 0" link type="primary" size="small" @click="openLockDetail(scope.row)">
+            {{ scope.row.quantityLocked }}
+          </el-button>
+          <span v-else>0</span>
         </template>
       </el-table-column>
       <el-table-column label="单位" align="center" prop="unitName" width="70" :show-overflow-tooltip="true" />
@@ -122,6 +125,26 @@
 
     <StockEditDialog v-model="editVisible" :row="editRow" :warehouse-options="warehouseOptions" @success="getList" />
     <StockImportDialog v-model="importVisible" :warehouse-options="warehouseOptions" @success="getList" />
+
+    <el-dialog v-model="lockVisible" title="锁定明细" width="900px" append-to-body>
+      <el-table v-loading="lockLoading" :data="lockRows" border size="small">
+        <el-table-column label="工单 / 出库单" min-width="170" :show-overflow-tooltip="true">
+          <template #default="scope">
+            {{ scope.row.workorderCode || scope.row.sourceDocCode || scope.row.workorderName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="领料单" prop="issueCode" width="150" :show-overflow-tooltip="true" />
+        <el-table-column label="物料" prop="itemName" min-width="150" :show-overflow-tooltip="true" />
+        <el-table-column label="需要" prop="demandQty" width="90" align="right" />
+        <el-table-column label="已锁定" prop="reservedQty" width="90" align="right" />
+        <el-table-column label="已消耗" prop="consumedQty" width="90" align="right" />
+        <el-table-column label="需求日期" prop="demandDate" width="170" :show-overflow-tooltip="true" />
+        <el-table-column label="状态" width="100">
+          <template #default="scope">{{ statusText(scope.row.status) }}</template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!lockLoading && lockRows.length === 0" description="暂无锁定明细" :image-size="60" />
+    </el-dialog>
   </div>
 </template>
 
@@ -131,6 +154,7 @@ import type { WmMaterialStockQueryParams, WmMaterialStock } from '@/types/api/me
 import type { WmWarehouse } from '@/types/api/mes/wm/warehouse'
 import type { TreeSelect } from '@/types'
 import { listWmMaterialStock, delWmMaterialStock } from '@/api/mes/wm/material_stock'
+import { listStockReservation } from '@/api/mes/wm/stockReservation'
 import { listAllWmWarehouse } from '@/api/mes/wm/warehouse'
 import { treeselect } from '@/api/mes/md/itemtype'
 import { listAttrDef } from '@/api/mes/md/attr'
@@ -153,6 +177,30 @@ const total = ref(0)
 const editVisible = ref(false)
 const editRow = ref<WmMaterialStock | null>(null)
 const importVisible = ref(false)
+const lockVisible = ref(false)
+const lockLoading = ref(false)
+const lockRows = ref<any[]>([])
+
+function statusText(status?: string) {
+  const map: Record<string, string> = {
+    OPEN: '待预占',
+    PARTIAL: '部分预占',
+    RESERVED: '已预占',
+    TRANSFERRED: '已转领料',
+    CONSUMED: '已消耗',
+    RELEASED: '已释放'
+  }
+  return status ? (map[status] || status) : '-'
+}
+
+function openLockDetail(row: WmMaterialStock) {
+  lockVisible.value = true
+  lockLoading.value = true
+  lockRows.value = []
+  listStockReservation({ materialStockId: row.materialStockId, pageNum: 1, pageSize: 200 })
+    .then((r: any) => { lockRows.value = r.rows || [] })
+    .finally(() => { lockLoading.value = false })
+}
 
 const data = reactive({
   queryParams: { pageNum: 1, pageSize: 10 } as WmMaterialStockQueryParams

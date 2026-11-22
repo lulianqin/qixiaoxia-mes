@@ -33,17 +33,12 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <el-tabs v-model="activeTab" class="prog-tabs" @tab-change="onTabChange">
+      <el-tabs v-model="activeTab" class="prog-tabs">
         <el-tab-pane label="工序进度" name="process">
           <ProcessProgressTable :rows="detail?.processes || []" />
         </el-tab-pane>
         <el-tab-pane label="流转卡(子工单)" name="card">
           <CardSuborderTable :rows="detail?.cards || []" />
-        </el-tab-pane>
-        <el-tab-pane label="甘特图（实际叠加）" name="gantt">
-          <div v-loading="ganttLoading" class="gantt-wrap">
-            <GanttChart ref="ganttRef" :tasks="ganttTasks" :readonly="true" :loading="ganttLoading" />
-          </div>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -55,11 +50,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { parseTime } from '@/utils/ruoyi'
-import GanttChart from '@/components/GanttChart/index.vue'
-import { getWorkorderProgress, getWorkorderGanttReadonly } from '@/api/mes/pro/progress'
+import { getWorkorderProgress } from '@/api/mes/pro/progress'
 import { WORKORDER_STATUS_OPTIONS, delayText, delayType } from '@/utils/mes/progress'
 import ProcessProgressTable from './ProcessProgressTable.vue'
 import CardSuborderTable from './CardSuborderTable.vue'
@@ -75,9 +69,6 @@ const visible = computed({
 
 const loading = ref(false)
 const detail = ref<any>(null)
-const ganttTasks = ref<any[]>([])
-const ganttLoading = ref(false)
-const ganttRef = ref()
 const activeTab = ref('process')
 let reqSeq = 0
 
@@ -94,31 +85,15 @@ watch(
 async function loadAll(id: number) {
   const seq = ++reqSeq
   loading.value = true
-  ganttLoading.value = true
   detail.value = null
-  ganttTasks.value = []
   try {
-    const [progRes, ganttRes] = await Promise.all([
-      getWorkorderProgress(id).catch(() => null),
-      getWorkorderGanttReadonly(id).catch(() => null)
-    ])
+    const progRes = await getWorkorderProgress(id).catch(() => null)
     if (seq !== reqSeq) return
     detail.value = progRes?.data || null
-    ganttTasks.value = ganttRes?.data?.tasks || []
-    await nextTick()
-    ganttRef.value?.fitToData()
   } finally {
     if (seq === reqSeq) {
       loading.value = false
-      ganttLoading.value = false
     }
-  }
-}
-
-async function onTabChange(name: string | number) {
-  if (name === 'gantt') {
-    await nextTick()
-    ganttRef.value?.fitToData()
   }
 }
 
@@ -140,5 +115,4 @@ function fmtDateTime(v: any): string {
 <style scoped>
 .wo-head { margin-bottom: 12px; }
 .prog-tabs { margin-top: 4px; }
-.gantt-wrap { min-height: 500px; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px; }
 </style>

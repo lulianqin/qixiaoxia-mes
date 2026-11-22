@@ -14,7 +14,7 @@
       </div>
     </template>
 
-    <el-form :model="form" label-width="90px" size="small" :disabled="readonly">
+    <el-form :model="form" label-width="90px" :disabled="readonly">
       <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="单据标题">

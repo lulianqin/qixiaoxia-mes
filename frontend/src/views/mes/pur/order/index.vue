@@ -127,11 +127,16 @@
         <el-button
           type="warning"
           plain
-          
           size="small"
           @click="handleExport"
           v-hasPermi="['mes:pur:order:export']"
         >导出</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="info" plain size="small" @click="handleDocExport" v-hasPermi="['mes:pur:order:export']">单据导出</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="info" plain size="small" @click="handleDocPrint" v-hasPermi="['mes:pur:order:export']">单据打印</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -188,11 +193,11 @@
           </template>
         </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-      <el-table-column fixed="right" label="操作" align="center" width="320" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="220" class-name="op-col">
         <template #default="scope">
-          <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['mes:pur:order:query']"></el-button></el-tooltip>
-          <el-tooltip content="修改" placement="top" v-if="['DRAFT','APPROVED'].includes(scope.row.status)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']"></el-button></el-tooltip>
-          <el-tooltip content="删除" placement="top"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']"></el-button></el-tooltip>
+          <el-button link type="primary" size="small" @click="handleView(scope.row)" v-hasPermi="['mes:pur:order:query']">查看</el-button>
+          <el-button v-if="['DRAFT','APPROVED'].includes(scope.row.status)" link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pur:order:edit']">修改</el-button>
+          <el-button link type="danger" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:pur:order:remove']">删除</el-button>
           <el-button v-if="scope.row.status === 'DRAFT'" link type="success" size="small" @click="handleApprove(scope.row)" v-hasPermi="['mes:pur:order:approve']">审批</el-button>
           <el-button v-if="scope.row.status === 'APPROVED'" link type="warning" size="small" @click="handleOrder(scope.row)" v-hasPermi="['mes:pur:order:order']">下单</el-button>
           <el-button v-if="['APPROVED','ORDERED'].includes(scope.row.status)" link type="warning" size="small" @click="handleReject(scope.row)" v-hasPermi="['mes:pur:order:approve']">驳回</el-button>
@@ -200,7 +205,7 @@
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="info" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:pur:order:close']">关闭</el-button>
           <el-button v-if="['RECEIVED','RECEIVING'].includes(scope.row.status)" link type="danger" size="small" @click="handleReturn(scope.row)" v-hasPermi="['mes:pur:order:return']">退货</el-button>
           <el-dropdown @command="cmd => handleChangeStatus(scope.row, cmd)" v-hasPermi="['mes:pur:order:changeStatus']">
-            <el-button link type="primary" size="small">改状态<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+            <el-button link type="primary" size="small">改状态</el-button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item v-for="d in mes_order_status" :key="d.value" :command="d.value"
@@ -367,6 +372,8 @@
 
 <script>
 import { listOrder, getOrder, delOrder, addOrder, updateOrder, approveOrder, orderOrder, closeOrder, cancelOrder, rejectOrder, changePurOrderStatus } from "@/api/mes/pur/order"
+import { exportPurDocExcel, fetchPurDocPdf, exportPurDocsMergeExcel, fetchPurDocsMergePdf } from "@/api/mes/pro/workorderFull"
+import { printPdfBlob } from "@/utils/pdfPrint"
 import { listAllOrder } from "@/api/mes/sal/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import { listAllVendor } from "@/api/mes/md/vendor"
@@ -750,6 +757,39 @@ export default {
       today.setHours(0, 0, 0, 0)
       return new Date(row.expectedDate) < today
     },
+    /** 单据导出：选 1 张导单张，多选要求同一供应商则合并 */
+    handleDocExport() {
+      const rows = this.selectedOrders()
+      if (!rows.length) return this.$modal.msgWarning('请选择采购单')
+      if (rows.length === 1) {
+        const r = rows[0]
+        return exportPurDocExcel(r.orderId, `${r.vendorName || ''}_${r.docTitle || r.orderName || '采购单'}_${r.orderCode}.xlsx`)
+      }
+      if (new Set(rows.map(r => r.vendorId)).size > 1) return this.$modal.msgWarning('合并导出要求选择同一供应商的单据')
+      exportPurDocsMergeExcel(rows.map(r => r.orderId), `${rows[0].vendorName || ''}_合并采购单_${this.ymd()}.xlsx`)
+    },
+    /** 单据打印：单张/合并都直接调起系统打印 */
+    handleDocPrint() {
+      const rows = this.selectedOrders()
+      if (!rows.length) return this.$modal.msgWarning('请选择采购单')
+      if (rows.length > 1 && new Set(rows.map(r => r.vendorId)).size > 1) {
+        return this.$modal.msgWarning('合并打印要求选择同一供应商的单据')
+      }
+      const req = rows.length === 1
+        ? fetchPurDocPdf(rows[0].orderId)
+        : fetchPurDocsMergePdf(rows.map(r => r.orderId))
+      req.then(blob => printPdfBlob(blob)).catch(() => {})
+    },
+    /** 当天 yyyyMMdd，用于合并单据文件名 */
+    ymd() {
+      const d = new Date()
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+    },
+    /** 当前勾选的行 */
+    selectedOrders() {
+      const ids = this.ids || []
+      return (this.orderList || []).filter(o => ids.includes(o.orderId))
+    },
     /** 导出按钮操作 */
     handleExport() {
       this.download('mes/pur/order/export', {
@@ -787,4 +827,9 @@ export default {
 .cancel-text {
   color: #f56c6c;
 }
+/* 操作列：纯中文按钮、两行排布、紧凑间距 */
+:deep(.op-col .cell) { white-space: normal; line-height: 24px; }
+:deep(.op-col .el-button) { padding: 0 3px !important; height: 24px; font-size: 12px; }
+:deep(.op-col .el-button + .el-button) { margin-left: 4px; }
+:deep(.op-col .el-dropdown) { margin-left: 4px; }
 </style>

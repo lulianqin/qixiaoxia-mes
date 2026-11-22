@@ -15,37 +15,68 @@ export function getWorkorderFullDetail(workorderId: number) {
   return request({ url: '/mes/pro/workorder/fullDetail/' + workorderId, method: 'get' })
 }
 
+// 复制工单模板：清空单号/状态/执行数据，微调后走 createFull 保存为新工单
+export function getWorkorderCopyTemplate(workorderId: number) {
+  return request({ url: '/mes/pro/workorder/copyTemplate/' + workorderId, method: 'get' })
+}
+
 // ─────────── 单据导出 / 打印 ───────────
 
-function download(url: string, data: any, filename: string) {
-  return request({ url, method: 'post', data, responseType: 'blob' }).then((blob: any) => {
-    const href = URL.createObjectURL(new Blob([blob]))
-    const a = document.createElement('a')
-    a.href = href
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(href)
-  })
+function fetchBlob(url: string, data: any) {
+  return request({ url, method: 'post', data, responseType: 'blob' })
 }
 
-/** 单张采购单导出 Excel / PDF 打印 */
-export function exportPurDoc(orderId: number, format: 'excel' | 'pdf', orderCode = '') {
-  return download(`/mes/pur/order/doc/${orderId}/${format}`, {}, `采购单_${orderCode || orderId}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+function saveBlob(blob: any, filename: string) {
+  const href = URL.createObjectURL(new Blob([blob]))
+  const a = document.createElement('a')
+  a.href = href
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(href)
 }
 
-/** 采购单合并导出（同供应商多单） */
-export function exportPurDocsMerge(orderIds: number[], format: 'excel' | 'pdf') {
-  return download(`/mes/pur/order/docMerge/${format}`, orderIds, `合并采购单.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+/** 单张采购单 Excel 导出 */
+export function exportPurDocExcel(orderId: number, filename = '') {
+  return fetchBlob(`/mes/pur/order/doc/${orderId}/excel`, {})
+    .then(b => saveBlob(b, filename || `采购单_${orderId}.xlsx`))
 }
 
-/** 单张加工单导出 Excel / PDF 打印 */
-export function exportProcessDoc(orderId: number, format: 'excel' | 'pdf', orderCode = '') {
-  return download(`/mes/wm/outsource/doc/${orderId}/${format}`, {}, `加工单_${orderCode || orderId}.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+/** 单张采购单 PDF（返回 blob，用于打印预览） */
+export function fetchPurDocPdf(orderId: number) {
+  return fetchBlob(`/mes/pur/order/doc/${orderId}/pdf`, {}) as Promise<Blob>
 }
 
-/** 加工单合并导出（同供应商多单） */
-export function exportProcessDocsMerge(orderIds: number[], format: 'excel' | 'pdf') {
-  return download(`/mes/wm/outsource/docMerge/${format}`, orderIds, `合并加工单.${format === 'excel' ? 'xlsx' : 'pdf'}`)
+/** 采购单合并导出 Excel（同供应商多单） */
+export function exportPurDocsMergeExcel(orderIds: number[], filename = '') {
+  return fetchBlob(`/mes/pur/order/docMerge/excel`, orderIds)
+    .then(b => saveBlob(b, filename || '合并采购单.xlsx'))
+}
+
+/** 采购单合并 PDF（返回 blob，用于打印预览） */
+export function fetchPurDocsMergePdf(orderIds: number[]) {
+  return fetchBlob(`/mes/pur/order/docMerge/pdf`, orderIds) as Promise<Blob>
+}
+
+/** 单张加工单 Excel 导出 */
+export function exportProcessDocExcel(orderId: number, filename = '') {
+  return fetchBlob(`/mes/wm/outsource/doc/${orderId}/excel`, {})
+    .then(b => saveBlob(b, filename || `加工单_${orderId}.xlsx`))
+}
+
+/** 单张加工单 PDF（返回 blob，用于打印预览） */
+export function fetchProcessDocPdf(orderId: number) {
+  return fetchBlob(`/mes/wm/outsource/doc/${orderId}/pdf`, {}) as Promise<Blob>
+}
+
+/** 加工单合并导出 Excel（同供应商多单） */
+export function exportProcessDocsMergeExcel(orderIds: number[], filename = '') {
+  return fetchBlob(`/mes/wm/outsource/docMerge/excel`, orderIds)
+    .then(b => saveBlob(b, filename || '合并加工单.xlsx'))
+}
+
+/** 加工单合并 PDF（返回 blob，用于打印预览） */
+export function fetchProcessDocsMergePdf(orderIds: number[]) {
+  return fetchBlob(`/mes/wm/outsource/docMerge/pdf`, orderIds) as Promise<Blob>
 }

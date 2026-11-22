@@ -18,8 +18,8 @@
           <el-row :gutter="12">
             <el-col :span="8">
               <el-form-item label="工单编码" prop="workorderCode">
-                <el-input v-model="form.workorderCode" placeholder="请输入" :disabled="mode !== 'add'">
-                  <template #append v-if="mode === 'add'">
+                <el-input v-model="form.workorderCode" placeholder="请输入" :disabled="mode === 'edit' || mode === 'view'">
+                  <template #append v-if="mode === 'add' || mode === 'copy'">
                     <el-switch v-model="autoGen" size="small" @change="onAutoGen" />
                   </template>
                 </el-input>
@@ -96,7 +96,14 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="来源销售订单">
-                <el-input v-model="form.sourceCode" readonly placeholder="自动带入" />
+                <el-input v-if="mode !== 'copy'" v-model="form.sourceCode" readonly placeholder="自动带入" />
+                <el-input v-else :model-value="sourceOrderLabel" readonly placeholder="点击选择销售订单行"
+                  style="cursor:pointer" @click="openOrderPicker">
+                  <template #append>
+                    <el-button icon="Search" @click.stop="openOrderPicker" />
+                    <el-button v-if="form.sourceCode || form.salesOrderLineId" icon="Close" @click.stop="clearOrderLink" />
+                  </template>
+                </el-input>
               </el-form-item>
             </el-col>
           </el-row>
@@ -159,6 +166,27 @@
     </el-tabs>
 
     <ItemSelect ref="itemRef" @onSelected="onProductSelected" />
+
+    <el-dialog title="选择销售订单明细行" v-model="orderPickerOpen" width="860px" append-to-body>
+      <el-alert title="默认展示当前来源订单及同产品明细行；可转数量为 0 的行不可选择" type="info" :closable="false" show-icon style="margin-bottom:12px" />
+      <el-form inline>
+        <el-form-item label="销售订单">
+          <el-select v-model="pickerOrderId" filterable remote clearable :remote-method="searchOrders" :loading="orderLoading"
+            placeholder="输入订单号搜索" style="width:360px" @change="onPickerOrderChange">
+            <el-option v-for="o in orderOptions" :key="o.orderId" :label="o.orderCode + ' — ' + (o.clientName || o.orderName || '')" :value="o.orderId" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <el-table :data="pickerLines" size="small" border highlight-current-row @row-click="pickOrderLine" style="cursor:pointer">
+        <el-table-column label="产品" prop="productName" min-width="160" :show-overflow-tooltip="true" />
+        <el-table-column label="订单数" prop="quantity" width="90" align="center" />
+        <el-table-column label="已转" prop="quantityProduced" width="90" align="center" />
+        <el-table-column label="可转" prop="quantityConvertible" width="90" align="center" />
+        <el-table-column label="交期" prop="requestDate" width="150" align="center" :show-overflow-tooltip="true" />
+      </el-table>
+      <el-empty v-if="pickerOrderId && !pickerLines.length" description="该订单暂无可转明细行" :image-size="60" />
+      <template #footer><el-button @click="orderPickerOpen = false">取 消</el-button></template>
+    </el-dialog>
   </div>
 </template>
 
@@ -167,8 +195,9 @@ import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  createWorkorderFull, updateWorkorderFull, getWorkorderFullDetail
+  createWorkorderFull, updateWorkorderFull, getWorkorderFullDetail, getWorkorderCopyTemplate
 } from '@/api/mes/pro/workorderFull'
+import { listOrder, getOrderDetail } from '@/api/mes/sal/order'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
@@ -190,7 +219,7 @@ const { proxy } = getCurrentInstance() as any
 const route = useRoute()
 const router = useRouter()
 
-const mode = ref<'add' | 'edit' | 'view'>('add')
+const mode = ref<'add' | 'edit' | 'view' | 'copy'>('add')
 const workorderId = ref<number | null>(null)
 const activeTab = ref('base')
 const submitting = ref(false)
@@ -212,11 +241,27 @@ const routeProductId = ref<number | null>(null)
 const purchaseDocs = ref<any[]>([])
 const processDocs = ref<any[]>([])
 const bomRows = ref<any[]>([])
+// 复制模式下选择目标销售订单行
+const orderPickerOpen = ref(false)
+const orderOptions = ref<any[]>([])
+const orderLoading = ref(false)
+const pickerOrderId = ref<number | null>(null)
+const pickerOrder = ref<any>(null)
+const pickerLines = ref<any[]>([])
+/** 当前工单已关联的来源订单，保证搜索时始终保留在候选中 */
+const currentSourceOrder = ref<any>(null)
 const routeConfig = reactive<any>({ productName: '', deliveryAddress: '', orderDate: today(), purchaser: '' })
 
 function today() {
   const d = new Date()
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
+
+/** 统一为 yyyy-MM-dd HH:mm:ss：销售明细行交期是 yyyy-MM-dd，工单需求日期要求带时分秒 */
+function normalizeDateTime(v: any): string | null {
+  if (!v) return null
+  const s = String(v)
+  return s.length === 10 ? s + ' 00:00:00' : s
 }
 
 const form = reactive<any>({
@@ -237,8 +282,16 @@ const rules = {
 }
 
 const readonly = computed(() => mode.value === 'view')
-const pageTitle = computed(() => (mode.value === 'add' ? '新增生产工单' : mode.value === 'edit' ? '编辑生产工单' : '查看生产工单'))
+const pageTitle = computed(() => {
+  if (mode.value === 'add') return '新增生产工单'
+  if (mode.value === 'copy') return '复制生产工单'
+  return mode.value === 'edit' ? '编辑生产工单' : '查看生产工单'
+})
 const productLabel = computed(() => (form.productName ? `${form.productName} (${form.productCode || ''})` : ''))
+const sourceOrderLabel = computed(() => {
+  if (!form.sourceCode) return ''
+  return form.salesOrderLineId ? `${form.sourceCode} · ${form.productName || ''}` : form.sourceCode
+})
 const docCount = computed(() => purchaseDocs.value.length + processDocs.value.length)
 /** 按属性域拆分，未配置则不展示对应版块 */
 const productAttrs = computed(() => (attrSchema.value || []).filter((a: any) => (a.attrScope || 'PRODUCT') === 'PRODUCT'))
@@ -246,15 +299,17 @@ const productionAttrs = computed(() => (attrSchema.value || []).filter((a: any) 
 
 onMounted(() => {
   const id = route.query.workorderId ? Number(route.query.workorderId) : null
+  const sourceId = route.query.sourceWorkorderId ? Number(route.query.sourceWorkorderId) : null
   mode.value = (route.query.mode as any) || (id ? 'edit' : 'add')
   workorderId.value = id
   loadProcessOptions()
   routeConfig.purchaser = useUserStore().name || ''
   getDicts('mes_sal_order_type').then((r: any) => { orderTypeOptions.value = r.data || [] })
   searchOwners('')
-  if (id) loadDetail(id)
+  if (mode.value === 'copy' && sourceId) loadCopyTemplate(sourceId)
+  else if (id) loadDetail(id)
   else initFromSalesOrder()
-  if (mode.value === 'add' && !form.workorderCode) form.workorderCode = ''
+  if ((mode.value === 'add' || mode.value === 'copy') && !form.workorderCode) form.workorderCode = ''
 })
 
 function loadProcessOptions() {
@@ -268,7 +323,7 @@ function initFromSalesOrder() {
   form.clientOrderCode = (q.clientOrderCode as string) || null
   form.salesOrderLineId = q.salesOrderLineId ? Number(q.salesOrderLineId) : null
   form.quantity = q.quantity ? Number(q.quantity) : 1
-  form.requestDate = (q.requestDate as string) || null
+  form.requestDate = normalizeDateTime(q.requestDate)
   if (q.orderType) form.orderType = q.orderType as string
   if (q.productId) {
     onProductSelected({
@@ -282,6 +337,7 @@ function loadDetail(id: number) {
   getWorkorderFullDetail(id).then((r: any) => {
     const d = r.data || {}
     Object.assign(form, d.workorder || {})
+    form.requestDate = normalizeDateTime(form.requestDate)
     if (!form.lineAttrs) form.lineAttrs = {}
     routeProductId.value = form.routeProductId
     routeProcesses.value = d.routeProcesses || []
@@ -298,9 +354,133 @@ function loadDetail(id: number) {
   })
 }
 
+/** 复制模板：加载源工单定义层数据，清空单号并自动生成新编码 */
+function loadCopyTemplate(sourceId: number) {
+  getWorkorderCopyTemplate(sourceId).then((r: any) => {
+    const d = r.data || {}
+    Object.assign(form, d.workorder || {})
+    form.workorderId = null
+    form.workorderCode = ''
+    form.status = 'PREPARE'
+    form.requestDate = normalizeDateTime(form.requestDate)
+    if (!form.lineAttrs) form.lineAttrs = {}
+    routeProductId.value = form.routeProductId
+    routeProcesses.value = d.routeProcesses || []
+    bomRows.value = d.bomList || []
+    routeConfig.productName = form.productName || ''
+    routeConfig.orderDate = today()
+    loadSchema(form.productId)
+    onProductSelected({
+      itemId: form.productId, itemCode: form.productCode, itemName: form.productName,
+      unitOfMeasure: form.unitOfMeasure, unitName: form.unitName
+    }, true)
+    purchaseDocs.value = (d.purchaseDocs || []).map((x: any) => ({ ...x.order, lines: x.lines || [] }))
+    processDocs.value = (d.processDocs || []).map((x: any) => ({ ...x, lines: x.processLines || [] }))
+    genSerialCode('WORKORDER_NO').then((res: any) => {
+      form.workorderCode = res.data
+      autoGen.value = true
+    })
+  })
+}
+
 function onAutoGen(flag: boolean) {
   if (flag) genSerialCode('WORKORDER_NO').then((r: any) => { form.workorderCode = r.data })
   else form.workorderCode = ''
+}
+
+// ─────────── 复制模式：选择目标销售订单行 ───────────
+
+/** 打开选择器：无需先清除，自动定位并回显当前来源订单 */
+async function openOrderPicker() {
+  orderPickerOpen.value = true
+  pickerLines.value = []
+  if (!orderOptions.value.length) await searchOrders('')
+  const code = form.sourceCode
+  if (!code) return
+  let current = orderOptions.value.find((o: any) => o.orderCode === code)
+  if (!current) {
+    const r: any = await listOrder({ pageNum: 1, pageSize: 10, orderCode: code } as any)
+    current = (r.rows || [])[0]
+    if (current) orderOptions.value = [current, ...orderOptions.value]
+  }
+  if (current) {
+    currentSourceOrder.value = current
+    pickerOrderId.value = current.orderId
+    onPickerOrderChange(current.orderId)
+  }
+}
+
+/** 支持按订单号或客户名称搜索；当前来源订单始终保留在候选中 */
+async function searchOrders(keyword: string) {
+  orderLoading.value = true
+  try {
+    const kw = keyword || undefined
+    const [c1, c2, c3, c4]: any[] = await Promise.all([
+      listOrder({ pageNum: 1, pageSize: 30, orderCode: kw, status: 'CONFIRMED' } as any),
+      listOrder({ pageNum: 1, pageSize: 30, orderCode: kw, status: 'PRODUCING' } as any),
+      kw ? listOrder({ pageNum: 1, pageSize: 30, clientName: kw, status: 'CONFIRMED' } as any) : Promise.resolve({ rows: [] }),
+      kw ? listOrder({ pageNum: 1, pageSize: 30, clientName: kw, status: 'PRODUCING' } as any) : Promise.resolve({ rows: [] })
+    ])
+    const map = new Map<number, any>()
+    ;[c1, c2, c3, c4].forEach((r: any) => (r.rows || []).forEach((o: any) => map.set(o.orderId, o)))
+    if (currentSourceOrder.value && !map.has(currentSourceOrder.value.orderId)) {
+      map.set(currentSourceOrder.value.orderId, currentSourceOrder.value)
+    }
+    orderOptions.value = Array.from(map.values())
+  } finally {
+    orderLoading.value = false
+  }
+}
+
+function onPickerOrderChange(orderId: number) {
+  pickerOrder.value = orderOptions.value.find((o: any) => o.orderId === orderId) || null
+  pickerLines.value = []
+  if (!orderId) return
+  getOrderDetail(orderId).then((r: any) => {
+    const all = r.data?.lines || []
+    const sameProduct = all.filter((l: any) => l.productId === form.productId)
+    const base = sameProduct.length ? sameProduct : all
+    // 可转数量大的排前面；0 可转行保留展示用于核对来源，但点击不可选
+    pickerLines.value = [...base].sort((a: any, b: any) =>
+      Number(b.quantityConvertible || 0) - Number(a.quantityConvertible || 0))
+    if (!all.length) ElMessage.info('该订单暂无明细行')
+  })
+}
+
+/** 清除销售订单关联：复制为手工工单 */
+function clearOrderLink() {
+  form.sourceCode = null
+  form.salesOrderLineId = null
+  form.orderSource = 'MANUAL'
+  purchaseDocs.value.forEach((d: any) => { d.sourceOrderCode = form.clientOrderCode })
+  processDocs.value.forEach((d: any) => { d.sourceOrderCode = form.clientOrderCode })
+  ElMessage.info('已清除销售订单关联，将作为手工工单保存')
+}
+
+function pickOrderLine(line: any) {
+  const convertible = Number(line.quantityConvertible || 0)
+  if (convertible <= 0) {
+    ElMessage.warning('该明细行已无可转数量，请选择其他行')
+    return
+  }
+  const o = pickerOrder.value || {}
+  form.sourceCode = o.orderCode || form.sourceCode
+  form.salesOrderLineId = line.lineId
+  form.orderSource = 'SALES_ORDER'
+  if (o.clientId) {
+    form.clientId = o.clientId
+    form.clientCode = o.clientCode
+    form.clientName = o.clientName
+  }
+  if (o.clientOrderCode) form.clientOrderCode = o.clientOrderCode
+  if (o.salesperson) form.salesperson = o.salesperson
+  if (!form.quantity || Number(form.quantity) > convertible) form.quantity = convertible
+  if (line.requestDate) form.requestDate = normalizeDateTime(line.requestDate)
+  // 单据来源订单号随新销售订单同步
+  purchaseDocs.value.forEach((d: any) => { d.sourceOrderCode = form.clientOrderCode })
+  processDocs.value.forEach((d: any) => { d.sourceOrderCode = form.clientOrderCode })
+  orderPickerOpen.value = false
+  ElMessage.success('已关联销售订单行，可继续微调数量、交期与单据')
 }
 
 function onProductSelected(row: any, keepRoute = false) {
@@ -409,7 +589,7 @@ function searchOwners(kw: string) {
     .finally(() => { ownerLoading.value = false })
 }
 
-/** 根据工序配置生成单据：按「开单类型 + 供应商」合并 */
+/** 根据工序配置生成单据：按「开单类型 + 供应商」合并，已存在的单据只补缺失明细，不覆盖/删除 */
 function generateDocs() {
   const rows = routeProcesses.value.filter((r: any) => r.vendorId)
   if (!rows.length) {
@@ -422,39 +602,65 @@ function generateDocs() {
     const key = String(r.vendorId)
     const group = r.docType === 'PURCHASE' ? purGroups : procGroups
     group[key] = group[key] || []
-    // 同一供应商下按工序去重，避免重复点击生成重复明细
     if (!group[key].some((x: any) => x.processId === r.processId)) group[key].push(r)
   })
-  purchaseDocs.value = Object.entries(purGroups).map(([, rs]) => ({
-    docTitle: (rs[0].processName || '') + '采购单', vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
-    purchaseType: 'OTHER', orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '',
-    deliveryAddress: routeConfig.deliveryAddress, remark: '',
-    lines: rs.map((r: any) => ({
-      // 采购的是工序服务（非库存物料），用负数伪物料ID避免同一单据内物料重复校验
-      itemId: -Math.abs(Number(r.processId) || 1), itemCode: 'PROC-' + (r.processCode || r.processId),
-      itemName: r.processName,
-      productName: routeConfig.productName || form.productName, specification: '',
-      unitOfMeasure: form.unitOfMeasure, unitName: form.unitName,
-      quantity: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
-      processId: r.processId, processCode: r.processCode, processName: r.processName,
-      lineAttrs: {}, remark: ''
-    }))
-  }))
-  processDocs.value = Object.entries(procGroups).map(([, rs]) => ({
-    docTitle: (rs[0].processName || '') + '加工单',
-    supplierType: rs[0].isOutsource === '1' ? 'OUTSIDE' : (rs[0].vendorId ? 'OUTSIDE' : 'INSIDE'),
-    vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
-    orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '', deliveryAddress: routeConfig.deliveryAddress, remark: '',
-    lines: rs.map((r: any) => ({
-      processId: r.processId, processCode: r.processCode, processName: r.processName,
-      productName: routeConfig.productName || form.productName,
-      planQty: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
-      vendorId: r.vendorId, vendorCode: r.vendorCode, vendorName: r.vendorName,
-      extAttrs: {}, attrSchema: [], remark: ''
-    }))
-  }))
+  let newPur = 0
+  let newProc = 0
+  // 采购单：同供应商已有单据则复用，仅补充缺少的工序明细
+  Object.entries(purGroups).forEach(([, rs]) => {
+    const exist = purchaseDocs.value.find((d: any) => String(d.vendorId) === String(rs[0].vendorId))
+    const lines = rs
+      .filter((r: any) => !(exist?.lines || []).some((l: any) => l.processId === r.processId))
+      .map((r: any) => ({
+        // 采购的是工序服务（非库存物料），用负数伪物料ID避免同一单据内物料重复校验
+        itemId: -Math.abs(Number(r.processId) || 1), itemCode: 'PROC-' + (r.processCode || r.processId),
+        itemName: r.processName,
+        productName: routeConfig.productName || form.productName, specification: '',
+        unitOfMeasure: form.unitOfMeasure, unitName: form.unitName,
+        quantity: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
+        processId: r.processId, processCode: r.processCode, processName: r.processName,
+        lineAttrs: {}, remark: ''
+      }))
+    if (exist) {
+      if (lines.length) { exist.lines = [...(exist.lines || []), ...lines]; newPur += lines.length }
+      return
+    }
+    newPur++
+    purchaseDocs.value.push({
+      docTitle: (rs[0].processName || '') + '采购单', vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
+      purchaseType: 'OTHER', orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '',
+      deliveryAddress: routeConfig.deliveryAddress, remark: '',
+      lines
+    })
+  })
+  // 加工单：同供应商已有单据则复用，仅补充缺少的工序明细
+  Object.entries(procGroups).forEach(([, rs]) => {
+    const exist = processDocs.value.find((d: any) => String(d.vendorId) === String(rs[0].vendorId))
+    const lines = rs
+      .filter((r: any) => !(exist?.lines || []).some((l: any) => l.processId === r.processId))
+      .map((r: any) => ({
+        processId: r.processId, processCode: r.processCode, processName: r.processName,
+        productName: routeConfig.productName || form.productName,
+        planQty: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
+        vendorId: r.vendorId, vendorCode: r.vendorCode, vendorName: r.vendorName,
+        extAttrs: {}, attrSchema: [], remark: ''
+      }))
+    if (exist) {
+      if (lines.length) { exist.lines = [...(exist.lines || []), ...lines]; newProc += lines.length }
+      return
+    }
+    newProc++
+    processDocs.value.push({
+      docTitle: (rs[0].processName || '') + '加工单',
+      supplierType: rs[0].isOutsource === '1' ? 'OUTSIDE' : (rs[0].vendorId ? 'OUTSIDE' : 'INSIDE'),
+      vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
+      orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '', deliveryAddress: routeConfig.deliveryAddress, remark: '',
+      lines
+    })
+  })
   activeTab.value = 'docs'
-  ElMessage.success(`已生成采购单 ${purchaseDocs.value.length} 张、加工单 ${processDocs.value.length} 张`)
+  if (!newPur && !newProc) ElMessage.info('所选供应商的单据均已生成，未新增明细')
+  else ElMessage.success(`已生成采购单 ${newPur} 张、加工单 ${newProc} 张，其余单据保持不变`)
 }
 
 function submit() {
@@ -462,7 +668,11 @@ function submit() {
     if (!valid) return
     if (!routeProcesses.value.length) { ElMessage.warning('请选择工艺路线或添加工序'); return }
     const payload = {
-      workorder: { ...form, routeProductId: routeProductId.value || form.routeProductId },
+      workorder: {
+        ...form,
+        requestDate: normalizeDateTime(form.requestDate),
+        routeProductId: routeProductId.value || form.routeProductId
+      },
       bomList: bomRows.value,
       paramList: [],
       routeProcesses: routeProcesses.value,
@@ -470,7 +680,7 @@ function submit() {
       processDocs: processDocs.value.map((d: any) => ({ ...d, lines: d.lines || [] }))
     }
     submitting.value = true
-    const call = mode.value === 'add'
+    const call = (mode.value === 'add' || mode.value === 'copy')
       ? createWorkorderFull(payload)
       : updateWorkorderFull(workorderId.value as number, payload)
     call.then(() => {

@@ -30,6 +30,7 @@ export interface WmMaterialStock extends BaseEntity {
   quantityOnhand?: number
   quantityOnhand2?: number
   quantityAvailable?: number
+  quantityLocked?: number
   quantityAvailable2?: number
   batchId?: number
   batchCode?: string

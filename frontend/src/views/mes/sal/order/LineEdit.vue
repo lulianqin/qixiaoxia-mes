@@ -9,6 +9,7 @@
                 <el-input v-model="form.productName" placeholder="请选择产品" readonly>
                   <template #append><el-button icon="Search" @click="itemSelectRef?.open()" /></template>
                 </el-input>
+                <el-button link type="primary" size="small" @click="openSpecDialog">按规格建档</el-button>
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -99,13 +100,45 @@
     </template>
     <ItemSelect ref="itemSelectRef" @onSelected="onProductSelected" />
   </el-dialog>
+
+  <el-dialog v-model="specVisible" title="按规格建档" width="680px" append-to-body :close-on-click-modal="false">
+    <el-form :model="specForm" label-width="100px">
+      <el-row>
+        <el-col :span="12">
+          <el-form-item label="产品大类" required>
+            <el-select v-model="specForm.parentId" filterable placeholder="选择 SPU" style="width:100%" @change="onSpuChange">
+              <el-option v-for="spu in spuOptions" :key="spu.itemId" :label="spu.itemName" :value="spu.itemId" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="规格描述" required>
+            <el-input v-model="specForm.specification" placeholder="如 白牛皮300克+白牛色扁纸绳+平口提手" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row>
+        <el-col :span="12"><el-form-item label="产品尺寸"><el-input v-model="specForm.productSize" placeholder="如 254*127*330mm" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="印刷要求"><el-input v-model="specForm.printingReq" /></el-form-item></el-col>
+      </el-row>
+      <el-row>
+        <el-col :span="12"><el-form-item label="装箱规格"><el-input v-model="specForm.packageSpec" placeholder="如 250个/箱" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="单位"><el-input v-model="specForm.unitName" disabled /></el-form-item></el-col>
+      </el-row>
+      <el-alert type="info" :closable="false" show-icon title="系统按产品大类+规格指纹自动查重，已存在则直接复用。" />
+    </el-form>
+    <template #footer>
+      <el-button type="primary" :loading="specSaving" @click="submitSpec">确 定</el-button>
+      <el-button @click="specVisible = false">取 消</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts" name="SalOrderLineEdit">
 import ItemSelect from '@/components/itemSelect/single.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import { ElMessage } from 'element-plus'
-import { getItem } from '@/api/mes/md/item'
+import { getItem, listItem, specVariantItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
 import { listRouteProduct, resolveRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
@@ -141,6 +174,10 @@ let routeReqSeq = 0
 // 扩展属性(schema/快照)加载序号, 同理防止旧产品属性覆盖当前行
 let attrReqSeq = 0
 const form = reactive<SalOrderLine>({})
+const specVisible = ref(false)
+const specSaving = ref(false)
+const spuOptions = ref<any[]>([])
+const specForm = reactive<any>({ parentId: null, specification: '', productSize: '', printingReq: '', packageSpec: '', unitName: '' })
 const rules = {
   productName: [{ required: true, message: '请选择产品', trigger: 'change' }],
   quantity: [{ required: true, message: '订单数量不能为空', trigger: 'blur' }],
@@ -251,6 +288,44 @@ function loadExtAttrsByProduct(itemId: number, snapshot?: Record<string, any>) {
       effAttrSchema.value = []
     }
   }).catch(() => { if (seq === attrReqSeq && form.productId === itemId) ElMessage.error('物料详情加载失败') })
+}
+
+function openSpecDialog() {
+  specForm.parentId = null
+  specForm.specification = form.productSpc || ''
+  specForm.productSize = form.productSize || ''
+  specForm.printingReq = form.printingReq || ''
+  specForm.packageSpec = ''
+  specForm.unitName = ''
+  specVisible.value = true
+  if (!spuOptions.value.length) {
+    listItem({ parentIdFilter: 'spu', pageNum: 1, pageSize: 1000 } as any)
+      .then((r: any) => { spuOptions.value = r.rows || [] })
+  }
+}
+
+function onSpuChange(itemId: number) {
+  const spu = spuOptions.value.find((s: any) => s.itemId === itemId)
+  specForm.unitName = spu?.unitName || ''
+}
+
+function submitSpec() {
+  if (!specForm.parentId) { ElMessage.warning('请选择产品大类'); return }
+  if (!specForm.specification) { ElMessage.warning('请填写规格描述'); return }
+  specSaving.value = true
+  specVariantItem({
+    parentId: specForm.parentId,
+    specification: specForm.specification,
+    productSize: specForm.productSize,
+    printingReq: specForm.printingReq,
+    packageSpec: specForm.packageSpec
+  } as any).then((r: any) => {
+    specVisible.value = false
+    if (r.data) {
+      onProductSelected(r.data)
+      ElMessage.success('已关联产品：' + r.data.itemCode)
+    }
+  }).finally(() => { specSaving.value = false })
 }
 
 function onProductSelected(row: any) {

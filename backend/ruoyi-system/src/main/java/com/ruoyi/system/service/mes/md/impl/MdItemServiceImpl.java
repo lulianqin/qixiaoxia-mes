@@ -2,7 +2,12 @@ package com.ruoyi.system.service.mes.md.impl;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdItem;
@@ -112,6 +117,74 @@ public class MdItemServiceImpl implements IMdItemService
         }
 
         return mdItemMapper.insertMdItem(mdItem);
+    }
+
+    @Override
+    @Transactional
+    public MdItem findOrCreateSpecVariant(MdItem spec)
+    {
+        if (spec == null || spec.getParentId() == null || spec.getParentId() <= 0)
+            throw new ServiceException("请选择产品大类(SPU)");
+        MdItem parent = mdItemMapper.selectMdItemById(spec.getParentId());
+        if (parent == null) throw new ServiceException("产品大类不存在");
+        MdItem query = new MdItem();
+        query.setSpecFingerprint(buildSpecFingerprint(spec));
+        MdItem existed = mdItemMapper.selectBySpecFingerprint(query);
+        if (existed != null) return existed;
+        fillVariantDefaults(spec, parent);
+        spec.setSpecFingerprint(query.getSpecFingerprint());
+        insertMdItem(spec);
+        return spec;
+    }
+
+    /** 规格指纹：SPU + 尺寸/印刷/包装/规格 + 扩展属性（按 key 排序）的 SHA-256 */
+    private String buildSpecFingerprint(MdItem spec)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append(spec.getParentId()).append('|')
+          .append(nullToEmpty(spec.getProductSize())).append('|')
+          .append(nullToEmpty(spec.getPrintingReq())).append('|')
+          .append(nullToEmpty(spec.getPackageSpec())).append('|')
+          .append(nullToEmpty(spec.getSpecification()));
+        if (spec.getExtAttrs() != null) {
+            for (Map.Entry<String, Object> e : new TreeMap<>(spec.getExtAttrs()).entrySet()) {
+                sb.append('|').append(e.getKey()).append('=').append(e.getValue());
+            }
+        }
+        return sha256(sb.toString());
+    }
+
+    private void fillVariantDefaults(MdItem spec, MdItem parent)
+    {
+        if (StringUtils.isEmpty(spec.getItemCode())) {
+            String base = StringUtils.isNotEmpty(parent.getItemCode()) ? parent.getItemCode() : "ITEM";
+            if (base.length() > 48) base = base.substring(0, 48);
+            spec.setItemCode(base + "-V" + Long.toString(System.currentTimeMillis(), 36).toUpperCase());
+        }
+        if (StringUtils.isEmpty(spec.getItemName())) {
+            String name = parent.getItemName() + (StringUtils.isNotEmpty(spec.getSpecification())
+                    ? " " + spec.getSpecification() : "");
+            spec.setItemName(name.length() > 255 ? name.substring(0, 255) : name);
+        }
+        if (StringUtils.isEmpty(spec.getUnitOfMeasure())) spec.setUnitOfMeasure(parent.getUnitOfMeasure());
+        if (StringUtils.isEmpty(spec.getUnitName())) spec.setUnitName(parent.getUnitName());
+        if (spec.getEnableFlag() == null) spec.setEnableFlag("1");
+        if (spec.getBatchFlag() == null) spec.setBatchFlag(parent.getBatchFlag());
+    }
+
+    private String nullToEmpty(String v) { return v == null ? "" : v.trim(); }
+
+    private String sha256(String text)
+    {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : digest) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception e) {
+            throw new ServiceException("规格指纹计算失败：" + e.getMessage());
+        }
     }
 
     /** 根据 itemTypeCode 查表补全 itemTypeId（前端可能只传了 code 没传 id） */

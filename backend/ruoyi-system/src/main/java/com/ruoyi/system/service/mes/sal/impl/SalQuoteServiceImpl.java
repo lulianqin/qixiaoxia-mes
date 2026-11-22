@@ -2,6 +2,7 @@ package com.ruoyi.system.service.mes.sal.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -68,7 +69,14 @@ public class SalQuoteServiceImpl implements ISalQuoteService
         quote.setClientName(req.getClientName());
         // 报价单只承接 ERP 的报价需求，不对接 MES 客户主数据（客户信息仅作参考文本）
         quote.setGoodsType(req.getGoodsType());
-        quote.setInquiryDate(req.getInquiryDate());
+        // 询价日期为空时默认取接收到报价单的日期；已存在报价单保留原值，避免重复下发被覆盖
+        Date inquiryDate = req.getInquiryDate();
+        if (inquiryDate == null)
+        {
+            inquiryDate = existing != null && existing.getInquiryDate() != null
+                    ? existing.getInquiryDate() : DateUtils.getNowDate();
+        }
+        quote.setInquiryDate(inquiryDate);
         quote.setBudget(req.getBudget());
         quote.setAttachment(req.getAttachment());
         quote.setRemark(req.getRemark());

@@ -15,7 +15,7 @@
       </div>
     </template>
 
-    <el-form :model="form" label-width="90px" size="small" :disabled="readonly">
+    <el-form :model="form" label-width="90px" :disabled="readonly">
       <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="单据标题">
@@ -63,7 +63,7 @@
         <template #default="{ row }">
           <div class="attr-wrap">
             <el-empty v-if="!row.attrSchema || !row.attrSchema.length" description="该工序未配置属性模板" :image-size="40" />
-            <el-form v-else label-width="120px" size="small" :disabled="readonly">
+            <el-form v-else label-width="120px" :disabled="readonly">
               <el-row :gutter="12">
                 <el-col v-for="a in row.attrSchema" :key="a.attrId" :span="8">
                   <el-form-item>
@@ -133,11 +133,25 @@ function hasAttrValue(row: any) {
   return Object.values(attrs).some((v: any) => v !== null && v !== undefined && String(v).trim() !== '')
 }
 
+/** 服务端回显的 extAttrs 是 JSON 字符串，统一转成对象，避免回显丢失与提交类型不匹配 */
+function normalizeAttrs(l: any) {
+  if (typeof l.extAttrs !== 'string') {
+    if (!l.extAttrs) l.extAttrs = {}
+    return
+  }
+  try {
+    l.extAttrs = l.extAttrs.trim() ? JSON.parse(l.extAttrs) : {}
+  } catch (e) {
+    l.extAttrs = {}
+  }
+}
+
 /** 为每行生成稳定 row-key，并加载工序属性模板（生成单据时也能直接看到属性） */
 function syncRows() {
   const lines = props.modelValue?.lines || []
   const autoExpand: string[] = []
   lines.forEach((l: any) => {
+    normalizeAttrs(l)
     if (!l.__key) l.__key = 'line-' + (++keySeq)
     if (!l.attrSchema || !l.attrSchema.length) {
       if (l.processId && !l.__schemaLoading) {

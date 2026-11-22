@@ -8,27 +8,13 @@
       </el-row>
       <el-row>
         <el-col :span="8"><el-form-item label="供应商"><el-switch v-model="form.vendorFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="客户"><el-switch v-model="form.clientFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="销售订单号"><el-switch v-model="form.coCodeFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8"><el-form-item label="采购订单号"><el-switch v-model="form.poCodeFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
         <el-col :span="8"><el-form-item label="生产工单"><el-switch v-model="form.workorderFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="生产任务"><el-switch v-model="form.taskFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-      </el-row>
-      <el-row>
-        <el-col :span="8"><el-form-item label="工作站"><el-switch v-model="form.workstationFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="工具"><el-switch v-model="form.toolFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="模具"><el-switch v-model="form.moldFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-      </el-row>
-      <el-row>
         <el-col :span="8"><el-form-item label="生产批号"><el-switch v-model="form.lotNumberFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="质量状态"><el-switch v-model="form.qualityStatusFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="纸卷号"><el-switch v-model="form.paperRollFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
       </el-row>
       <el-row>
-        <el-col :span="8"><el-form-item label="门幅"><el-switch v-model="form.paperWidthFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
+        <el-col :span="8"><el-form-item label="质量状态"><el-switch v-model="form.qualityStatusFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
       </el-row>
+      <!-- 仅保留 qxx_wm_batch 有对应列的批次属性，无落库字段的属性已移除 -->
       <!-- 批次配置随物料编辑弹窗的【确认】统一保存，不再单独提供保存按钮 -->
     </el-form>
   </div>
@@ -43,16 +29,18 @@ import { getBatchConfigByItemId, addBatchConfig, updateBatchConfig } from '@/api
 const props = defineProps<{ itemId: number }>()
 const { proxy } = getCurrentInstance() as any
 
-const data = reactive({
-  form: {
-    itemId: props.itemId,
+/** 默认配置：仅包含 qxx_wm_batch 有对应列的批次属性 */
+function emptyForm(itemId: number): MdItemBatchConfig {
+  return {
+    itemId,
     produceDateFlag: '0', expireDateFlag: '0', recptDateFlag: '0',
-    vendorFlag: '0', clientFlag: '0', coCodeFlag: '0',
-    poCodeFlag: '0', workorderFlag: '0', taskFlag: '0',
-    workstationFlag: '0', toolFlag: '0', moldFlag: '0',
-    lotNumberFlag: '0', qualityStatusFlag: '0', paperRollFlag: '0',
-    paperWidthFlag: '0', enableFlag: '1'
+    vendorFlag: '0', workorderFlag: '0', lotNumberFlag: '0',
+    qualityStatusFlag: '0', enableFlag: '1'
   } as MdItemBatchConfig
+}
+
+const data = reactive({
+  form: emptyForm(props.itemId)
 })
 
 const { form } = toRefs(data)
@@ -60,19 +48,7 @@ const { form } = toRefs(data)
 async function load(itemId: number) {
   try {
     const r = await getBatchConfigByItemId(itemId)
-    if (r.data) {
-      form.value = r.data
-    } else {
-      form.value = {
-        configId: undefined, itemId,
-        produceDateFlag: '0', expireDateFlag: '0', recptDateFlag: '0',
-        vendorFlag: '0', clientFlag: '0', coCodeFlag: '0',
-        poCodeFlag: '0', workorderFlag: '0', taskFlag: '0',
-        workstationFlag: '0', toolFlag: '0', moldFlag: '0',
-        lotNumberFlag: '0', qualityStatusFlag: '0', paperRollFlag: '0',
-        paperWidthFlag: '0', enableFlag: '1'
-      } as MdItemBatchConfig
-    }
+    form.value = r.data || { configId: undefined, ...emptyForm(itemId) }
   } catch (e) { /* ignore */ }
 }
 

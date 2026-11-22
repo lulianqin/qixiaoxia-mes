@@ -90,6 +90,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     private com.ruoyi.system.service.mes.wm.OutsourceIssueHelper outsourceIssueHelper;
 
     @Autowired
+    private com.ruoyi.system.service.mes.wm.IWmStockReservationService stockReservationService;
+
+    @Autowired
     private RedisLockTemplate lockTemplate;
 
     @Autowired
@@ -471,6 +474,13 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             BigDecimal delta = line.getQuantityIssue() != null ? line.getQuantityIssue() : BigDecimal.ZERO;
             if (delta.compareTo(BigDecimal.ZERO) <= 0) continue;
 
+            // 2.1 工单已按 BOM 预占的，先把本行对应量转出（释放锁并归还可用量），
+            //     再由下方既有 FIFO 预占重新占用，避免同一物料被重复锁定
+            if (header.getWorkorderId() != null) {
+                stockReservationService.transferToIssue(header.getWorkorderId(), line.getItemId(), delta,
+                        header.getIssueId(), header.getIssueCode());
+            }
+
             Long preferWh = line.getWarehouseId() != null ? line.getWarehouseId() : header.getWarehouseId();
             if (line.getBatchId() != null) {
                 // 指定批次：走 6 字段精确匹配
@@ -532,6 +542,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
                 BigDecimal releaseQty = e.getValue(); // 净预占量（正数）
                 existing.setQuantityAvailable((existing.getQuantityAvailable() != null ? existing.getQuantityAvailable() : BigDecimal.ZERO).add(releaseQty));
+                existing.setQuantityLocked(releaseLocked(existing.getQuantityLocked(), releaseQty));
                 existing.setUpdateTime(new Date());
                 wmMaterialStockMapper.updateWmMaterialStock(existing);
 
@@ -561,6 +572,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
                 wmTransactionMapper.insertWmTransaction(tx);
             }
         }
+
+        // 已转出的备货预占归还给工单，供后续重新预占
+        stockReservationService.restoreFromIssue(issueId);
 
         // 恢复为已下达状态（释放预占后回到 APPROVED，仍可再次预占或作废）
         header.setStatus(WmIssueConstants.STATUS_APPROVED);
@@ -622,6 +636,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
                 deductOnhandAndWriteIssueOut(line, header, batchQty, existing);
             }
         }
+
+        // 已发料的备货预占记为已消耗
+        stockReservationService.consumeByIssue(header.getIssueId());
 
         // 5. 更新 header 状态
         header.setStatus(WmIssueConstants.STATUS_ISSUED);
@@ -990,6 +1007,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             }
         }
 
+        // 已发料的备货预占记为已消耗
+        stockReservationService.consumeByIssue(issueId);
+
         // 6. 累加 header 的 quantityIssuedTotal，判断是否全发完
         BigDecimal totalIssued = (header.getQuantityIssuedTotal() != null ? header.getQuantityIssuedTotal() : BigDecimal.ZERO).add(issuedThisTime);
         header.setQuantityIssuedTotal(totalIssued);
@@ -1018,12 +1038,20 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         return wmMaterialStockMapper.loadMaterialStockForUpdate(q);
     }
 
-    /** 扣减可用库存（预占），现有库存不动；不足抛异常由调用方前置检查 */
+    /** 释放锁定量，最小为 0 */
+    private static BigDecimal releaseLocked(BigDecimal locked, BigDecimal qty) {
+        BigDecimal v = (locked != null ? locked : BigDecimal.ZERO).subtract(qty);
+        return v.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : v;
+    }
+
+    /** 扣减可用库存（预占）：现有库存不动，同步累加锁定量 */
     private void deductAvailable(WmMaterialStock stock, BigDecimal delta) {
         mesQuantityService.normalizeStockRow(stock);
         BigDecimal avail = stock.getQuantityAvailable() != null ? stock.getQuantityAvailable() : BigDecimal.ZERO;
         BigDecimal newAvailable = avail.subtract(delta);
         stock.setQuantityAvailable(newAvailable.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newAvailable);
+        BigDecimal locked = stock.getQuantityLocked() != null ? stock.getQuantityLocked() : BigDecimal.ZERO;
+        stock.setQuantityLocked(locked.add(delta));
         stock.setUpdateTime(new Date());
         wmMaterialStockMapper.updateWmMaterialStock(stock);
     }
@@ -1137,6 +1165,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             if (stock == null) continue;  // 未锁到（如已被删除），跳过
             BigDecimal oldAvail = stock.getQuantityAvailable() != null ? stock.getQuantityAvailable() : BigDecimal.ZERO;
             stock.setQuantityAvailable(oldAvail.add(releaseQty));
+            stock.setQuantityLocked(releaseLocked(stock.getQuantityLocked(), releaseQty));
             stock.setUpdateTime(new Date());
             wmMaterialStockMapper.updateWmMaterialStock(stock);
             writeIssueTransaction(line, header, releaseQty, WmIssueConstants.TX_RELEASE, stock);
@@ -1160,6 +1189,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             throw new ServiceException("物料[" + line.getItemCode() + "]库存不足！当前库存：" + stock.getQuantityOnhand() + "，需出库：" + qty);
         }
         stock.setQuantityOnhand(result);
+        stock.setQuantityLocked(releaseLocked(stock.getQuantityLocked(), qty));
         stock.setQuantityAvailable(clampAvailableToOnhand(stock.getQuantityAvailable(), result));
         // 库存清零时辅助单位数量同步归零（部分卷出库时保持辅单位不变）
         if (result.compareTo(BigDecimal.ZERO) == 0) {
@@ -1205,6 +1235,7 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             throw new ServiceException("物料[" + d.getItemCode() + "]库存不足！当前：" + stock.getQuantityOnhand() + "，需发料：" + qty);
         }
         stock.setQuantityOnhand(newOnhand);
+        stock.setQuantityLocked(releaseLocked(stock.getQuantityLocked(), qty));
         stock.setQuantityAvailable(clampAvailableToOnhand(stock.getQuantityAvailable(), newOnhand));
         // 库存清零时辅助单位数量同步归零（部分卷发料时保持辅单位不变）
         if (newOnhand.compareTo(BigDecimal.ZERO) == 0) {

@@ -93,6 +93,17 @@ public class MdItemController extends BaseController
         return toAjax(mdItemService.insertMdItem(mdItem));
     }
 
+    /**
+     * 接单按规格建档：同规格命中直接复用，未命中以 SPU 新建 SKU 变体。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:md:item:add')")
+    @Log(title = "物料产品", businessType = BusinessType.INSERT)
+    @PostMapping("/specVariant")
+    public AjaxResult specVariant(@RequestBody MdItem spec)
+    {
+        return AjaxResult.success(mdItemService.findOrCreateSpecVariant(spec));
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:md:item:edit')")
     @Log(title = "物料产品", businessType = BusinessType.UPDATE)
     @PutMapping

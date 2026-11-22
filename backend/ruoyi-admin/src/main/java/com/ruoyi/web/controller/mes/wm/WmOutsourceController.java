@@ -140,6 +140,7 @@ public class WmOutsourceController extends BaseController
                 new com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model();
         m.title = "合并加工单";
         m.partyLabel = "加工商：";
+        m.showBizNo = false;
         m.headers.add("产品名称");
         m.headers.add("业务单号");
         m.headers.add("产品尺寸");

@@ -24,6 +24,8 @@ import com.ruoyi.system.domain.mes.pro.WorkorderProcDocVO;
 import com.ruoyi.system.domain.mes.pro.WorkorderProcLineVO;
 import com.ruoyi.system.domain.mes.pro.WorkorderPurDocVO;
 import com.ruoyi.system.domain.mes.pro.WorkorderPurLineVO;
+import com.ruoyi.system.domain.mes.sal.SalOrder;
+import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.domain.mes.pur.PurOrderLine;
 import com.ruoyi.system.domain.mes.pur.vo.PurOrderVO;
@@ -32,8 +34,11 @@ import com.ruoyi.system.domain.mes.wm.WmOutsourceOrder;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderProcessMapper;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
+import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
+import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessLineMapper;
+import com.ruoyi.system.service.mes.common.MesQuantityService;
 import com.ruoyi.system.service.mes.pro.IProRouteProductService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderBomService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderFullService;
@@ -67,6 +72,8 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
     @Autowired private IOutsourceService outsourceService;
     @Autowired private WmOutsourceOrderMapper outsourceOrderMapper;
     @Autowired private WmOutsourceProcessLineMapper processLineMapper;
+    @Autowired private SalOrderLineMapper salOrderLineMapper;
+    @Autowired private SalOrderMapper salOrderMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -77,12 +84,42 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
             throw new ServiceException("工单信息不能为空");
         }
         ensureRouteProductBinding(body.getWorkorder(), body.getRouteProcesses());
+        validateSalesOrderLink(body.getWorkorder());
         ProWorkorder wo = workorderService.createWorkorderWithBom(
                 body.getWorkorder(), body.getBomList(), body.getParamList());
         saveRouteSnapshot(wo.getWorkorderId(), body.getRouteProcesses());
         savePurchaseDocs(wo, body.getPurchaseDocs());
         saveProcessDocs(wo, body.getProcessDocs());
         return wo;
+    }
+
+    /** 复制/开单关联销售订单行时校验：行存在、来源订单一致、数量不超过可转量 */
+    private void validateSalesOrderLink(ProWorkorder wo)
+    {
+        if (wo == null || wo.getSalesOrderLineId() == null)
+        {
+            return;
+        }
+        SalOrderLine line = salOrderLineMapper.selectSalOrderLineByLineId(wo.getSalesOrderLineId());
+        if (line == null)
+        {
+            throw new ServiceException("销售订单明细行不存在");
+        }
+        if (StringUtils.isNotEmpty(wo.getSourceCode()))
+        {
+            SalOrder order = salOrderMapper.selectSalOrderByOrderId(line.getOrderId());
+            if (order == null || !wo.getSourceCode().equals(order.getOrderCode()))
+            {
+                throw new ServiceException("来源销售订单与所选明细行不匹配");
+            }
+        }
+        BigDecimal produced = salOrderLineMapper.sumProducedQtyByLineId(wo.getSalesOrderLineId());
+        BigDecimal total = line.getQuantity() == null ? BigDecimal.ZERO : line.getQuantity();
+        BigDecimal convertible = total.subtract(produced == null ? BigDecimal.ZERO : produced);
+        if (wo.getQuantity() != null && wo.getQuantity().compareTo(convertible) > 0)
+        {
+            throw new ServiceException("工单数量超过销售订单可转数量(" + convertible + ")");
+        }
     }
 
     @Override
@@ -141,6 +178,284 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         vo.setPurchaseDocs(loadPurchaseDocs(workorderId));
         vo.setProcessDocs(loadProcessDocs(workorderId));
         return vo;
+    }
+
+    // ────────────────────────── 复制模板 ──────────────────────────
+
+    /**
+     * 复制模板：只保留定义层数据（表头/BOM/工序/单据明细），清空主键、单号、
+     * 状态与执行数据，前端微调后仍走 createFull 保存为新工单。
+     */
+    @Override
+    public WorkorderFullDetailVO getCopyTemplate(Long workorderId)
+    {
+        if (workorderId == null)
+        {
+            throw new ServiceException("工单ID不能为空");
+        }
+        if (workorderService.selectProWorkorderByWorkorderId(workorderId) == null)
+        {
+            throw new ServiceException("工单不存在");
+        }
+        WorkorderFullDetailVO source = getFullDetail(workorderId);
+        if (source == null || source.getWorkorder() == null)
+        {
+            throw new ServiceException("工单不存在");
+        }
+        WorkorderFullDetailVO copy = new WorkorderFullDetailVO();
+        copy.setWorkorder(resetWorkorderForCopy(source.getWorkorder()));
+        copy.setBomList(resetBomForCopy(source.getBomList()));
+        copy.setParamList(resetParamForCopy(source.getParamList()));
+        copy.setRouteProcesses(source.getRouteProcesses());
+        copy.setPurchaseDocs(resetPurchaseDocsForCopy(source.getPurchaseDocs()));
+        copy.setProcessDocs(resetProcessDocsForCopy(source.getProcessDocs()));
+        return copy;
+    }
+
+    /** 表头：保留业务内容，重置单号/状态/数量进度/流转单生成字段 */
+    private ProWorkorder resetWorkorderForCopy(ProWorkorder src)
+    {
+        ProWorkorder wo = new ProWorkorder();
+        wo.setWorkorderName(src.getWorkorderName());
+        wo.setWorkorderType(src.getWorkorderType());
+        wo.setOrderSource(src.getOrderSource());
+        wo.setSourceCode(src.getSourceCode());
+        wo.setSalesOrderLineId(src.getSalesOrderLineId());
+        wo.setProductId(src.getProductId());
+        wo.setProductCode(src.getProductCode());
+        wo.setProductName(src.getProductName());
+        wo.setProductSpc(src.getProductSpc());
+        wo.setRouteProductId(src.getRouteProductId());
+        wo.setOwnerId(src.getOwnerId());
+        wo.setOwnerName(src.getOwnerName());
+        wo.setUnitOfMeasure(src.getUnitOfMeasure());
+        wo.setUnitName(src.getUnitName());
+        wo.setQuantity(src.getQuantity());
+        wo.setClientId(src.getClientId());
+        wo.setClientCode(src.getClientCode());
+        wo.setClientName(src.getClientName());
+        wo.setClientOrderCode(src.getClientOrderCode());
+        wo.setProductSize(src.getProductSize());
+        wo.setPrintingReq(src.getPrintingReq());
+        wo.setRopeSpec(src.getRopeSpec());
+        wo.setPackageReq(src.getPackageReq());
+        wo.setShippingReq(src.getShippingReq());
+        wo.setLineAttrs(src.getLineAttrs());
+        wo.setOrderType(src.getOrderType());
+        wo.setVendorId(src.getVendorId());
+        wo.setVendorCode(src.getVendorCode());
+        wo.setVendorName(src.getVendorName());
+        wo.setOutsourceFactoryId(src.getOutsourceFactoryId());
+        wo.setOrderDate(src.getOrderDate());
+        wo.setTitle(src.getTitle());
+        wo.setBagMouth(src.getBagMouth());
+        wo.setBottomBoard(src.getBottomBoard());
+        wo.setMaterial(src.getMaterial());
+        wo.setMaterialGram(src.getMaterialGram());
+        wo.setRollWidth(src.getRollWidth());
+        wo.setLossRate(src.getLossRate());
+        wo.setOrderWeight(src.getOrderWeight());
+        wo.setPlateCircumference(src.getPlateCircumference());
+        wo.setProcessFlow(src.getProcessFlow());
+        wo.setProductImage(src.getProductImage());
+        wo.setSalesperson(src.getSalesperson());
+        wo.setRequestDate(src.getRequestDate());
+        wo.setRemark(src.getRemark());
+        wo.setStatus("PREPARE");
+        return wo;
+    }
+
+    /** BOM：清主键/工单号；按件用量清空总量，交后端按新工单数量重算 */
+    private List<ProWorkorderBom> resetBomForCopy(List<ProWorkorderBom> src)
+    {
+        List<ProWorkorderBom> rows = new ArrayList<>();
+        if (src == null)
+        {
+            return rows;
+        }
+        for (ProWorkorderBom s : src)
+        {
+            ProWorkorderBom b = new ProWorkorderBom();
+            b.setItemId(s.getItemId());
+            b.setItemCode(s.getItemCode());
+            b.setItemName(s.getItemName());
+            b.setItemSpc(s.getItemSpc());
+            b.setUnitOfMeasure(s.getUnitOfMeasure());
+            b.setUnitName(s.getUnitName());
+            b.setUnit2(s.getUnit2());
+            b.setUnit2Name(s.getUnit2Name());
+            b.setConversionRate(s.getConversionRate());
+            b.setProcessId(s.getProcessId());
+            b.setProcessName(s.getProcessName());
+            b.setItemOrProduct(s.getItemOrProduct());
+            b.setQuantity(s.getQuantity());
+            b.setQuantityMode(s.getQuantityMode());
+            b.setBomSource(s.getBomSource());
+            b.setScrapRate(s.getScrapRate());
+            if (!MesQuantityService.MODE_TOTAL.equals(s.getQuantityMode()))
+            {
+                b.setTotalQuantity(null);
+                b.setTotalQuantity2(null);
+            }
+            else
+            {
+                b.setTotalQuantity(s.getTotalQuantity());
+                b.setTotalQuantity2(s.getTotalQuantity2());
+            }
+            rows.add(b);
+        }
+        return rows;
+    }
+
+    /** 工序参数：清主键/工单号 */
+    private List<Map<String, Object>> resetParamForCopy(List<Map<String, Object>> src)
+    {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (src == null)
+        {
+            return rows;
+        }
+        for (Map<String, Object> s : src)
+        {
+            Map<String, Object> p = new java.util.LinkedHashMap<>(s);
+            p.remove("recordId");
+            p.remove("workorderId");
+            p.remove("factoryId");
+            rows.add(p);
+        }
+        return rows;
+    }
+
+    /** 采购单：保留供应商/日期/明细，清空单号、状态与金额汇总 */
+    private List<WorkorderFullDetailVO.PurchaseDoc> resetPurchaseDocsForCopy(
+            List<WorkorderFullDetailVO.PurchaseDoc> src)
+    {
+        List<WorkorderFullDetailVO.PurchaseDoc> docs = new ArrayList<>();
+        if (src == null)
+        {
+            return docs;
+        }
+        for (WorkorderFullDetailVO.PurchaseDoc s : src)
+        {
+            PurOrderVO o = s.getOrder();
+            if (o == null)
+            {
+                continue;
+            }
+            PurOrderVO order = new PurOrderVO();
+            order.setDocTitle(o.getDocTitle());
+            order.setVendorId(o.getVendorId());
+            order.setVendorCode(o.getVendorCode());
+            order.setVendorName(o.getVendorName());
+            order.setPurchaseType(o.getPurchaseType());
+            order.setOrderDate(o.getOrderDate());
+            order.setExpectedDate(o.getExpectedDate());
+            order.setPurchaser(o.getPurchaser());
+            order.setSourceOrderCode(o.getSourceOrderCode());
+            order.setDeliveryAddress(o.getDeliveryAddress());
+            order.setCurrency(o.getCurrency());
+            order.setRemark(o.getRemark());
+            WorkorderFullDetailVO.PurchaseDoc doc = new WorkorderFullDetailVO.PurchaseDoc();
+            doc.setOrder(order);
+            doc.setLines(resetPurLinesForCopy(s.getLines()));
+            docs.add(doc);
+        }
+        return docs;
+    }
+
+    private List<PurOrderLine> resetPurLinesForCopy(List<PurOrderLine> src)
+    {
+        List<PurOrderLine> lines = new ArrayList<>();
+        if (src == null)
+        {
+            return lines;
+        }
+        for (PurOrderLine s : src)
+        {
+            PurOrderLine l = new PurOrderLine();
+            l.setItemId(s.getItemId());
+            l.setItemCode(s.getItemCode());
+            l.setItemName(s.getItemName());
+            l.setProductName(s.getProductName());
+            l.setSpecification(s.getSpecification());
+            l.setUnitOfMeasure(s.getUnitOfMeasure());
+            l.setUnitName(s.getUnitName());
+            l.setUnit2(s.getUnit2());
+            l.setUnit2Name(s.getUnit2Name());
+            l.setConversionRate(s.getConversionRate());
+            l.setProcessId(s.getProcessId());
+            l.setProcessCode(s.getProcessCode());
+            l.setProcessName(s.getProcessName());
+            l.setQuantityOrdered(s.getQuantityOrdered());
+            l.setQuantityOrdered2(s.getQuantityOrdered2());
+            l.setUnitPrice(s.getUnitPrice());
+            l.setAmount(s.getAmount());
+            l.setTaxRate(s.getTaxRate());
+            l.setLineAttrs(s.getLineAttrs());
+            l.setExpectedDate(s.getExpectedDate());
+            l.setRemark(s.getRemark());
+            lines.add(l);
+        }
+        return lines;
+    }
+
+    /** 加工单：保留加工商/日期/工序明细，清空单号、状态与发料收货进度 */
+    private List<WmOutsourceOrder> resetProcessDocsForCopy(List<WmOutsourceOrder> src)
+    {
+        List<WmOutsourceOrder> docs = new ArrayList<>();
+        if (src == null)
+        {
+            return docs;
+        }
+        for (WmOutsourceOrder s : src)
+        {
+            WmOutsourceOrder o = new WmOutsourceOrder();
+            o.setSupplierType(s.getSupplierType());
+            o.setVendorId(s.getVendorId());
+            o.setVendorCode(s.getVendorCode());
+            o.setVendorName(s.getVendorName());
+            o.setRouteId(s.getRouteId());
+            o.setDocTitle(s.getDocTitle());
+            o.setOrderDate(s.getOrderDate());
+            o.setExpectedDate(s.getExpectedDate());
+            o.setPurchaser(s.getPurchaser());
+            o.setSourceOrderCode(s.getSourceOrderCode());
+            o.setDeliveryAddress(s.getDeliveryAddress());
+            o.setRemark(s.getRemark());
+            o.setProcessLines(resetProcLinesForCopy(s.getProcessLines()));
+            docs.add(o);
+        }
+        return docs;
+    }
+
+    private List<WmOutsourceProcessLine> resetProcLinesForCopy(List<WmOutsourceProcessLine> src)
+    {
+        List<WmOutsourceProcessLine> lines = new ArrayList<>();
+        if (src == null)
+        {
+            return lines;
+        }
+        for (WmOutsourceProcessLine s : src)
+        {
+            WmOutsourceProcessLine l = new WmOutsourceProcessLine();
+            l.setSeq(s.getSeq());
+            l.setVendorId(s.getVendorId());
+            l.setVendorCode(s.getVendorCode());
+            l.setVendorName(s.getVendorName());
+            l.setProcessId(s.getProcessId());
+            l.setProcessCode(s.getProcessCode());
+            l.setProcessName(s.getProcessName());
+            l.setProductName(s.getProductName());
+            l.setPlanQty(s.getPlanQty());
+            l.setDoneQty(BigDecimal.ZERO);
+            l.setUnitPrice(s.getUnitPrice());
+            l.setAmount(s.getAmount());
+            l.setExpectedDate(s.getExpectedDate());
+            l.setExtAttrs(s.getExtAttrs());
+            l.setRemark(s.getRemark());
+            lines.add(l);
+        }
+        return lines;
     }
 
     // ────────────────────────── 工序快照 ──────────────────────────

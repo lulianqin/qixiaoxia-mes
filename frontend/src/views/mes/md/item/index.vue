@@ -207,8 +207,8 @@
         <el-tab-pane label="BOM组成" name="bom" v-if="form.itemId != null">
           <ItemBom ref="itemBomRef" :itemId="form.itemId" />
         </el-tab-pane>
-        <!-- 批次配置 tab (编辑时显示) -->
-        <el-tab-pane label="批次配置" name="batch" v-if="form.itemId != null">
+        <!-- 批次配置 tab (暂隐藏：配置项暂无业务消费，待启用后由 BATCH_CONFIG_ENABLED 打开) -->
+        <el-tab-pane label="批次配置" name="batch" v-if="BATCH_CONFIG_ENABLED && form.itemId != null">
           <BatchConfig ref="batchConfigRef" :itemId="form.itemId" />
         </el-tab-pane>
       </el-tabs>
@@ -259,6 +259,8 @@ const filterText = ref<string>('')
 const treeRef = ref<any>(null)
 const batchConfigRef = ref<any>(null)
 const itemBomRef = ref<any>(null)
+// 批次配置页签开关：当前批次配置仅存储、无业务消费，先隐藏避免误导
+const BATCH_CONFIG_ENABLED = false
 const effAttrSchema = ref<MdItemTypeAttr[]>([])
 const extAttrFormRef = ref<any>(null)
 

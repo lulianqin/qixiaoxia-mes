@@ -24,7 +24,7 @@
       <el-table-column label="ERP报价单号" align="center" prop="externalQuoteNo" width="160" :show-overflow-tooltip="true" />
       <el-table-column label="标题" align="center" prop="title" :show-overflow-tooltip="true" />
       <el-table-column label="客户" align="center" prop="clientName" :show-overflow-tooltip="true" />
-      <el-table-column label="询价日期" align="center" prop="inquiryDate" width="120"><template #default="s">{{ parseTime(s.row.inquiryDate, '{y}-{m}-{d}') }}</template></el-table-column>
+      <el-table-column label="询价日期" align="center" prop="inquiryDate" width="120"><template #default="s">{{ parseTime(s.row.inquiryDate || s.row.createTime, '{y}-{m}-{d}') }}</template></el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="100"><template #default="s"><el-tag :type="statusMeta(s.row.status).type">{{ statusMeta(s.row.status).text }}</el-tag></template></el-table-column>
       <el-table-column label="报价人" align="center" prop="quoteUser" width="100" :show-overflow-tooltip="true" />
       <el-table-column label="报价时间" align="center" prop="quoteTime" width="170"><template #default="s">{{ parseTime(s.row.quoteTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</template></el-table-column>

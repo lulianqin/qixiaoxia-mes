@@ -65,7 +65,7 @@
          口径与 WmItemRecptMapper 一致：任一 FAIL→FAILED；CONCESSION→CONCESSION；
          存在 PENDING/INSPECTING→PENDING；全 PASS→PASSED；无单→NONE）。 -->
     <select id="selectOutsourceOrderList" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder" resultMap="WmOutsourceOrderResult">
-        select t.order_id, t.factory_id, t.outsource_factory_id, t.order_code, t.vendor_id, t.vendor_code, t.vendor_name,
+        select t.order_id, t.factory_id, t.outsource_factory_id, t.order_code, t.supplier_type, t.vendor_id, t.vendor_code, t.vendor_name,
                t.workorder_id, t.workorder_code, t.card_id, t.route_id, t.process_id, t.process_code,
                coalesce(
                    (select group_concat(pl.process_name order by pl.seq separator '、')

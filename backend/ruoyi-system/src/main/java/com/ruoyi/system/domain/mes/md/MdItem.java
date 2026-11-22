@@ -124,6 +124,9 @@ public class MdItem extends BaseEntity
     /** 扩展属性 JSON */
     private Map<String, Object> extAttrs;
 
+    /** 规格指纹（SPU + 规格组合 SHA-256，用于同规格查重） */
+    private String specFingerprint;
+
     public Long getItemId() { return itemId; }
     public void setItemId(Long itemId) { this.itemId = itemId; }
 
@@ -212,6 +215,9 @@ public class MdItem extends BaseEntity
 
     public Map<String, Object> getExtAttrs() { return extAttrs; }
     public void setExtAttrs(Map<String, Object> extAttrs) { this.extAttrs = extAttrs; }
+
+    public String getSpecFingerprint() { return specFingerprint; }
+    public void setSpecFingerprint(String specFingerprint) { this.specFingerprint = specFingerprint; }
 
     @Override
     public String toString() {

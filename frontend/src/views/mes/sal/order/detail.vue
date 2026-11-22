@@ -93,8 +93,11 @@
               <span v-else>—</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="90">
-            <template #default="s"><el-button link type="primary" size="small" @click="goWorkorderBoard(s.row)">看板</el-button></template>
+          <el-table-column label="操作" align="center" width="140">
+            <template #default="s">
+              <el-button link type="primary" size="small" @click="goWorkorderBoard(s.row)">看板</el-button>
+              <el-button link type="primary" size="small" @click="copyWorkorder(s.row)" v-hasPermi="['mes:pro:workorder:add']">复制</el-button>
+            </template>
           </el-table-column>
         </el-table>
       </el-card>
@@ -164,6 +167,9 @@ function loadDetail() {
 
 function goWorkorderBoard(wo: any) {
   router.push({ path: '/mes/pro/workorder_board', query: { workorderId: wo.workorderId } })
+}
+function copyWorkorder(wo: any) {
+  router.push({ path: '/mes/pro/workorder_edit', query: { mode: 'copy', sourceWorkorderId: wo.workorderId } })
 }
 function woStatusText(s?: string): string {
   return ({ PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' } as any)[s || ''] || s || ''

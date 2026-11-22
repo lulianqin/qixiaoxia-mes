@@ -20,4 +20,7 @@ public interface IProWorkorderFullService
 
     /** 开单页回显：主工单 + BOM + 参数 + 工序快照 + 已生成单据 */
     WorkorderFullDetailVO getFullDetail(Long workorderId);
+
+    /** 复制模板：以已有工单为模板，清空单号/状态/执行数据，返回可直接再次提交的开单数据 */
+    WorkorderFullDetailVO getCopyTemplate(Long workorderId);
 }

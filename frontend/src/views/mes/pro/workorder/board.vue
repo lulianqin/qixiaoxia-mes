@@ -41,22 +41,25 @@
             <el-button link type="primary" icon="Plus" size="small" @click="goAddTask" v-hasPermi="['mes:pro:task:add']">新增任务</el-button>
           </div>
         </template>
-        <WorkorderProcessProgress :rows="tasks"
-          @edit="openTaskEdit" @report="goFeedback" @action="quickStatus" @process-board="goProcess" @qrcode="openCardQr" />
+        <el-tabs v-model="activeTab" @tab-change="onTabChange">
+          <el-tab-pane label="工序进度" name="process">
+            <WorkorderProcessProgress :rows="tasks"
+              @edit="openTaskEdit" @report="goFeedback" @action="quickStatus" @process-board="goProcess" @qrcode="openCardQr" />
+          </el-tab-pane>
+          <el-tab-pane label="甘特图（实际叠加）" name="gantt">
+            <div v-loading="ganttLoading" class="gantt-wrap">
+              <GanttChart ref="ganttRef" :tasks="ganttTasks" :readonly="true" :loading="ganttLoading" />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </el-card>
+
+      <!-- 物料清单与备货（BOM + 库存占用 + 缺口，可直接调整） -->
+      <WorkorderMaterialPanel :workorder-id="workorderId" :editable="materialEditable" @changed="load" />
 
       <!-- 关联单据汇总 -->
       <el-card shadow="never" class="mb16">
         <template #header><span>关联单据</span></template>
-        <el-row :gutter="12">
-          <el-col :span="4" v-for="d in dimCards" :key="d.key">
-            <el-card shadow="hover" class="dim-card" :class="{ active: activeDim === d.key }" @click="activeDim = activeDim === d.key ? '' : d.key">
-              <div class="dim-num">{{ d.total }}</div>
-              <div class="dim-label">{{ d.label }}</div>
-            </el-card>
-          </el-col>
-        </el-row>
-
         <el-collapse v-model="activeDims" class="mt16">
           <el-collapse-item name="feedback" v-if="dims.feedback.total >= 0">
             <template #title><span class="dim-title">报工记录（{{ dims.feedback.total }}）<el-tag v-if="dims.feedback.pending" size="small" type="warning" class="ml8">待审核 {{ dims.feedback.pending }}</el-tag><el-tag v-if="dims.feedback.audited" size="small" type="success" class="ml8">已审核 {{ dims.feedback.audited }}</el-tag></span></template>
@@ -80,12 +83,40 @@
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="outsource">
-            <template #title><span class="dim-title">加工单（外协）（{{ dims.outsource.total }}）</span></template>
+            <template #title><span class="dim-title">加工单（{{ dims.outsource.total }}）</span></template>
             <el-table :data="dims.outsource.list" size="small" border>
               <el-table-column label="加工单号" align="center" prop="orderCode" width="140"  :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
-              <el-table-column label="外协厂商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
-              <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
+              <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
+              <el-table-column label="加工类型" align="center" width="110">
+                <template #default="s"><dict-tag :options="mes_outsource_supplier_type" :value="s.row.supplierType" /></template>
+              </el-table-column>
+              <el-table-column label="状态" align="center" width="110">
+                <template #default="s"><dict-tag :options="mes_outsource_status" :value="s.row.status" /></template>
+              </el-table-column>
+              <el-table-column label="操作" align="center" width="170" fixed="right" class-name="op-col">
+                <template #default="s">
+                  <el-button link type="primary" size="small" @click="doExportDoc(s.row, 'PROC', 'excel')">导出</el-button>
+                  <el-button link type="primary" size="small" @click="doExportDoc(s.row, 'PROC', 'pdf')">打印</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-collapse-item>
+          <el-collapse-item name="reservation">
+            <template #title><span class="dim-title">备货预占（{{ dims.reservation?.total || 0 }}）</span></template>
+            <el-table :data="dims.reservation?.list || []" size="small" border>
+              <el-table-column label="物料编码" align="center" prop="itemCode" width="140" :show-overflow-tooltip="true" />
+              <el-table-column label="物料名称" align="center" prop="itemName" min-width="150" :show-overflow-tooltip="true" />
+              <el-table-column label="需求数量" align="center" prop="demandQty" width="100" />
+              <el-table-column label="已锁定" align="center" prop="reservedQty" width="100" />
+              <el-table-column label="已消耗" align="center" prop="consumedQty" width="100" />
+              <el-table-column label="仓库" align="center" prop="warehouseName" width="120" :show-overflow-tooltip="true" />
+              <el-table-column label="需求日期" align="center" width="170">
+                <template #default="s">{{ fmtDate(s.row.demandDate) }}</template>
+              </el-table-column>
+              <el-table-column label="状态" align="center" width="110">
+                <template #default="s">{{ reservationStatusText(s.row.status) }}</template>
+              </el-table-column>
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="purchase">
@@ -99,7 +130,15 @@
               <el-table-column label="预计到货" align="center" width="120">
                 <template #default="s">{{ fmtDate(s.row.expectedDate) }}</template>
               </el-table-column>
-              <el-table-column label="状态" align="center" prop="status" width="100" :show-overflow-tooltip="true" />
+              <el-table-column label="状态" align="center" width="100">
+                <template #default="s"><dict-tag :options="mes_order_status" :value="s.row.status" /></template>
+              </el-table-column>
+              <el-table-column label="操作" align="center" width="170" fixed="right" class-name="op-col">
+                <template #default="s">
+                  <el-button link type="primary" size="small" @click="doExportDoc(s.row, 'PUR', 'excel')">导出</el-button>
+                  <el-button link type="primary" size="small" @click="doExportDoc(s.row, 'PUR', 'pdf')">打印</el-button>
+                </template>
+              </el-table-column>
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="issue">
@@ -120,7 +159,7 @@
               <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="数量" align="center" prop="totalQuantity" width="90"  :show-overflow-tooltip="true" />
               <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
-              <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
+              <el-table-column label="状态" align="center" width="90"><template #default="s"><dict-tag :options="mes_itemrecpt_status" :value="s.row.status" /></template></el-table-column>
             </el-table>
           </el-collapse-item>
           <el-collapse-item name="productRecpt">
@@ -130,7 +169,7 @@
               <el-table-column label="客户" align="center" prop="clientName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="数量" align="center" prop="totalQuantity" width="90"  :show-overflow-tooltip="true" />
               <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
-              <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
+              <el-table-column label="状态" align="center" width="90"><template #default="s"><dict-tag :options="mes_itemrecpt_status" :value="s.row.status" /></template></el-table-column>
             </el-table>
           </el-collapse-item>
         </el-collapse>
@@ -146,36 +185,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, getCurrentInstance } from 'vue'
+import { ref, computed, getCurrentInstance, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getWorkorderBoard } from '@/api/mes/pro/workorder'
-import { getWorkorderProgress } from '@/api/mes/pro/progress'
+import { getWorkorderProgress, getWorkorderGanttReadonly } from '@/api/mes/pro/progress'
 import { quickTaskStatus, dispatchTask, cancelTask } from '@/api/mes/pro/task'
+import { exportPurDocExcel, fetchPurDocPdf, exportProcessDocExcel, fetchProcessDocPdf } from '@/api/mes/pro/workorderFull'
+import { printPdfBlob } from '@/utils/pdfPrint'
 import PurOrderWizard from './PurOrderWizard.vue'
 import OutsourceOrderCreateDialog from '@/views/mes/wm/outsource/OutsourceOrderCreateDialog.vue'
 import WorkorderProcessProgress from './components/WorkorderProcessProgress.vue'
+import WorkorderMaterialPanel from './components/WorkorderMaterialPanel.vue'
 import TaskQuickEditDialog from './components/TaskQuickEditDialog.vue'
 import CardQrDialog from './components/CardQrDialog.vue'
 import ExceptionCreateDialog from '../exception/components/ExceptionCreateDialog.vue'
+import GanttChart from '@/components/GanttChart/index.vue'
 
 const { proxy } = getCurrentInstance() as any
-const { mes_wm_issue_status } = proxy.useDict('mes_wm_issue_status')
+const { mes_wm_issue_status, mes_order_status, mes_outsource_status, mes_outsource_supplier_type, mes_itemrecpt_status } =
+  proxy.useDict('mes_wm_issue_status', 'mes_order_status', 'mes_outsource_status', 'mes_outsource_supplier_type', 'mes_itemrecpt_status')
 const route = useRoute()
 const router = useRouter()
 
 const workorderId = computed(() => Number(route.query.workorderId))
 const loading = ref(false)
 const wo = ref<any>({})
+const materialEditable = computed(() => ['PREPARE', 'PRODUCING'].includes(wo.value?.status))
 const tasks = ref<any[]>([])
-const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, purchase: {}, issue: {}, itemRecpt: {}, productRecpt: {} })
+const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, purchase: {}, issue: {}, itemRecpt: {}, productRecpt: {}, reservation: {} })
 const activeDims = ref<string[]>([])
-const activeDim = ref('')
 const purWizOpen = ref(false)
 const outsourceOpen = ref(false)
 const taskEditOpen = ref(false)
 const taskEditRef = ref()
 const qrOpen = ref(false)
 const exceptionRef = ref()
+const activeTab = ref('process')
+const ganttTasks = ref<any[]>([])
+const ganttLoading = ref(false)
+const ganttRef = ref()
 
 const WO_STATUS = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
 const WO_TAG = { PREPARE: 'info', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'danger', CLOSED: 'info' }
@@ -188,15 +236,17 @@ const progressPercent = computed(() => {
   return q <= 0 ? 0 : Math.min(100, Math.round(p / q * 100))
 })
 
-const dimCards = computed(() => [
-  { key: 'feedback', label: '报工', total: dims.value.feedback.total ?? 0 },
-  { key: 'inspection', label: '检验', total: dims.value.inspection.total ?? 0 },
-  { key: 'outsource', label: '加工单', total: dims.value.outsource.total ?? 0 },
-  { key: 'purchase', label: '采购', total: dims.value.purchase.total ?? 0 },
-  { key: 'issue', label: '领料', total: dims.value.issue.total ?? 0 },
-  { key: 'itemRecpt', label: '收料', total: dims.value.itemRecpt.total ?? 0 },
-  { key: 'productRecpt', label: '入库', total: dims.value.productRecpt.total ?? 0 },
-])
+/** 单据导出 / 打印：与工单开单页「已生成单据」一致（Excel 下载、PDF 直接调起打印） */
+function doExportDoc(row: any, type: 'PUR' | 'PROC', format: 'excel' | 'pdf') {
+  const label = type === 'PUR' ? '采购单' : '加工单'
+  const filename = `${row.vendorName || ''}_${row.docTitle || label}_${row.orderCode}.xlsx`
+  if (format === 'excel') {
+    type === 'PUR' ? exportPurDocExcel(row.orderId, filename) : exportProcessDocExcel(row.orderId, filename)
+    return
+  }
+  const req = type === 'PUR' ? fetchPurDocPdf(row.orderId) : fetchProcessDocPdf(row.orderId)
+  req.then((blob: Blob) => printPdfBlob(blob)).catch(() => {})
+}
 
 /** 工序快捷状态（弱流程记录，不校验机台/负责人/质检） */
 function quickStatus(t: any, action: string) {
@@ -235,12 +285,16 @@ function goFeedback(row: any) {
 function load() {
   if (!workorderId.value) return
   loading.value = true
+  ganttLoading.value = true
   Promise.all([
     getWorkorderBoard(workorderId.value),
-    getWorkorderProgress(workorderId.value).catch(() => null)
-  ]).then(([r, p]) => {
+    getWorkorderProgress(workorderId.value).catch(() => null),
+    getWorkorderGanttReadonly(workorderId.value).catch(() => null)
+  ]).then(([r, p, g]) => {
     if (!r.data) return
     wo.value = r.data.workorder || {}
+    ganttTasks.value = (g as any)?.data?.tasks || []
+    nextTick(() => { if (activeTab.value === 'gantt') ganttRef.value?.fitToData() })
     // 合并进度数据（计划/实际时间、完成率、延期），按 taskId 对齐
     const progressByTask = new Map<number, any>()
     ;((p as any)?.data?.processes || []).forEach((row: any) => progressByTask.set(row.taskId, row))
@@ -256,8 +310,29 @@ function load() {
       issue: r.data.issue || {},
       itemRecpt: r.data.itemRecpt || {},
       productRecpt: r.data.productRecpt || {},
+      reservation: r.data.reservation || {},
     }
-  }).finally(() => { loading.value = false })
+  }).finally(() => { loading.value = false; ganttLoading.value = false })
+}
+
+function reservationStatusText(status?: string) {
+  const map: Record<string, string> = {
+    OPEN: '待预占',
+    PARTIAL: '部分预占',
+    RESERVED: '已预占',
+    TRANSFERRED: '已转领料',
+    CONSUMED: '已消耗',
+    RELEASED: '已释放'
+  }
+  return status ? (map[status] || status) : '-'
+}
+
+/** 切到甘特图 tab 时自适应缩放 */
+async function onTabChange(name: string | number) {
+  if (name === 'gantt') {
+    await nextTick()
+    ganttRef.value?.fitToData()
+  }
 }
 
 load()
@@ -267,13 +342,11 @@ load()
 .mb16 { margin-bottom: 16px; }
 .board-actions { display: flex; align-items: center; gap: 10px; }
 .action-tip { color: #909399; font-size: 12px; }
+.gantt-wrap { min-height: 500px; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px; }
 .mt16 { margin-top: 16px; }
 .ml8 { margin-left: 8px; }
 .header-title { font-weight: bold; font-size: 16px; margin-right: 8px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; }
-.dim-card { text-align: center; cursor: pointer; border-left: 3px solid #ebeef5; }
-.dim-card.active { border-left-color: #409eff; }
-.dim-num { font-size: 26px; font-weight: bold; color: #1f2d3d; }
-.dim-label { color: #909399; font-size: 13px; margin-top: 4px; }
 .dim-title { font-weight: 600; }
+:deep(.op-col .el-button + .el-button) { margin-left: 4px; }
 </style>

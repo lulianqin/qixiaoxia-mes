@@ -60,18 +60,18 @@
         </template>
       </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="90"><template #default="s"><el-tag :type="statusMeta(s.row.status).type">{{ statusMeta(s.row.status).text }}</el-tag></template></el-table-column>
-      <el-table-column fixed="right" label="操作" align="center" width="360" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="220" class-name="op-col">
         <template #default="scope">
-          <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
+          <el-button link type="primary" size="small" @click="handleView(scope.row)">查看</el-button>
           <el-button v-if="scope.row.status==='PENDING_ACCEPT'" link type="success" size="small" @click="handleAccept(scope.row)" v-hasPermi="['mes:sal:order:edit']">接单</el-button>
           <el-button v-if="scope.row.status==='PENDING_ACCEPT' && scope.row.sourceSystem==='ERP'" link type="danger" size="small" @click="handleReject(scope.row)" v-hasPermi="['mes:sal:order:reject']">打回</el-button>
-          <el-button v-if="canModify(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">改</el-button>
+          <el-button v-if="canModify(scope.row)" link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">修改</el-button>
           <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
           <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">结单</el-button>
           <el-button v-if="['PENDING_ACCEPT','CONFIRMED','PRODUCING'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
-          <el-button v-if="canModify(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']"></el-button>
+          <el-button v-if="canModify(scope.row)" link type="danger" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']">删除</el-button>
           <el-dropdown @command="(cmd) => handleChangeStatus(scope.row, cmd)" v-hasPermi="['mes:sal:order:changeStatus']">
-            <el-button link type="primary" size="small">改状态<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+            <el-button link type="primary" size="small">改状态</el-button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item v-for="s in salStatusOptions" :key="s.dictValue" :command="s.dictValue"
@@ -80,7 +80,7 @@
             </template>
           </el-dropdown>
           <el-dropdown @command="(cmd) => handleRowExport(scope.row, cmd)" v-hasPermi="['mes:sal:order:exportDetail']">
-            <el-button link type="primary" size="small">导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+            <el-button link type="primary" size="small">导出</el-button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
@@ -214,3 +214,11 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+/* 操作列：纯中文按钮、两行排布、紧凑间距 */
+:deep(.op-col .cell) { white-space: normal; line-height: 24px; }
+:deep(.op-col .el-button) { padding: 0 3px !important; height: 24px; font-size: 12px; }
+:deep(.op-col .el-button + .el-button) { margin-left: 4px; }
+:deep(.op-col .el-dropdown) { margin-left: 4px; }
+</style>

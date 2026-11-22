@@ -77,6 +77,10 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private IWmWarehouseService wmWarehouseService;
     @Autowired private IQcFactoryService qcFactoryService;
     @Autowired private IQcGateService qcGateService;
+    @Autowired private com.ruoyi.system.service.mes.wm.IWmStockReservationService stockReservationService;
+
+    /** 预占来源单据类型：销售出库 */
+    private static final String RES_SOURCE = "PRODUCT_SALES";
 
     private TransactionTemplate txTemplate;
 
@@ -118,6 +122,9 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         entity.setCreateTime(DateUtils.getNowDate());
         wmProductSalesMapper.insertWmProductSales(entity);
         saveLines(entity);
+        // 开单即锁：按出库行预占库存（缺口留 OPEN，出库时校验）
+        stockReservationService.reserveForProductSales(entity.getSalesId(), entity.getSalesCode(),
+                wmProductSalesLineMapper.selectLinesBySalesId(entity.getSalesId()));
         // OQC 生成 hook：PC 手工新增/从销售订单生成(save 后 fromSaleOrder 草稿提交)的出库单头+行落库后
         // 生成出货待检单（工厂内部锁+事务保证原子，随本方法外层事务与出库单创建同生共死）
         if (entity.getLines() != null && !entity.getLines().isEmpty()) {
@@ -137,6 +144,9 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         entity.setUpdateTime(DateUtils.getNowDate());
         wmProductSalesMapper.updateWmProductSales(entity);
         saveLines(entity);
+        // 行变更：释放旧预占后按新行重新锁料
+        stockReservationService.reserveForProductSales(entity.getSalesId(), exist.getSalesCode(),
+                wmProductSalesLineMapper.selectLinesBySalesId(entity.getSalesId()));
         return 1;
     }
 
@@ -147,6 +157,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         if (exist != null && !WmProductSalesConstants.isEditable(exist.getStatus())) {
             throw new ServiceException("当前状态[" + exist.getStatus() + "]不允许删除");
         }
+        stockReservationService.releaseBySource(RES_SOURCE, salesId);
         return wmProductSalesMapper.deleteWmProductSalesBySalesId(salesId);
     }
 
@@ -158,6 +169,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             if (exist != null && !WmProductSalesConstants.isEditable(exist.getStatus())) {
                 throw new ServiceException("出库单[" + exist.getSalesCode() + "]当前状态不允许删除");
             }
+            stockReservationService.releaseBySource(RES_SOURCE, id);
         }
         return wmProductSalesMapper.deleteWmProductSalesBySalesIds(salesIds);
     }
@@ -335,7 +347,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         stock.setQuantityAvailable(clampAvailableToOnhand(stock.getQuantityAvailable(), newOnhand));
         stock.setUpdateTime(new Date());
         wmMaterialStockMapper.updateWmMaterialStock(stock);
-
+        // 预占转消耗：出库量从“锁定”转为“已消耗”，可用量在开单时已扣
+        stockReservationService.consumeBySource(RES_SOURCE, header.getSalesId(), d.getItemId(), qty);
         d.setDetailId(null);
         d.setSalesId(header.getSalesId());
         d.setMaterialStockId(stock.getMaterialStockId());
@@ -441,6 +454,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         header.setUpdateTime(DateUtils.getNowDate());
         header.setUpdateBy(SecurityUtils.getUsername());
         int rows = wmProductSalesMapper.updateWmProductSales(header);
+        // 关闭：释放残余预占（正常已全部出库，此处兜底）
+        stockReservationService.releaseBySource(RES_SOURCE, salesId);
         // QC 联动作废：关闭时把该来源仍处 PENDING/INSPECTING 的检验单置 CLOSED
         // （COMPLETED 单是质量档案保留不关）
         qcFactoryService.closeBySource(QcConstants.SOURCE_PRODUCT_SALES, salesId);
@@ -470,6 +485,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         if (WmProductSalesConstants.STATUS_PARTIAL_POSTED.equals(header.getStatus())) {
             rollbackPostedStock(header);
         }
+        // 作废：释放未出库预占（已出库部分已由 rollbackPostedStock 回滚库存）
+        stockReservationService.releaseBySource(RES_SOURCE, salesId);
         header.setStatus(WmProductSalesConstants.STATUS_CANCELED);
         header.setUpdateTime(DateUtils.getNowDate());
         header.setUpdateBy(SecurityUtils.getUsername());

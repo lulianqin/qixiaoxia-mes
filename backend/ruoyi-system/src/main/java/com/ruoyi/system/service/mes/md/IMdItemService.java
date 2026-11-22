@@ -20,6 +20,15 @@ public interface IMdItemService
 
     public boolean checkItemCodeUnique(MdItem mdItem);
 
+    /**
+     * 按规格查找或创建 SKU 变体。
+     * 指纹命中直接复用；未命中以 parentId 为 SPU 新建变体。
+     *
+     * @param spec 规格信息（parentId 必填，extAttrs/productSize/printingReq/packageSpec 参与指纹）
+     * @return 命中的既有变体或新建变体
+     */
+    public MdItem findOrCreateSpecVariant(MdItem spec);
+
     /** 新增物料（含行业子表联动 + 变体继承逻辑） */
         public int insertMdItem(MdItem mdItem);
     /** 更新物料（含行业子表联动） */

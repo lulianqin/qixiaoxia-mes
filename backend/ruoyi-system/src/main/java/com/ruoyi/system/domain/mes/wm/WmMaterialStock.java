@@ -59,6 +59,9 @@ public class WmMaterialStock extends BaseEntity
     @Excel(name = "可用库存量")
     private BigDecimal quantityAvailable;
 
+    @Excel(name = "锁定库存量")
+    private BigDecimal quantityLocked;
+
     @Excel(name = "可用库存量(辅)")
     private BigDecimal quantityAvailable2;
 
@@ -193,6 +196,9 @@ public class WmMaterialStock extends BaseEntity
 
     public BigDecimal getQuantityAvailable() { return quantityAvailable; }
     public void setQuantityAvailable(BigDecimal v) { this.quantityAvailable = v; }
+
+    public BigDecimal getQuantityLocked() { return quantityLocked; }
+    public void setQuantityLocked(BigDecimal v) { this.quantityLocked = v; }
 
     public BigDecimal getQuantityAvailable2() { return quantityAvailable2; }
     public void setQuantityAvailable2(BigDecimal v) { this.quantityAvailable2 = v; }

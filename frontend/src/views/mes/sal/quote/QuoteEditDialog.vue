@@ -9,7 +9,7 @@
         <el-descriptions-item label="状态">{{ statusText }}</el-descriptions-item>
         <el-descriptions-item label="标题">{{ detail.title || '-' }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ detail.clientName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="询价日期">{{ parseTime(detail.inquiryDate, '{y}-{m}-{d}') || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="询价日期">{{ parseTime(detail.inquiryDate || detail.createTime, '{y}-{m}-{d}') || '-' }}</el-descriptions-item>
         <el-descriptions-item label="报价人">{{ detail.quoteUser || '-' }}</el-descriptions-item>
         <el-descriptions-item label="报价时间">{{ parseTime(detail.quoteTime, '{y}-{m}-{d} {h}:{i}:{s}') || '-' }}</el-descriptions-item>
         <el-descriptions-item label="报价总额">{{ detail.totalAmount ?? '-' }}</el-descriptions-item>

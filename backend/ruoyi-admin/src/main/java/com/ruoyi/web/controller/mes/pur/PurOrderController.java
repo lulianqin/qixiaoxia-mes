@@ -202,6 +202,7 @@ public class PurOrderController extends BaseController
         com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model m = new com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.Model();
         m.title = "合并采购单";
         m.partyLabel = "供应商：";
+        m.showBizNo = false;
         m.headers.add("产品名称");
         m.headers.add("业务单号");
         m.headers.add("产品尺寸");
@@ -263,7 +264,6 @@ public class PurOrderController extends BaseController
         m.headers.add("单价");
         m.headers.add("总金额(元）");
         m.headers.add("送货日期");
-        m.headers.add("订单编号");
         m.headers.add("备注");
         String productName = productNameOf(o.getWorkorderId(), o.getWorkorderCode());
         for (com.ruoyi.system.domain.mes.pur.PurOrderLine l : detail.getLines())
@@ -287,7 +287,6 @@ public class PurOrderController extends BaseController
             row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getUnitPrice()));
             row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getAmount()));
             row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmtDate(l.getExpectedDate()));
-            row.add(l.getSourceOrderCode() != null ? l.getSourceOrderCode() : o.getSourceOrderCode());
             row.add(l.getRemark());
             m.rows.add(row);
             if (l.getAmount() != null) m.total = m.total.add(l.getAmount());

@@ -25,3 +25,8 @@ export function updateItem(data: MdItem): Promise<AjaxResult> {
 export function delItem(itemId: number | number[]): Promise<AjaxResult> {
   return request({ url: '/mes/md/item/' + itemId, method: 'delete' })
 }
+
+// 接单按规格建档：同规格命中复用，未命中以 SPU 新建 SKU 变体
+export function specVariantItem(data: Partial<MdItem>): Promise<AjaxResult<MdItem>> {
+  return request({ url: '/mes/md/item/specVariant', method: 'post', data })
+}

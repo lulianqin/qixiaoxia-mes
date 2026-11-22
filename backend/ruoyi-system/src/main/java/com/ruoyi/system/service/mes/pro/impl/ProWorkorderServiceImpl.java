@@ -110,6 +110,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     private IWmMaterialStockService wmMaterialStockService;
 
     @Autowired
+    private com.ruoyi.system.service.mes.wm.IWmStockReservationService stockReservationService;
+
+    @Autowired
     private IProWorkorderChangeService proWorkorderChangeService;
 
     @Autowired
@@ -894,6 +897,19 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             if (patch.getProcessFlow() != null) data.setProcessFlow(patch.getProcessFlow());
             if (patch.getProductImage() != null) data.setProductImage(patch.getProductImage());
             if (patch.getSalesperson() != null) data.setSalesperson(patch.getSalesperson());
+            // 流转单可编辑的文本要求字段
+            if (patch.getPrintingReq() != null) data.setPrintingReq(patch.getPrintingReq());
+            if (patch.getPackageReq() != null) data.setPackageReq(patch.getPackageReq());
+            if (patch.getShippingReq() != null) data.setShippingReq(patch.getShippingReq());
+            if (patch.getRemark() != null) data.setRemark(patch.getRemark());
+            // 产品属性/生产属性：与工单已有扩展属性合并，只覆盖本次提交的键
+            if (patch.getLineAttrs() != null && !patch.getLineAttrs().isEmpty())
+            {
+                Map<String, Object> merged = new LinkedHashMap<>();
+                if (wo.getLineAttrs() != null) merged.putAll(wo.getLineAttrs());
+                merged.putAll(patch.getLineAttrs());
+                data.setLineAttrs(merged);
+            }
         }
 
         data.setUpdateBy(SecurityUtils.getUsername());
@@ -1089,6 +1105,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     @Override
     public int deleteProWorkorderByWorkorderIds(Long[] workorderIds)
     {
+        if (workorderIds != null) {
+            for (Long workorderId : workorderIds) stockReservationService.releaseByWorkorder(workorderId);
+        }
         return qxxProWorkorderMapper.deleteProWorkorderByWorkorderIds(workorderIds);
     }
 
@@ -1101,6 +1120,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     @Override
     public int deleteProWorkorderByWorkorderId(Long workorderId)
     {
+        stockReservationService.releaseByWorkorder(workorderId);
         return qxxProWorkorderMapper.deleteProWorkorderByWorkorderId(workorderId);
     }
 
@@ -1282,6 +1302,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         // Step 2: 级联取消该工单下所有非终态排产任务
         proTaskService.cancelByWorkorder(workorderId);
 
+        // Step 2.1 释放该工单剩余备货预占，避免锁定库存泄漏
+        stockReservationService.releaseByWorkorder(workorderId);
+
         // Step 3: 更新工单状态
         wo.setStatus("CANCEL");
         wo.setUpdateTime(DateUtils.getNowDate());
@@ -1317,7 +1340,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         }
         Map<Long, MdItem> items = mesQuantityService.loadItems(bomItemIds);
         Map<Long, BigDecimal> availableByItem = sumAvailableByItemIds(bomItemIds, items);
-        Map<Long, BigDecimal> reservedByItem = sumReservedByItem(workorderId, items);
+        Map<Long, BigDecimal> lockedByItem = sumLockedByItemIds(bomItemIds, items);
+        Map<Long, BigDecimal> issueReserved = sumReservedByItem(workorderId, items);
+        Map<Long, BigDecimal> reservationReserved = sumWorkorderReservations(workorderId);
 
         List<Map<String, Object>> result = new ArrayList<>();
         boolean allSufficient = true;
@@ -1329,7 +1354,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             BigDecimal required = mesQuantityService.toBaseQty(requiredBiz, bom.getUnitOfMeasure(), item);
 
             BigDecimal availableTotal = availableByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
-            BigDecimal reserved = reservedByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO);
+            BigDecimal reserved = issueReserved.getOrDefault(bom.getItemId(), BigDecimal.ZERO)
+                    .add(reservationReserved.getOrDefault(bom.getItemId(), BigDecimal.ZERO));
             BigDecimal effectiveQty = availableTotal.add(reserved);
             boolean sufficient = effectiveQty.compareTo(required) >= 0;
 
@@ -1345,7 +1371,9 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             row.put("bomSource", bom.getBomSource());
             row.put("requiredQty", required);
             row.put("availableQty", availableTotal);
+            row.put("lockedQty", lockedByItem.getOrDefault(bom.getItemId(), BigDecimal.ZERO));
             row.put("reservedForOrder", reserved);
+            row.put("workorderReservedQty", reservationReserved.getOrDefault(bom.getItemId(), BigDecimal.ZERO));
             row.put("effectiveQty", effectiveQty);
             row.put("sufficient", sufficient);
             row.put("shortageQty", sufficient ? BigDecimal.ZERO : required.subtract(effectiveQty));
@@ -1424,6 +1452,39 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             availableByItem.merge(stock.getItemId(), baseQty, BigDecimal::add);
         }
         return availableByItem;
+    }
+
+    /** 按 itemId 集合汇总锁定量 quantity_locked（库存总锁，含其他工单占用） */
+    private Map<Long, BigDecimal> sumLockedByItemIds(List<Long> itemIds, Map<Long, MdItem> items)
+    {
+        Map<Long, BigDecimal> lockedByItem = new HashMap<>();
+        if (itemIds == null || itemIds.isEmpty()) return lockedByItem;
+        List<WmMaterialStock> stocks = wmMaterialStockMapper.selectByItemIds(itemIds);
+        if (stocks == null) return lockedByItem;
+        for (WmMaterialStock stock : stocks) {
+            if (stock.getItemId() == null || stock.getQuantityLocked() == null) continue;
+            BigDecimal baseQty = mesQuantityService.toBaseQty(
+                    stock.getQuantityLocked(), stock.getUnitOfMeasure(), items.get(stock.getItemId()));
+            lockedByItem.merge(stock.getItemId(), baseQty, BigDecimal::add);
+        }
+        return lockedByItem;
+    }
+
+    /** 汇总本工单仍有效的预占量（备货占用） */
+    private Map<Long, BigDecimal> sumWorkorderReservations(Long workorderId)
+    {
+        Map<Long, BigDecimal> reserved = new HashMap<>();
+        com.ruoyi.system.domain.mes.wm.WmStockReservation q =
+                new com.ruoyi.system.domain.mes.wm.WmStockReservation();
+        q.setWorkorderId(workorderId);
+        for (com.ruoyi.system.domain.mes.wm.WmStockReservation r : stockReservationService.selectList(q)) {
+            String st = r.getStatus();
+            boolean active = "OPEN".equals(st) || "PARTIAL".equals(st) || "RESERVED".equals(st);
+            if (active && r.getItemId() != null && r.getReservedQty() != null) {
+                reserved.merge(r.getItemId(), r.getReservedQty(), BigDecimal::add);
+            }
+        }
+        return reserved;
     }
 
     /**
@@ -1986,6 +2047,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
 
         // 4. 批量插入BOM行（自动合并产品BOM + 计算用量方式/损耗/基准单位）
         saveWorkorderBomRows(workorder, bomList);
+
+        // 4.1 备货预占：按落库后的 BOM 占用可用库存，缺口保留为 OPEN 需求
+        List<ProWorkorderBom> savedBoms = proWorkorderBomService.selectProWorkorderBomByWorkorderId(workorderId);
+        stockReservationService.reserveForWorkorder(workorder, savedBoms);
 
         // 5. 批量插入工序参数行
         if (paramList != null && !paramList.isEmpty())

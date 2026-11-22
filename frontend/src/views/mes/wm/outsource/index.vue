@@ -42,12 +42,18 @@
           批量收货<span v-if="receivableRows.length > 0">（{{ receivableRows.length }}）</span>
         </el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button type="info" plain size="small" :disabled="!selectedRows.length" @click="handleDocExport" v-hasPermi="['mes:wm:outsource:export']">单据导出</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="info" plain size="small" :disabled="!selectedRows.length" @click="handleDocPrint" v-hasPermi="['mes:wm:outsource:export']">单据打印</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
 
     <!-- 列表 -->
       <el-table ref="tableRef" v-loading="loading" :data="list" border row-key="orderId" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="48" :selectable="canSelectRow" />
+      <el-table-column type="selection" width="48" />
       <el-table-column label="外协单号" align="center" prop="orderCode" width="160" :show-overflow-tooltip="true" />
       <el-table-column label="来源" align="center" prop="sourceType" width="80" :show-overflow-tooltip="true">
         <template #default="{ row }">
@@ -80,7 +86,7 @@
       <el-table-column label="代操作人" align="center" prop="agentOperator" width="90" :show-overflow-tooltip="true">
         <template #default="{ row }">{{ row.agentOperator || '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="200" fixed="right">
+      <el-table-column label="操作" align="center" width="220" fixed="right" class-name="op-col">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
           <el-button v-if="row.status === 'DRAFT'" link type="warning" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleExecute(row)" v-hasPermi="['mes:wm:outsource:execute']">执行发料</el-button>
@@ -88,18 +94,11 @@
           <el-button v-else-if="row.status === 'VENDOR_RCVD' || row.status === 'PROCESSING'" link type="primary" size="small" :disabled="actionLoadingId != null" @click="handleAgentResult(row)" v-hasPermi="['mes:wm:outsource:agentOps']">{{ row.status === 'VENDOR_RCVD' ? '录结果' : '补录' }}</el-button>
           <el-button v-else-if="row.status === 'FINISHED'" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleShip(row)" v-hasPermi="['mes:wm:outsource:agentOps']">发货回厂</el-button>
           <el-button v-else-if="canReceive(row.status)" link type="success" size="small" :loading="actionLoadingId === row.orderId" :disabled="actionLoadingId != null" @click="handleReceive(row)" v-hasPermi="['mes:wm:outsource:receive']">收货</el-button>
-          <el-dropdown @command="cmd => handleMoreCommand(row, cmd)">
-            <el-button link type="primary" size="small">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item v-if="row.status === 'DRAFT' && checkPermi(['mes:wm:outsource:remove'])" command="delete">删除</el-dropdown-item>
-                <el-dropdown-item v-if="row.status === 'PROCESSING' && checkPermi(['mes:wm:outsource:agentOps'])" command="complete">完成</el-dropdown-item>
-                <el-dropdown-item v-if="checkPermi(['mes:wm:outsource:query'])" command="process">工序</el-dropdown-item>
-                <el-dropdown-item v-if="checkPermi(['mes:wm:outsource:export'])" command="export">导出</el-dropdown-item>
-                <el-dropdown-item v-if="checkPermi(['mes:wm:outsource:changeStatus'])" command="status">改状态</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          <el-button v-if="row.status === 'DRAFT' && checkPermi(['mes:wm:outsource:remove'])" link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-button v-if="row.status === 'PROCESSING' && checkPermi(['mes:wm:outsource:agentOps'])" link type="primary" size="small" @click="handleComplete(row)">完成</el-button>
+          <el-button v-if="checkPermi(['mes:wm:outsource:query'])" link type="primary" size="small" @click="handleProcessLines(row)">工序</el-button>
+          <el-button v-if="checkPermi(['mes:wm:outsource:export'])" link type="primary" size="small" @click="handleExport(row)">导出</el-button>
+          <el-button v-if="checkPermi(['mes:wm:outsource:changeStatus'])" link type="primary" size="small" @click="openStatusPick(row)">改状态</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -193,6 +192,8 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { checkPermi } from '@/utils/permission'
 import QcStatusTag from '../../qc/components/QcStatusTag.vue'
 import { showBatchResult } from './batchResult'
+import { printPdfBlob } from '@/utils/pdfPrint'
+import { exportProcessDocExcel, fetchProcessDocPdf, exportProcessDocsMergeExcel, fetchProcessDocsMergePdf } from '@/api/mes/pro/workorderFull'
 import type { OutsourceIssueLineVO } from './types'
 
 interface OutsourceOrderRow {
@@ -314,15 +315,6 @@ function handleProcessLines(row: OutsourceOrderRow) {
   processLineVisible.value = true
 }
 
-/** 「更多」下拉命令分发 */
-function handleMoreCommand(row: OutsourceOrderRow, cmd: string) {
-  if (cmd === 'delete') handleDelete(row)
-  else if (cmd === 'complete') handleComplete(row)
-  else if (cmd === 'process') handleProcessLines(row)
-  else if (cmd === 'export') handleExport(row)
-  else if (cmd === 'status') openStatusPick(row)
-}
-
 function openStatusPick(row: OutsourceOrderRow) {
   statusPickRow.value = row
   statusPickValue.value = ''
@@ -426,11 +418,39 @@ async function handleDelete(row: OutsourceOrderRow) {
 function canReceive(status: string) {
   return status === 'SHIPPED'
 }
-function canSelectRow(row: OutsourceOrderRow) {
-  return row.status === 'DRAFT' || canReceive(row.status)
-}
 function handleSelectionChange(rows: OutsourceOrderRow[]) {
   selectedRows.value = rows
+}
+
+/** 单据导出：选 1 张导单张，多选要求同一供应商则合并 */
+function handleDocExport() {
+  const rows = selectedRows.value
+  if (!rows.length) return ElMessage.warning('请选择加工单')
+  if (rows.length === 1) {
+    const r: any = rows[0]
+    return exportProcessDocExcel(r.orderId, `${r.vendorName || ''}_${r.docTitle || '加工单'}_${r.orderCode}.xlsx`)
+  }
+  if (new Set(rows.map(r => r.vendorName)).size > 1) return ElMessage.warning('合并导出要求选择同一加工商的单据')
+  exportProcessDocsMergeExcel(rows.map(r => r.orderId), `${rows[0].vendorName || ''}_合并加工单_${ymd()}.xlsx`)
+}
+
+/** 单据打印：单张/合并都直接调起系统打印 */
+function handleDocPrint() {
+  const rows = selectedRows.value
+  if (!rows.length) return ElMessage.warning('请选择加工单')
+  if (rows.length > 1 && new Set(rows.map(r => r.vendorName)).size > 1) {
+    return ElMessage.warning('合并打印要求选择同一加工商的单据')
+  }
+  const req = rows.length === 1
+    ? fetchProcessDocPdf(rows[0].orderId)
+    : fetchProcessDocsMergePdf(rows.map(r => r.orderId))
+  req.then((blob: Blob) => printPdfBlob(blob)).catch(() => {})
+}
+
+/** 当天 yyyyMMdd，用于合并单据文件名 */
+function ymd() {
+  const d = new Date()
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
 }
 
 // 来料检验状态 tag：点击跳转 IQC 列表并按外协单过滤
@@ -483,3 +503,10 @@ onMounted(() => {
   getList()
 })
 </script>
+
+<style scoped>
+/* 操作列：纯中文按钮、两行排布、紧凑间距 */
+:deep(.op-col .cell) { white-space: normal; line-height: 24px; }
+:deep(.op-col .el-button) { padding: 0 3px !important; height: 24px; font-size: 12px; }
+:deep(.op-col .el-button + .el-button) { margin-left: 4px; }
+</style>

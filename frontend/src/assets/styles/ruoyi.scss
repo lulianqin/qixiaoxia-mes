@@ -90,11 +90,11 @@
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
   display: flex;
+  align-items: center;
   justify-content: center;
   position: relative;
   padding: 0 13px;
   height: 50px;
-  line-height: 50px;
   margin-right: 0;
 }
 
@@ -103,12 +103,14 @@
   font-size: 14px;
   color: #ffffff;
   text-align: center;
+  line-height: 1.4;
 }
 
 .el-dialog__headerbtn {
   position: absolute;
   right: 0;
-  top: 3px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .el-dialog__headerbtn .el-dialog__close {

@@ -76,6 +76,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
     @Autowired
     private IWmWarehouseService wmWarehouseService;
 
+    @Autowired
+    private com.ruoyi.system.service.mes.wm.IWmStockReservationService stockReservationService;
+
     /** 质检生成工厂：入库单创建后生成 IQC 待检单（内部锁+事务，幂等） */
     @Autowired
     private IQcFactoryService qcFactoryService;
@@ -271,6 +274,11 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
         // 1. 更新库存（内部使用 Redisson 锁 + TransactionTemplate）
         storageCoreService.processItemRecpt(txBeans);
+
+        // 1.1 到货回补：按需求日期 FIFO 自动把新库存分配给缺料工单
+        for (WmItemRecptLine line : lines) {
+            if (line.getItemId() != null) stockReservationService.reallocateByItem(line.getItemId());
+        }
 
         // 2. 写入物料追溯 RECEIPT（采购入库→原料库存，追溯链起点）
         for (WmItemRecptLine line : lines) {

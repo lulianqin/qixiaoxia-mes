@@ -20,6 +20,9 @@ public interface MdItemMapper
 
     public MdItem checkItemCodeUnique(MdItem mdItem);
 
+    /** 按规格指纹查重（同品名同规格复用） */
+    public MdItem selectBySpecFingerprint(MdItem query);
+
     public int insertMdItem(MdItem mdItem);
 
     public int updateMdItem(MdItem mdItem);

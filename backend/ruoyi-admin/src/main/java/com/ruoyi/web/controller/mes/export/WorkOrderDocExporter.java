@@ -54,6 +54,8 @@ public class WorkOrderDocExporter
         public String partyName;
         public String bizNo;
         public String bizNoLabel = "业务单号NO：";
+        /** 是否展示右上角业务单号（合并单据不展示） */
+        public boolean showBizNo = true;
         public String docCode;
         public String docCodeLabel = "采购单号NO：";
         public List<String> headers = new ArrayList<>();
@@ -84,13 +86,116 @@ public class WorkOrderDocExporter
             r = body(sh, r, m, st, cols);
             r = total(sh, r, m, st, cols);
             r = footer(sh, r, m, st, cols);
-            embedImage(wb, sh, r + 1, m.productImage);
+            r = image(sh, r, m, cols);
             for (int i = 0; i < cols; i++)
             {
                 sh.setColumnWidth(i, i == 0 ? 6000 : 4200);
             }
             wb.write(out);
         }
+    }
+
+    /** 图片最大显示高度（像素），约 5 行表格高度 */
+    private static final int IMG_MAX_HEIGHT_PX = 180;
+    /** 单行默认高度（像素，22pt） */
+    private static final double ROW_HEIGHT_PX = 22 * 96 / 72d;
+    /** 1 像素对应 EMU */
+    private static final int EMU_PER_PX = 9525;
+
+    /** 申购人行之后插入产品图片：按原图比例缩放（最高 180px），水平居中 */
+    private static int image(Sheet sh, int r, Model m, int cols)
+    {
+        byte[] bytes = loadImage(m.productImage);
+        if (bytes == null)
+        {
+            return r;
+        }
+        int[] size = imageSize(bytes);
+        if (size == null)
+        {
+            return r;
+        }
+        double tableW = tableWidthPx(sh, cols);
+        double scale = Math.min(1d, Math.min(IMG_MAX_HEIGHT_PX / (double) size[1],
+                tableW / (double) size[0]));
+        double dispW = size[0] * scale;
+        double dispH = Math.max(24, size[1] * scale);
+        int imgRows = Math.max(1, (int) Math.ceil(dispH / ROW_HEIGHT_PX));
+        for (int i = 0; i < imgRows; i++)
+        {
+            sh.createRow(r + i).setHeightInPoints((float) (dispH * 72d / 96d / imgRows));
+        }
+        double startX = Math.max(0, (tableW - dispW) / 2);
+        int startCol = 0;
+        double acc = 0;
+        while (startCol < cols - 1 && acc + colWidthPx(startCol) <= startX)
+        {
+            acc += colWidthPx(startCol++);
+        }
+        int endCol = startCol;
+        double endAcc = acc + colWidthPx(startCol);
+        while (endCol < cols - 1 && endAcc < startX + dispW)
+        {
+            endAcc += colWidthPx(++endCol);
+        }
+        try
+        {
+            int type = isPng(bytes) ? Workbook.PICTURE_TYPE_PNG : Workbook.PICTURE_TYPE_JPEG;
+            int idx = sh.getWorkbook().addPicture(bytes, type);
+            Drawing<?> drawing = sh.createDrawingPatriarch();
+            ClientAnchor a = sh.getWorkbook().getCreationHelper().createClientAnchor();
+            a.setCol1(startCol);
+            a.setDx1((int) Math.round((startX - acc) * EMU_PER_PX));
+            a.setRow1(r);
+            a.setDy1(0);
+            a.setCol2(endCol);
+            double endInCol = Math.min(colWidthPx(endCol),
+                    Math.max(0, startX + dispW - (endAcc - colWidthPx(endCol))));
+            a.setDx2((int) Math.round(endInCol * EMU_PER_PX));
+            a.setRow2(r + imgRows);
+            a.setDy2(0);
+            drawing.createPicture(a, idx);
+        }
+        catch (Exception ignored)
+        {
+            // 图片格式不支持时忽略，不影响单据主体
+        }
+        return r + imgRows;
+    }
+
+    private static int[] imageSize(byte[] bytes)
+    {
+        try (ByteArrayInputStream in = new ByteArrayInputStream(bytes))
+        {
+            java.awt.image.BufferedImage bi = javax.imageio.ImageIO.read(in);
+            return bi == null ? null : new int[] { bi.getWidth(), bi.getHeight() };
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+    }
+
+    /** 列宽（像素，按设定列宽估算） */
+    private static double colWidthPx(int col)
+    {
+        return (col == 0 ? 6000 : 4200) / 256d * 7 + 5;
+    }
+
+    /** 表格总宽度（像素） */
+    private static double tableWidthPx(Sheet sh, int cols)
+    {
+        double w = 0;
+        for (int i = 0; i < cols; i++)
+        {
+            w += colWidthPx(i);
+        }
+        return w;
+    }
+
+    private static boolean isPng(byte[] b)
+    {
+        return b.length > 4 && (b[0] & 0xFF) == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47;
     }
 
     private static int title(Sheet sh, int r, Model m, Styles st, int cols)
@@ -116,7 +221,7 @@ public class WorkOrderDocExporter
         Row row = sh.createRow(r);
         set(row, 0, m.partyLabel, st.label);
         set(row, 1, safe(m.partyName), st.value);
-        if (cols > 3)
+        if (cols > 3 && m.showBizNo)
         {
             set(row, cols - 3, m.bizNoLabel + safe(m.bizNo), st.value);
             sh.addMergedRegion(new CellRangeAddress(r, r, cols - 3, cols - 1));
@@ -203,30 +308,6 @@ public class WorkOrderDocExporter
         return r + 1;
     }
 
-    private static void embedImage(Workbook wb, Sheet sh, int rowIdx, String image)
-    {
-        byte[] bytes = loadImage(image);
-        if (bytes == null)
-        {
-            return;
-        }
-        try
-        {
-            int idx = wb.addPicture(bytes, Workbook.PICTURE_TYPE_PNG);
-            Drawing<?> drawing = sh.createDrawingPatriarch();
-            ClientAnchor anchor = wb.getCreationHelper().createClientAnchor();
-            anchor.setCol1(0);
-            anchor.setRow1(rowIdx);
-            anchor.setCol2(4);
-            anchor.setRow2(rowIdx + 10);
-            drawing.createPicture(anchor, idx);
-        }
-        catch (Exception ignored)
-        {
-            // 图片格式不支持时忽略，不影响单据主体
-        }
-    }
-
     // ═══════════════════ PDF ═══════════════════
 
     public static void writePdf(Model m, OutputStream out) throws Exception
@@ -269,7 +350,8 @@ public class WorkOrderDocExporter
         sb.append("<div class='c t1'>").append(COMPANY).append("</div>");
         sb.append("<div class='c t2'>").append(esc(m.title)).append("</div>");
         sb.append("<table class='info'><tr><td>").append(esc(m.partyLabel)).append(esc(m.partyName))
-          .append("</td><td style='text-align:right'>").append(esc(m.bizNoLabel)).append(esc(m.bizNo))
+          .append("</td><td style='text-align:right'>")
+          .append(m.showBizNo ? esc(m.bizNoLabel) + esc(m.bizNo) : "")
           .append("</td></tr><tr><td></td><td style='text-align:right'>")
           .append(esc(m.docCodeLabel)).append(esc(m.docCode)).append("</td></tr></table>");
         sb.append("<table class='grid'><tr>");
@@ -297,8 +379,9 @@ public class WorkOrderDocExporter
         String img = imageDataUri(m.productImage);
         if (img != null)
         {
-            sb.append("<div style='margin-top:12px'><img src='").append(img)
-              .append("' style='max-height:220px'/></div>");
+            // 原图比例展示，最高 180px，超宽时等比缩小
+            sb.append("<div style='text-align:center;margin:8px 0'><img src='").append(img)
+              .append("' style='height:auto;width:auto;max-height:180px;max-width:100%'/></div>");
         }
         sb.append("</body></html>");
         return sb.toString();
@@ -375,6 +458,22 @@ public class WorkOrderDocExporter
                 return new org.springframework.core.io.ClassPathResource(
                         src.substring("classpath:".length())).getInputStream().readAllBytes();
             }
+            // 系统内相对路径（/profile/upload/...）→ 上传目录物理文件
+            String relative = src;
+            String prefix = com.ruoyi.common.constant.Constants.RESOURCE_PREFIX;
+            if (relative.startsWith(prefix + "/"))
+            {
+                relative = relative.substring(prefix.length());
+            }
+            if (relative.startsWith("/"))
+            {
+                java.io.File f = new java.io.File(
+                        com.ruoyi.common.config.RuoYiConfig.getProfile() + relative);
+                if (f.exists())
+                {
+                    return java.nio.file.Files.readAllBytes(f.toPath());
+                }
+            }
             java.io.File f = new java.io.File(src);
             if (f.exists())
             {
@@ -394,7 +493,8 @@ public class WorkOrderDocExporter
         {
             return null;
         }
-        return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes);
+        return (isPng(bytes) ? "data:image/png;base64," : "data:image/jpeg;base64,")
+                + Base64.getEncoder().encodeToString(bytes);
     }
 
     /** 单元格样式集合 */
@@ -412,19 +512,19 @@ public class WorkOrderDocExporter
 
         Styles(Workbook wb)
         {
-            title = base(wb, 16, true, HorizontalAlignment.CENTER);
-            subTitle = base(wb, 14, true, HorizontalAlignment.CENTER);
-            label = base(wb, 10, true, HorizontalAlignment.CENTER);
-            value = base(wb, 10, false, HorizontalAlignment.LEFT);
-            head = base(wb, 10, true, HorizontalAlignment.CENTER);
-            cell = base(wb, 10, false, HorizontalAlignment.CENTER);
-            totalLabel = base(wb, 10, true, HorizontalAlignment.RIGHT);
-            totalValue = base(wb, 11, true, HorizontalAlignment.RIGHT);
-            wrap = base(wb, 10, false, HorizontalAlignment.LEFT);
+            title = base(wb, 16, true, HorizontalAlignment.CENTER, false);
+            subTitle = base(wb, 14, true, HorizontalAlignment.CENTER, false);
+            label = base(wb, 10, true, HorizontalAlignment.CENTER, false);
+            value = base(wb, 10, false, HorizontalAlignment.LEFT, false);
+            head = base(wb, 10, true, HorizontalAlignment.CENTER, true);
+            cell = base(wb, 10, false, HorizontalAlignment.CENTER, true);
+            totalLabel = base(wb, 10, true, HorizontalAlignment.RIGHT, false);
+            totalValue = base(wb, 11, true, HorizontalAlignment.RIGHT, false);
+            wrap = base(wb, 10, false, HorizontalAlignment.LEFT, false);
             wrap.setWrapText(true);
         }
 
-        private static CellStyle base(Workbook wb, int size, boolean bold, HorizontalAlignment align)
+        private static CellStyle base(Workbook wb, int size, boolean bold, HorizontalAlignment align, boolean border)
         {
             CellStyle s = wb.createCellStyle();
             Font f = wb.createFont();
@@ -433,10 +533,13 @@ public class WorkOrderDocExporter
             s.setFont(f);
             s.setAlignment(align);
             s.setVerticalAlignment(VerticalAlignment.CENTER);
-            s.setBorderTop(BorderStyle.THIN);
-            s.setBorderBottom(BorderStyle.THIN);
-            s.setBorderLeft(BorderStyle.THIN);
-            s.setBorderRight(BorderStyle.THIN);
+            if (border)
+            {
+                s.setBorderTop(BorderStyle.THIN);
+                s.setBorderBottom(BorderStyle.THIN);
+                s.setBorderLeft(BorderStyle.THIN);
+                s.setBorderRight(BorderStyle.THIN);
+            }
             return s;
         }
     }

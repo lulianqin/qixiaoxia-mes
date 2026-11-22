@@ -51,7 +51,7 @@
         <el-tag :type="delayTagType(s.row.delayLevel)" size="small">{{ delayLabel(s.row.delayLevel) }}</el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="操作" align="center" width="400" fixed="right" class-name="op-col">
+    <el-table-column label="操作" align="center" width="220" fixed="right" class-name="op-col">
       <template #default="s">
         <el-button v-if="canDispatch(s.row)" link type="success" size="small"
           @click.stop="emit('action', s.row, 'DISPATCH')" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
@@ -66,15 +66,10 @@
         <el-button link type="primary" size="small" @click.stop="emit('edit', s.row)" v-hasPermi="['mes:pro:task:edit']">编辑</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('qrcode', s.row)" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('process-board', s.row)">工序看板</el-button>
-        <el-dropdown trigger="click" class="op-more" @click.stop @command="onMoreCommand(s.row, $event)">
-          <el-button link type="primary" size="small" @click.stop>更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="CANCEL" v-if="!isFinal(s.row)" v-hasPermi="['mes:pro:task:edit']">取消</el-dropdown-item>
-              <el-dropdown-item command="EXCEPTION" v-if="!isFinal(s.row)" v-hasPermi="['mes:pro:exception:add']">报异常</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <el-button v-if="!isFinal(s.row)" link type="danger" size="small"
+          @click.stop="emit('action', s.row, 'CANCEL')" v-hasPermi="['mes:pro:task:edit']">取消</el-button>
+        <el-button v-if="!isFinal(s.row)" link type="primary" size="small"
+          @click.stop="emit('action', s.row, 'EXCEPTION')" v-hasPermi="['mes:pro:exception:add']">报异常</el-button>
       </template>
     </el-table-column>
   </el-table>
@@ -107,7 +102,6 @@ function canStartTask(t: any) { return ['NORMAL', 'PREPARE', 'PAUSED'].includes(
 function canDispatch(t: any) { return ['NORMAL', 'PREPARE'].includes(t.status) && !t.qcBlocked }
 function canReport(t: any) { return t.status === 'PRODUCING' && !t.qcBlocked }
 function isFinal(t: any) { return t.status === 'COMPLETED' || t.status === 'CANCEL' }
-function onMoreCommand(row: any, cmd: string) { emit('action', row, cmd) }
 function onRowClick(row: any) { emit('process-board', row) }
 function fmtTime(v: any) { return v ? parseTime(v, '{m}-{d} {h}:{i}') : '-' }
 function delayLabel(level: string) { return level ? delayText(level) : '-' }
@@ -118,6 +112,9 @@ function delayTagType(level: string) { return level ? delayType(level) : 'info' 
 .ml8 { margin-left: 8px; }
 .sub { font-size: 12px; color: #909399; line-height: 1.4; }
 .sub.bad { color: #f56c6c; }
-:deep(.op-col .el-button + .el-button) { margin-left: 6px; }
-:deep(.op-col .op-more) { margin-left: 6px; vertical-align: middle; }
+/* 操作列按钮两行排布，间距紧凑 */
+:deep(.op-col .cell) { white-space: normal; line-height: 24px; }
+/* 覆盖全局 .el-button--small 的 0 15px 内边距，避免按钮文字被撑开 */
+:deep(.op-col .el-button) { padding: 0 3px !important; height: 24px; font-size: 12px; }
+:deep(.op-col .el-button + .el-button) { margin-left: 4px; }
 </style>

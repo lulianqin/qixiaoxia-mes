@@ -1,5 +1,6 @@
 package com.ruoyi.system.service.mes.sys.integration;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -89,8 +90,15 @@ public class ErpCallbackPayload
                 row.put("externalLineId", line.getExternalLineId());
                 row.put("lineNo", line.getLineNo());
                 row.put("productCode", line.getProductCode());
+                // price / quoteRemark 为旧字段名，保留兼容；ERP 回写按单价×数量算行金额
                 row.put("price", line.getPrice());
+                row.put("unitPrice", line.getPrice());
+                row.put("quantity", line.getQuantity());
+                row.put("unit", line.getUnit());
+                BigDecimal qty = line.getQuantity() == null ? BigDecimal.ONE : line.getQuantity();
+                row.put("totalPrice", line.getPrice() == null ? null : line.getPrice().multiply(qty));
                 row.put("quoteRemark", line.getQuoteRemark());
+                row.put("produceRemark", line.getQuoteRemark());
                 row.put("deliveryDate", line.getDeliveryDate());
                 row.put("quoteValidDate", line.getQuoteValidDate() == null ? null
                         : DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, line.getQuoteValidDate()));

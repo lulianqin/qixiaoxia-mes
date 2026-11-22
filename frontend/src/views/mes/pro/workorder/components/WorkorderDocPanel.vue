@@ -15,7 +15,7 @@
     <ProcessDocCard v-for="(d, i) in processDocs" :key="'o' + i" :model-value="d" :process-options="processOptions"
       :readonly="readonly" @remove="processDocs.splice(i, 1)" />
 
-    <el-divider v-if="savedDocs.length" content-position="left">已生成单据（导出 / 合并打印）</el-divider>
+    <el-divider v-if="savedDocs.length" content-position="left">已生成单据（导出 / 打印）</el-divider>
     <el-table v-if="savedDocs.length" :data="savedDocs" size="small" border>
       <el-table-column label="类型" width="90" align="center">
         <template #default="{ row }">
@@ -25,7 +25,11 @@
       <el-table-column label="单号" prop="orderCode" width="200" />
       <el-table-column label="单据标题" prop="docTitle" min-width="140" />
       <el-table-column label="供应商" prop="vendorName" min-width="160" />
-      <el-table-column label="状态" prop="status" width="100" align="center" />
+      <el-table-column label="状态" width="100" align="center">
+        <template #default="{ row }">
+          <dict-tag :options="row.type === 'PUR' ? mes_order_status : mes_outsource_status" :value="row.status" />
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="260" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="doExport(row, 'excel')">导出Excel</el-button>
@@ -35,30 +39,25 @@
     </el-table>
 
     <div v-if="savedDocs.length" class="merge-bar">
-      <span class="tip">勾选同供应商的多张单据可合并打印：</span>
-      <el-checkbox-group v-model="mergeSelected">
-        <el-checkbox v-for="d in savedDocs" :key="d.type + d.orderId" :value="d.type + ':' + d.orderId" :label="d.type + ':' + d.orderId">
-          {{ d.orderCode }}
-        </el-checkbox>
-      </el-checkbox-group>
-      <el-button type="primary" size="small" :disabled="mergeSelected.length < 2" @click="doMerge('excel')">合并导出</el-button>
-      <el-button type="primary" size="small" :disabled="mergeSelected.length < 2" plain @click="doMerge('pdf')">合并打印</el-button>
+      <span class="tip">同供应商多张单据的合并导出，请到采购单/加工单列表页勾选后操作。</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, getCurrentInstance } from 'vue'
 import PurchaseDocCard from './PurchaseDocCard.vue'
 import ProcessDocCard from './ProcessDocCard.vue'
+import { printPdfBlob } from '@/utils/pdfPrint'
 import {
-  exportPurDoc, exportPurDocsMerge, exportProcessDoc, exportProcessDocsMerge
+  exportPurDocExcel, fetchPurDocPdf, exportProcessDocExcel, fetchProcessDocPdf
 } from '@/api/mes/pro/workorderFull'
+
+const { proxy } = getCurrentInstance() as any
+const { mes_order_status, mes_outsource_status } = proxy.useDict('mes_order_status', 'mes_outsource_status')
 
 const props = defineProps<{ purchaseDocs: any[]; processDocs: any[]; processOptions: any[]; readonly?: boolean }>()
 const emit = defineEmits<{ (e: 'update:purchaseDocs', v: any[]): void; (e: 'update:processDocs', v: any[]): void }>()
-
-const mergeSelected = ref<string[]>([])
 
 const savedDocs = computed(() => {
   const rows: any[] = []
@@ -93,16 +92,15 @@ function today() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
 }
 
+/** 单张单据：Excel 下载文件名 = 供应商+单据名称+单号；PDF 直接调起系统打印 */
 function doExport(row: any, format: 'excel' | 'pdf') {
-  const fn = row.type === 'PUR' ? exportPurDoc : exportProcessDoc
-  fn(row.orderId, format, row.orderCode)
-}
-
-function doMerge(format: 'excel' | 'pdf') {
-  const purIds = mergeSelected.value.filter((k: string) => k.startsWith('PUR:')).map((k: string) => Number(k.split(':')[1]))
-  const procIds = mergeSelected.value.filter((k: string) => k.startsWith('PROC:')).map((k: string) => Number(k.split(':')[1]))
-  if (purIds.length >= 2) exportPurDocsMerge(purIds, format)
-  if (procIds.length >= 2) exportProcessDocsMerge(procIds, format)
+  const filename = `${row.vendorName || ''}_${row.docTitle || (row.type === 'PUR' ? '采购单' : '加工单')}_${row.orderCode}.xlsx`
+  if (format === 'excel') {
+    row.type === 'PUR' ? exportPurDocExcel(row.orderId, filename) : exportProcessDocExcel(row.orderId, filename)
+    return
+  }
+  const req = row.type === 'PUR' ? fetchPurDocPdf(row.orderId) : fetchProcessDocPdf(row.orderId)
+  req.then((blob: Blob) => printPdfBlob(blob)).catch(() => {})
 }
 </script>
 

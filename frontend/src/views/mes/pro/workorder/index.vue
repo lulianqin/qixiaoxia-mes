@@ -71,18 +71,18 @@
       <el-table-column label="状态" align="center" prop="status" width="80" :show-overflow-tooltip="true"><template #default="scope"><span :style="{color: statusColor[scope.row.status]}">{{ statusMap[scope.row.status] || scope.row.status }}</span></template></el-table-column>
       <el-table-column label="需求日期" align="center" prop="requestDate" width="180" :show-overflow-tooltip="true"><template #default="scope"><span>{{ parseTime(scope.row.requestDate, '{y}-{m}-{d}') }}</span></template></el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
-      <el-table-column label="操作" align="center" width="300" fixed="right" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="300" fixed="right" class-name="small-padding fixed-width compact-actions">
         <template #default="scope">
-          <el-tooltip content="排产" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="success" icon="Calendar" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']"></el-button></el-tooltip>
-          <el-tooltip content="开工" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="VideoPlay" @click="handleStart(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
-          <el-tooltip content="齐套看板" placement="top"><el-button link type="warning" icon="List" @click="handleCheckMaterial(scope.row)"></el-button></el-tooltip>
-          <el-tooltip content="修改" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
-          <el-tooltip content="删除" placement="top" v-if="scope.row.status==='PREPARE'"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']"></el-button></el-tooltip>
-          <el-tooltip content="取消" placement="top" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'"><el-button link type="danger" icon="Close" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']"></el-button></el-tooltip>
-          <el-tooltip content="进度" placement="top"><el-button link type="primary" icon="DataLine" @click="handleProgress(scope.row)"></el-button></el-tooltip>
-          <el-tooltip content="看板" placement="top"><el-button link type="warning" icon="Odometer" @click="goWorkorderBoard(scope.row)"></el-button></el-tooltip>
-          <el-tooltip content="生成流转单" placement="top"><el-button link type="success" icon="Tickets" @click="handleFlowSheet(scope.row)" v-hasPermi="['mes:pro:workorder:flowSheet']"></el-button></el-tooltip>
-          <el-tooltip content="查看" placement="top"><el-button link type="primary" icon="View" @click="handleView(scope.row)"></el-button></el-tooltip>
+          <el-button link type="success" size="small" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']">排产</el-button>
+          <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleStart(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">开工</el-button>
+          <el-button link type="warning" size="small" @click="handleCheckMaterial(scope.row)">齐套</el-button>
+          <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">修改</el-button>
+          <el-button link type="primary" size="small" @click="handleCopy(scope.row)" v-hasPermi="['mes:pro:workorder:add']">复制</el-button>
+          <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']">删除</el-button>
+          <el-button link type="danger" size="small" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">取消</el-button>
+          <el-button link type="warning" size="small" @click="goWorkorderBoard(scope.row)">看板</el-button>
+          <el-button link type="success" size="small" @click="handleFlowSheet(scope.row)" v-hasPermi="['mes:pro:workorder:flowSheet']">流转单</el-button>
+          <el-button link type="primary" size="small" @click="handleView(scope.row)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -315,9 +315,6 @@
     <!-- 工单齐套看板 → 触发采购单/领料单/退料单/入库单 -->
     <KitDashboard v-model="kitDashboardOpen" :workorderId="kitWorkorderId" @refresh="getList" />
 
-    <!-- 工单进度全屏弹窗（工序/流转卡/只读甘特） -->
-    <WorkorderProgressDialog v-model="progressOpen" :workorder-id="progressWorkorderId" />
-
     <!-- 开工检查流程弹窗 -->
     <el-dialog :title="'开工检查 — ' + startCheckWorkorderName" v-model="startCheckOpen" width="850px" append-to-body @close="startCheckOpen=false" :close-on-click-modal="false">
       <!-- 步骤条 -->
@@ -441,7 +438,6 @@ import ItemSelect from '@/components/itemSelect/single.vue'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import KitDashboard from './KitDashboard.vue'
-import WorkorderProgressDialog from './components/WorkorderProgressDialog.vue'
 import FlowSheetDialog from './FlowSheetDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listUser } from '@/api/system/user'
@@ -453,7 +449,7 @@ import { getDicts } from '@/api/system/dict/data'
 
 export default {
   name: 'Workorder',
-  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard, WorkorderProgressDialog, FlowSheetDialog },
+  components: { ItemSelect, WorkstationSelect, ExtAttrForm, KitDashboard, FlowSheetDialog },
   data() {
     return {
       autoGenFlag: false, optType: undefined, step: 1, prorouteId: null,
@@ -465,8 +461,6 @@ export default {
       bomEditOpen: false, bomEditTitle: '', bomEditForm: {},
       // 工单齐套看板
       kitDashboardOpen: false, kitWorkorderId: null,
-      // 工单进度弹窗
-      progressOpen: false, progressWorkorderId: null,
       // 生产流转单
       flowSheetOpen: false, flowSheetWorkorderId: null,
       // 开工检查流程
@@ -612,6 +606,10 @@ export default {
       const id = row.workorderId || this.ids[0]
       const m = row.status === 'PREPARE' ? 'edit' : 'view'
       this.$router.push({ path: '/mes/pro/workorder_edit', query: { workorderId: id, mode: m } })
+    },
+    // 复制工单：以当前工单为模板新建，微调后保存为新工单
+    handleCopy(row) {
+      this.$router.push({ path: '/mes/pro/workorder_edit', query: { mode: 'copy', sourceWorkorderId: row.workorderId } })
     },
     /** 工单负责人远程搜索（账号/手机号两路并发，按 userId 去重；保留已选回显项） */
     searchOwners(kw) {
@@ -915,11 +913,6 @@ export default {
       this.kitWorkorderId = row.workorderId
       this.kitDashboardOpen = true
     },
-    // 打开工单进度全屏弹窗
-    handleProgress(row) {
-      this.progressWorkorderId = row.workorderId
-      this.progressOpen = true
-    },
     // 生成生产流转单
     handleFlowSheet(row) {
       this.flowSheetWorkorderId = row.workorderId
@@ -1042,6 +1035,22 @@ export default {
 </script>
 
 <style scoped>
+/* 操作列文字按钮紧凑排布：固定每行 5 个，两行展示 */
+:deep(.compact-actions .cell) {
+  padding: 2px !important;
+  display: grid;
+  grid-template-columns: repeat(5, max-content);
+  justify-content: center;
+  gap: 2px 4px;
+}
+:deep(.compact-actions .el-button) {
+  margin: 0 !important;
+  padding: 0 2px !important;
+  height: auto;
+  font-size: 12px;
+  line-height: 22px;
+  justify-self: center;
+}
 .proc-timeline {
   display: flex;
   flex-wrap: nowrap;
