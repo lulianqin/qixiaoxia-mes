@@ -40,9 +40,11 @@ export PATH=$JAVA_HOME/bin:$PATH
 cd backend && mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
 
 # 重启（⚠️ 必须带 -Xmx512m 内存限制，1.8GB 服务器否则 OOM Kill）
+# ⚠️ 必须带 -DQXX_DB_PASSWORD，配置默认值是本地 root，线上密码不同，漏了会启动失败
 kill $(lsof -ti :8081) 2>/dev/null; sleep 2
 nohup java -Xms256m -Xmx512m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m \
   -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC -Duser.timezone=Asia/Shanghai \
+  -DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456 \
   -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
   --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
   > /tmp/qxx-backend.log 2>&1 &
@@ -126,6 +128,7 @@ ssh qxx 'curl -s -o /dev/null -w "app页面: %{http_code}\n" http://localhost/ap
 | 后端启动后立即退出、日志 0 行 | OOM Kill（1.8GB 服务器，JVM 堆/Metaspace 无界） | 重启命令必须带 `-Xmx512m -XX:MaxMetaspaceSize=192m`（见步骤 2）。项目自带 `ry.sh` 用 `-Xmx1024m` 也偏大，勿直接用 |
 | `pkill -f ruoyi-admin.jar` 导致 SSH 退出码 255 | 命令行含 jar 名，pkill 匹配杀掉 SSH 自身远程进程 | 改用 `kill $(lsof -ti :8081)` |
 | 后端启动后立即退出（非 OOM） | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
+| `Access denied for user 'root'@'172.19.0.1'` | 启动命令漏了 `-DQXX_DB_PASSWORD`，用了配置里的本地默认密码 root | 重启命令补上 `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456` |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
 | app 页面只渲染纯文字、无图标无分组 | HBuilderX build easycom 失效，uni-ui 组件未编译进产物 | 页面显式 import uni-ui 组件（含连带依赖）+ `app/utils/uni-ui-register.js` 全局注册，重新 HBuilderX 打包。详见记忆 `app-h5-build-deploy` |
