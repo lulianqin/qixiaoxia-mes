@@ -9,7 +9,7 @@
         <el-progress v-if="order.orderCode" :percentage="Number(order.progressPercent || 0)" :stroke-width="12" style="width:220px;display:inline-flex;vertical-align:middle;margin-left:12px" />
       </template>
       <template #extra>
-        <el-button type="primary" plain icon="Printer" @click="exportPdf" v-hasPermi="['mes:sal:order:exportDetail']">导出 PDF</el-button>
+        <el-button type="primary" plain icon="Printer" @click="printOrder" v-hasPermi="['mes:sal:order:exportDetail']">打印</el-button>
         <el-button type="success" plain icon="Document" @click="exportExcel" v-hasPermi="['mes:sal:order:exportDetail']">导出 Excel</el-button>
       </template>
     </el-page-header>
@@ -19,11 +19,13 @@
         <template #header><span>订单信息</span></template>
         <el-descriptions :column="3" size="small" border>
           <el-descriptions-item label="订单名称">{{ order.orderName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="签约主体">{{ signCompanyText }}</el-descriptions-item>
           <el-descriptions-item label="订单类型">{{ orderTypeText }}</el-descriptions-item>
           <el-descriptions-item label="订单来源">{{ sourceText }}</el-descriptions-item>
           <el-descriptions-item label="客户编码">{{ order.clientCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="客户名称">{{ order.clientName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="客户PO号">{{ order.clientOrderCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="ERP单号">{{ order.externalOrderNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="业务员">{{ order.salesperson || '-' }}</el-descriptions-item>
           <el-descriptions-item label="业务线">{{ businessLineText }}</el-descriptions-item>
           <el-descriptions-item label="是否有样品">{{ order.sampleFlag === 'Y' ? '是' : '否' }}</el-descriptions-item>
@@ -47,7 +49,12 @@
           <el-table-column label="行号" align="center" prop="lineNo" width="60"  :show-overflow-tooltip="true" />
           <el-table-column label="产品编码" align="center" prop="productCode" width="140"  :show-overflow-tooltip="true" />
           <el-table-column label="产品名称" align="center" prop="productName" :show-overflow-tooltip="true" />
-          <el-table-column label="规格" align="center" prop="productSpc" width="120" :show-overflow-tooltip="true" />
+          <el-table-column v-if="isExternalSource" label="MES产品名称" align="center" prop="mesProductName" :show-overflow-tooltip="true">
+            <template #default="s">{{ s.row.mesProductName || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="产品尺寸" align="center" width="130" :show-overflow-tooltip="true">
+            <template #default="s">{{ s.row.productSize || s.row.productSpc || '-' }}</template>
+          </el-table-column>
           <el-table-column label="数量" align="center" prop="quantity" width="90"  :show-overflow-tooltip="true" />
           <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
           <el-table-column label="单价" align="center" prop="unitPrice" width="90"  :show-overflow-tooltip="true" />
@@ -59,9 +66,8 @@
           <el-table-column label="需求交期" align="center" width="110">
             <template #default="s">{{ fmtDate(s.row.requestDate) }}</template>
           </el-table-column>
-          <el-table-column label="尺寸" align="center" prop="productSize" width="130" :show-overflow-tooltip="true" />
-          <el-table-column label="印刷要求" align="center" prop="printingReq" min-width="120" :show-overflow-tooltip="true" />
-          <el-table-column label="包装要求" align="center" prop="packageReq" min-width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="材质及工艺" align="center" prop="printingReq" min-width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="包装方式" align="center" prop="packageReq" min-width="120" :show-overflow-tooltip="true" />
           <el-table-column label="工艺路线" align="center" prop="routeName" min-width="130" :show-overflow-tooltip="true">
             <template #default="s">{{ s.row.routeName || '-' }}</template>
           </el-table-column>
@@ -114,11 +120,12 @@
 <script setup lang="ts">
 import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOrderBoard } from '@/api/mes/sal/order'
+import { getOrderBoard, fetchOrderPdf } from '@/api/mes/sal/order'
+import { printPdfBlob } from '@/utils/pdfPrint'
 import type { SalOrder, SalOrderLine } from '@/types'
 
 const { proxy } = getCurrentInstance() as any
-const { mes_sal_order_status: statusDict, mes_sal_order_type: orderTypeDict } = proxy.useDict('mes_sal_order_status', 'mes_sal_order_type')
+const { mes_sal_order_status: statusDict, mes_sal_order_type: orderTypeDict, sys_company: signCompanyDict } = proxy.useDict('mes_sal_order_status', 'mes_sal_order_type', 'sys_company')
 
 const route = useRoute()
 const router = useRouter()
@@ -143,7 +150,14 @@ const orderTypeText = computed(() => {
   return d ? (d.label || d.dictLabel) : (v || '-')
 })
 const businessLineText = computed(() => ({ DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }[order.value.businessLine || ''] || order.value.businessLine || '-'))
-const sourceText = computed(() => ({ 1: '直接新增', 2: 'CRM系统' }[String(order.value.source)] || '-'))
+const signCompanyText = computed(() => {
+  const v = order.value.signCompany
+  const d = signCompanyDict.value?.find((x: any) => x.value === v || x.dictValue === v)
+  return d ? (d.label || d.dictLabel) : (v || '-')
+})
+const sourceText = computed(() => ({ 1: '直接新增', 2: 'CRM系统', 3: 'ERP系统' }[String(order.value.source)] || '-'))
+/** 外部来源单据（ERP/SRM）才有「源产品名称 vs MES 产品名称」两列 */
+const isExternalSource = computed(() => ['ERP', 'SRM'].includes(order.value.sourceSystem || ''))
 
 function fmtDate(v?: string): string {
   return v ? proxy.parseTime(v, '{y}-{m}-{d}') : '-'
@@ -180,8 +194,10 @@ function stepPct(s: any): number {
   return q <= 0 ? 0 : Math.min(100, Math.round(p / q * 100))
 }
 
-function exportPdf() {
-  proxy.download('mes/sal/order/exportPdf/' + orderId.value, {}, `sal_order_${order.value.orderCode}.pdf`)
+/** 打印：取 PDF blob 后直接调起系统打印，不下载 */
+function printOrder() {
+  if (!orderId.value) return
+  fetchOrderPdf(orderId.value).then(blob => printPdfBlob(blob)).catch(() => {})
 }
 function exportExcel() {
   proxy.download('mes/sal/order/exportExcel/' + orderId.value, {}, `sal_order_${order.value.orderCode}.xlsx`)

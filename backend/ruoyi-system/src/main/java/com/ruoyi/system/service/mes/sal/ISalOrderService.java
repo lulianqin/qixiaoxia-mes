@@ -45,6 +45,9 @@ public interface ISalOrderService
     /** ERP 下发采购单接收（幂等：同外部单号覆盖，已投产拒绝变更） */
     public SalOrder receiveFromErp(ErpOrderReceiveRequest req);
 
+    /** ERP 撤回下发：按外部单号作废销售订单（仅待接单可作废，已接单/已派工单拒绝） */
+    public SalOrder cancelFromErp(com.ruoyi.system.domain.mes.sal.dto.ErpOrderCancelRequest req);
+
     /** 接单（ERP 来源可调整交期），返回回写任务ID；非 ERP 来源返回 null */
     public Long acceptOrderWithSync(Long orderId, SalOrderAcceptRequest req);
 

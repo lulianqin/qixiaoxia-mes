@@ -27,6 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectProRouteList" parameterType="ProRoute" resultMap="ProRouteResult">
         <include refid="selectProRouteVo"/>
         <where>
+            and del_flag = '0'
             <if test="routeCode != null  and routeCode != ''"> and route_code = #{routeCode}</if>
             <if test="routeName != null  and routeName != ''"> and route_name like concat('%', #{routeName}, '%')</if>
             <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
@@ -36,18 +37,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectProRouteByRouteId" parameterType="Long" resultMap="ProRouteResult">
         <include refid="selectProRouteVo"/>
-        where route_id = #{routeId}
+        where route_id = #{routeId} and del_flag = '0'
     </select>
 
     <select id="selectByRouteIds" resultMap="ProRouteResult">
         <include refid="selectProRouteVo"/>
-        where route_id in
+        where del_flag = '0' and route_id in
         <foreach item="routeId" collection="routeIds" open="(" separator="," close=")">#{routeId}</foreach>
     </select>
 
     <select id="selectProRouteByRouteCode" parameterType="String" resultMap="ProRouteResult">
         <include refid="selectProRouteVo"/>
-        where route_code = #{routeCode}
+        where route_code = #{routeCode} and del_flag = '0'
     </select>
 
     <insert id="insertProRoute" parameterType="ProRoute" useGeneratedKeys="true" keyProperty="routeId">

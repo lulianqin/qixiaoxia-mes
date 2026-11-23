@@ -20,6 +20,7 @@ import com.ruoyi.common.enums.SalOrderStatus;
 import com.ruoyi.common.enums.SalOrderType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.DictUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdClient;
@@ -37,6 +38,7 @@ import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
 import com.ruoyi.system.domain.mes.sal.SalOrderLine;
 import com.ruoyi.system.domain.mes.sal.SalOrderToWorkorderRequest;
+import com.ruoyi.system.domain.mes.sal.dto.ErpOrderCancelRequest;
 import com.ruoyi.system.domain.mes.sal.dto.ErpOrderLineRequest;
 import com.ruoyi.system.domain.mes.sal.dto.ErpOrderReceiveRequest;
 import com.ruoyi.system.domain.mes.sal.dto.SalOrderAcceptRequest;
@@ -169,6 +171,11 @@ public class SalOrderServiceImpl implements ISalOrderService
         normalizeOrderDimensions(order);
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
+        // 人工建单必须指定签约主体（导出单据抬头取值）；CRM 等外部来源允许后续接单时补选
+        if (SalConstants.SOURCE_DIRECT == order.getSource() && StringUtils.isEmpty(order.getSignCompany()))
+        {
+            throw new ServiceException("请选择签约主体");
+        }
         order.setCreateBy(SecurityUtils.getUsername());
         order.setCreateTime(DateUtils.getNowDate());
         salOrderMapper.insertSalOrder(order);
@@ -281,7 +288,7 @@ public class SalOrderServiceImpl implements ISalOrderService
             salOrderMapper.updateSalOrder(order);
             // 表头更新后再重置接单/打回痕迹，避免被 updateSalOrder 的旧状态覆盖
             salOrderMapper.resetForErpResend(order.getOrderId(), order.getFactoryId(), version,
-                    SecurityUtils.getUsername(), DateUtils.getNowDate());
+                    order.getClientOrderCode(), SecurityUtils.getUsername(), DateUtils.getNowDate());
             order.setStatus(SalOrderStatus.PENDING_ACCEPT.getCode());
             order.setAcceptStatus("PENDING");
             order.setRejectReason(null);
@@ -298,6 +305,32 @@ public class SalOrderServiceImpl implements ISalOrderService
         saveLines(order, lines, true);
         // ERP / SRM 两端单据号分别留痕
         externalDocService.recordOrder(system, order);
+        return order;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SalOrder cancelFromErp(ErpOrderCancelRequest req)
+    {
+        String no = req == null ? null : req.getExternalOrderNo();
+        if (StringUtils.isEmpty(no)) throw new ServiceException("ERP采购单号不能为空");
+        SalOrder order = salOrderMapper.selectSalOrderByExternalNo(SalConstants.SYSTEM_ERP, no);
+        if (order == null) throw new ServiceException("MES 未找到该 ERP 采购单对应的销售订单：" + no);
+        if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus()))
+        {
+            SalOrderStatus current = SalOrderStatus.fromCode(order.getStatus());
+            throw new ServiceException("工厂当前状态为" + (current == null ? "已处理" : current.getInfo())
+                    + "，不允许撤回下发；如需作废请联系工厂按内部流程处理");
+        }
+        // 已派生工单说明工厂已开始备产，作废会让工单成孤儿，必须拒绝
+        assertNoDerivedWorkorder(order.getOrderId(), "撤回");
+        String operator = SecurityUtils.getUsername();
+        salOrderMapper.updateStatusDirect(order.getOrderId(), SalOrderStatus.CANCEL.getCode(),
+                operator, DateUtils.getNowDate());
+        salOrderMapper.insertStatusLog(order.getOrderId(), order.getOrderCode(), order.getStatus(),
+                SalOrderStatus.CANCEL.getCode(),
+                StringUtils.isEmpty(req.getReason()) ? "ERP撤回下发" : req.getReason(), operator);
+        order.setStatus(SalOrderStatus.CANCEL.getCode());
         return order;
     }
 
@@ -325,6 +358,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         }
         applyAcceptDates(order, req);
         applyAcceptSalesperson(order, req);
+        applyAcceptSignCompany(order, req);
         // 接单时确认 MES 客户/产品，首次建立两系统映射，后续默认关联且允许调整
         // 必须先落库映射再校验必填项，否则 ERP/SRM 单据会因 clientId/productId 未回填而校验失败
         applyAcceptMappings(orderId, order, req);
@@ -425,7 +459,8 @@ public class SalOrderServiceImpl implements ISalOrderService
             patch.setLineId(line.getLineId());
             patch.setProductId(productId);
             patch.setProductCode(item.getItemCode());
-            patch.setProductName(item.getItemName());
+            // 源产品名称不改写（外部单保留 ERP/SRM 名称），MES 物料名称单独落列
+            patch.setMesProductName(item.getItemName());
             patch.setUnitOfMeasure(item.getUnitOfMeasure());
             patch.setUnitName(item.getUnitName());
             salOrderLineMapper.updateSalOrderLine(patch);
@@ -576,6 +611,20 @@ public class SalOrderServiceImpl implements ISalOrderService
         }
     }
 
+    /** 接单时确认签约主体：ERP 未匹配到供方时由人工补选 */
+    private void applyAcceptSignCompany(SalOrder order, SalOrderAcceptRequest req)
+    {
+        String signCompany = req == null ? null : req.getSignCompany();
+        if (StringUtils.isEmpty(signCompany) || signCompany.equals(order.getSignCompany())) return;
+        SalOrder upd = new SalOrder();
+        upd.setOrderId(order.getOrderId());
+        upd.setSignCompany(signCompany);
+        upd.setUpdateBy(SecurityUtils.getUsername());
+        upd.setUpdateTime(DateUtils.getNowDate());
+        salOrderMapper.updateSalOrder(upd);
+        order.setSignCompany(signCompany);
+    }
+
     /** 接单时调整交期（整单 + 行级），所有来源订单均允许；未变更不视为调整 */
     private void applyAcceptDates(SalOrder order, SalOrderAcceptRequest req)
     {
@@ -627,15 +676,23 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setOrderName(req.getOrderName());
         order.setClientCode(req.getClientCode());
         order.setClientName(req.getClientName());
-        // 外部系统未传客户PO号时，用采购单号回填，保证单据与列表能看到可追溯编号
-        order.setClientOrderCode(StringUtils.isNotEmpty(req.getClientOrderCode())
-                ? req.getClientOrderCode() : req.getExternalOrderNo());
+        // 客户PO号 = ERP 侧订单编号，与 ERP 采购单号是两个字段：
+        // 采购单未关联销售订单时 ERP 不传该值，这里必须留空，不能拿采购单号兜底填充，
+        // 否则 MES 里「客户PO号」和「ERP单号」会显示成同一个值，误导业务。
+        order.setClientOrderCode(req.getClientOrderCode());
         order.setSalesperson(req.getSalesperson());
         order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
         order.setRequestDate(req.getRequestDate());
         order.setTotalAmount(req.getTotalAmount());
         order.setPaymentMethod(req.getPaymentMethod());
         order.setRemark(req.getRemark());
+        // 签约主体 = 销售订单对应主体，ERP 采购单按其供方名称匹配字典 sys_company；
+        // 匹配不到时留空，接单环节强制人工选择。
+        if (StringUtils.isNotEmpty(req.getSupplierName()))
+        {
+            String signCompany = DictUtils.getDictValue("sys_company", req.getSupplierName());
+            if (StringUtils.isNotEmpty(signCompany)) order.setSignCompany(signCompany);
+        }
         Long clientId = resolveClientId(req.getClientCode(), req.getClientName(), SalConstants.SYSTEM_ERP);
         if (clientId != null) order.setClientId(clientId);
     }
@@ -644,28 +701,33 @@ public class SalOrderServiceImpl implements ISalOrderService
     {
         SalOrderLine line = new SalOrderLine();
         line.setExternalLineId(dto.getExternalLineId());
+        // 产品名称保留 ERP 采购单名称（对单口径一致），映射到的 MES 物料名称另存 mes_product_name
+        line.setProductName(dto.getProductName());
+        line.setProductCode(dto.getProductCode());
+        // 产品尺寸：ERP 可能只传 productSpec 或 productSize，两者互为兜底，保证 MES 侧有值
+        line.setProductSpc(StringUtils.isNotEmpty(dto.getProductSpec())
+                ? dto.getProductSpec() : dto.getProductSize());
+        line.setProductSize(StringUtils.isNotEmpty(dto.getProductSize())
+                ? dto.getProductSize() : dto.getProductSpec());
+        line.setUnitOfMeasure(dto.getUnit());
         MdItem item = resolveItem(dto);
         if (item != null)
         {
             line.setProductId(item.getItemId());
             line.setProductCode(item.getItemCode());
-            line.setProductName(item.getItemName());
-            line.setProductSpc(item.getSpecification());
+            line.setMesProductName(item.getItemName());
+            if (StringUtils.isEmpty(line.getProductSpc())) line.setProductSpc(item.getSpecification());
             line.setUnitOfMeasure(item.getUnitOfMeasure());
-        }
-        else
-        {
-            line.setProductCode(dto.getProductCode());
-            line.setProductName(dto.getProductName());
-            line.setProductSpc(dto.getProductSpec());
-            line.setUnitOfMeasure(dto.getUnit());
         }
         line.setQuantity(dto.getQuantity());
         line.setUnitPrice(dto.getUnitPrice());
         line.setRequestDate(dto.getRequestDate());
-        line.setProductSize(dto.getProductSize());
-        line.setPrintingReq(dto.getPrintingReq());
-        line.setPackageReq(dto.getPackageReq());
+        // 材质及工艺（ERP Material）优先落到印刷要求，兼容旧字段 printingReq
+        line.setPrintingReq(StringUtils.isNotEmpty(dto.getMaterial())
+                ? dto.getMaterial() : dto.getPrintingReq());
+        // 包装方式（ERP PackingModeTxt）优先落到包装要求，兼容旧字段 packageReq
+        line.setPackageReq(StringUtils.isNotEmpty(dto.getPackingModeTxt())
+                ? dto.getPackingModeTxt() : dto.getPackageReq());
         line.setShippingReq(dto.getShippingReq());
         line.setRemark(dto.getRemark());
         return line;
@@ -746,9 +808,11 @@ public class SalOrderServiceImpl implements ISalOrderService
 
     private void assertErpUpdatable(SalOrder order, String action)
     {
+        // CANCEL 允许重发：ERP 撤回下发后单据仍归 ERP 所有，重新下发视为复活原单
         if (!SalOrderStatus.PENDING_ACCEPT.is(order.getStatus())
                 && !SalOrderStatus.REJECTED.is(order.getStatus())
-                && !SalOrderStatus.CONFIRMED.is(order.getStatus()))
+                && !SalOrderStatus.CONFIRMED.is(order.getStatus())
+                && !SalOrderStatus.CANCEL.is(order.getStatus()))
         {
             throw new ServiceException("ERP采购单已投产，不可" + action + "；如需变更请联系工厂处理");
         }
@@ -775,6 +839,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         }
         assertNoDerivedWorkorder(order.getOrderId(), "修改");
         normalizeOrderDimensions(order);
+        if (StringUtils.isEmpty(order.getSignCompany())) throw new ServiceException("请选择签约主体");
         order.setStatus(existing.getStatus()); // 状态不允许经编辑接口篡改
         // 审核历史列为留存字段,不允许经编辑接口覆写,强制以库中值为准
         order.setApproveBy(existing.getApproveBy());
@@ -889,6 +954,7 @@ public class SalOrderServiceImpl implements ISalOrderService
     {
         List<String> missing = new ArrayList<>();
         if (StringUtils.isEmpty(order.getOrderName())) missing.add("表头-订单名称");
+        if (StringUtils.isEmpty(order.getSignCompany())) missing.add("表头-签约主体");
         if (order.getClientId() == null) missing.add("表头-客户");
         if (order.getOrderDate() == null) missing.add("表头-订单日期");
         if (order.getRequestDate() == null) missing.add("表头-需求交期");
@@ -979,10 +1045,13 @@ public class SalOrderServiceImpl implements ISalOrderService
     private ProWorkorder buildWorkorderFromLine(SalOrder order, SalOrderLine line, SalOrderToWorkorderRequest req)
     {
         ProWorkorder wo = new ProWorkorder();
+        // 生产按 MES 物料执行：工单产品名称优先取 MES 物料名称，源单名称只留在销售明细
+        String productLabel = StringUtils.isNotEmpty(line.getMesProductName())
+                ? line.getMesProductName() : line.getProductName();
         wo.setWorkorderCode(req.getWorkorderCode());
         wo.setWorkorderName(StringUtils.isNotEmpty(req.getWorkorderName())
                 ? req.getWorkorderName()
-                : (StringUtils.isNotEmpty(line.getProductName()) ? line.getProductName() : order.getOrderName())
+                : (StringUtils.isNotEmpty(productLabel) ? productLabel : order.getOrderName())
                         + "-" + order.getOrderCode());
         wo.setWorkorderType("SELF");
         wo.setOrderSource("SALES_ORDER");
@@ -990,7 +1059,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         wo.setSalesOrderLineId(line.getLineId());
         wo.setProductId(line.getProductId());
         wo.setProductCode(line.getProductCode());
-        wo.setProductName(line.getProductName());
+        wo.setProductName(productLabel);
         wo.setProductSpc(line.getProductSpc());
         wo.setUnitOfMeasure(line.getUnitOfMeasure());
         wo.setUnitName(line.getUnitName());

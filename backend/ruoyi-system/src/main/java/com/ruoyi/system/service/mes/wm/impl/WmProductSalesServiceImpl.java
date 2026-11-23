@@ -78,6 +78,7 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
     @Autowired private IQcFactoryService qcFactoryService;
     @Autowired private IQcGateService qcGateService;
     @Autowired private com.ruoyi.system.service.mes.wm.IWmStockReservationService stockReservationService;
+    @Autowired private com.ruoyi.system.service.mes.wm.WmSalesOutboundNotifier salesOutboundNotifier;
 
     /** 预占来源单据类型：销售出库 */
     private static final String RES_SOURCE = "PRODUCT_SALES";
@@ -229,6 +230,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
             postedThisTime = postedThisTime.add(qty);
         }
         updateHeaderAfterPost(header, postedThisTime);
+        // ERP 出库申请：累计已出库量并落回写任务（幂等，调度器可靠投递）
+        salesOutboundNotifier.notifyIfErpApply(salesId);
         return salesId;
     }
 
@@ -356,6 +359,13 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         d.setBatchCode(stock.getBatchCode());
         d.setWarehouseId(stock.getWarehouseId());
         d.setQuantity(qty);
+        // 明细表 item_name/单位等为非空：请求未携带时从出库行补齐，避免插入失败
+        if (d.getItemId() == null) d.setItemId(line.getItemId());
+        if (d.getItemCode() == null) d.setItemCode(line.getItemCode());
+        if (d.getItemName() == null) d.setItemName(line.getItemName());
+        if (d.getSpecification() == null) d.setSpecification(line.getSpecification());
+        if (d.getUnitOfMeasure() == null) d.setUnitOfMeasure(line.getUnitOfMeasure());
+        if (d.getUnitName() == null) d.setUnitName(line.getUnitName());
         d.setCreateTime(DateUtils.getNowDate());
         d.setCreateBy(SecurityUtils.getUsername());
         wmProductSalesDetailMapper.insertWmProductSalesDetail(d);

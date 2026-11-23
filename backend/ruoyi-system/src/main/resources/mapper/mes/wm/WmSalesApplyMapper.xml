@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmSalesApplyMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.wm.WmSalesApply" id="WmSalesApplyResult">
+        <result property="applyId"             column="apply_id"             />
+        <result property="factoryId"           column="factory_id"           />
+        <result property="applyCode"           column="apply_code"           />
+        <result property="externalApplyNo"     column="external_apply_no"    />
+        <result property="externalOrderNo"     column="external_order_no"    />
+        <result property="purchaseOrderId"     column="purchase_order_id"    />
+        <result property="salesOrderId"        column="sales_order_id"       />
+        <result property="salesOrderCode"      column="sales_order_code"     />
+        <result property="requestDate"         column="request_date"         />
+        <result property="receiverName"        column="receiver_name"        />
+        <result property="receiverTel"         column="receiver_tel"         />
+        <result property="receiverAddress"     column="receiver_address"     />
+        <result property="status"              column="status"               />
+        <result property="mesSalesId"          column="mes_sales_id"         />
+        <result property="mesSalesCode"        column="mes_sales_code"       />
+        <result property="remark"              column="remark"               />
+        <result property="createBy"            column="create_by"            />
+        <result property="createTime"          column="create_time"          />
+        <result property="updateBy"            column="update_by"            />
+        <result property="updateTime"          column="update_time"          />
+    </resultMap>
+
+    <sql id="selectWmSalesApplyVo">
+        select apply_id, factory_id, apply_code, external_apply_no, external_order_no, purchase_order_id,
+               sales_order_id, sales_order_code, request_date, receiver_name, receiver_tel, receiver_address,
+               status, mes_sales_id, mes_sales_code, remark, create_by, create_time, update_by, update_time
+        from qxx_wm_sales_apply
+    </sql>
+
+    <select id="selectByApplyCode" resultMap="WmSalesApplyResult">
+        <include refid="selectWmSalesApplyVo"/>
+        where apply_code = #{applyCode} and factory_id = #{factoryId}
+        limit 1
+    </select>
+
+    <select id="selectWmSalesApplyById" resultMap="WmSalesApplyResult">
+        <include refid="selectWmSalesApplyVo"/>
+        where apply_id = #{applyId} and factory_id = #{factoryId}
+    </select>
+
+    <select id="selectWmSalesApplyList" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply" resultMap="WmSalesApplyResult">
+        <include refid="selectWmSalesApplyVo"/>
+        <where>
+            <if test="applyCode != null and applyCode != ''"> and apply_code like concat('%', #{applyCode}, '%')</if>
+            <if test="externalOrderNo != null and externalOrderNo != ''"> and external_order_no = #{externalOrderNo}</if>
+            <if test="salesOrderCode != null and salesOrderCode != ''"> and sales_order_code = #{salesOrderCode}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by apply_id desc
+    </select>
+
+    <insert id="insertWmSalesApply" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply" useGeneratedKeys="true" keyProperty="applyId">
+        insert into qxx_wm_sales_apply
+        (apply_code, external_apply_no, external_order_no, purchase_order_id, sales_order_id,
+         sales_order_code, request_date, receiver_name, receiver_tel, receiver_address, status, remark,
+         create_by, create_time)
+        values
+        (#{applyCode}, #{externalApplyNo}, #{externalOrderNo}, #{purchaseOrderId}, #{salesOrderId},
+         #{salesOrderCode}, #{requestDate}, #{receiverName}, #{receiverTel}, #{receiverAddress}, #{status}, #{remark},
+         #{createBy}, #{createTime})
+    </insert>
+
+    <update id="updateWmSalesApplyResult" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply">
+        update qxx_wm_sales_apply
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="salesOrderId != null">sales_order_id = #{salesOrderId},</if>
+            <if test="salesOrderCode != null">sales_order_code = #{salesOrderCode},</if>
+            <if test="mesSalesId != null">mes_sales_id = #{mesSalesId},</if>
+            <if test="mesSalesCode != null">mes_sales_code = #{mesSalesCode},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = now()
+        </trim>
+        where apply_id = #{applyId}
+    </update>
+
+    <update id="updateWmSalesApplyStatus" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply">
+        update qxx_wm_sales_apply
+        set status = #{status}, update_time = now()
+        where apply_id = #{applyId} and factory_id = #{factoryId}
+    </update>
+</mapper>

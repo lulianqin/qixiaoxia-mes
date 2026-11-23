@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="factoryId"        column="factory_id"        />
         <result property="orderCode"        column="order_code"        />
         <result property="orderName"        column="order_name"        />
+        <result property="signCompany"      column="sign_company"      />
         <result property="orderType"        column="order_type"        />
         <result property="clientId"         column="client_id"         />
         <result property="clientCode"       column="client_code"       />
@@ -49,12 +50,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSalOrderVo">
-        select order_id, factory_id, order_code, order_name, order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, source_system, external_order_id, external_order_no, external_version, accept_status, accept_time, reject_reason, reject_by, reject_time, sync_status, sync_time, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
+        select order_id, factory_id, order_code, order_name, sign_company, order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, source_system, external_order_id, external_order_no, external_version, accept_status, accept_time, reject_reason, reject_by, reject_time, sync_status, sync_time, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
     </sql>
 
     <select id="selectSalOrderList" parameterType="SalOrder" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
         <where>
+            and del_flag = '0'
             <if test="orderCode != null  and orderCode != ''"> and order_code like concat('%', #{orderCode}, '%')</if>
             <if test="orderName != null  and orderName != ''"> and order_name like concat('%', #{orderName}, '%')</if>
             <if test="clientCode != null  and clientCode != ''"> and client_code like concat('%', #{clientCode}, '%')</if>
@@ -76,30 +78,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSalOrderAllConvertible" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where status in ('CONFIRMED', 'PRODUCING')
+        where del_flag = '0' and status in ('CONFIRMED', 'PRODUCING')
         order by order_id desc
     </select>
 
     <select id="selectSalOrderByOrderId" parameterType="Long" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where order_id = #{orderId}
+        where order_id = #{orderId} and del_flag = '0'
     </select>
 
     <select id="selectSalOrderByOrderCode" parameterType="String" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where order_code = #{orderCode}
+        where order_code = #{orderCode} and del_flag = '0'
     </select>
 
     <!-- ERP 下发幂等查询：按来源系统 + 外部单号定位（factory_id 由拦截器注入） -->
     <select id="selectSalOrderByExternalNo" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where source_system = #{sourceSystem} and external_order_no = #{externalOrderNo}
+        where source_system = #{sourceSystem} and external_order_no = #{externalOrderNo} and del_flag = '0'
         limit 1
     </select>
 
     <select id="checkOrderCodeUnique" parameterType="SalOrder" resultMap="SalOrderResult">
         <include refid="selectSalOrderVo"/>
-        where order_code = #{orderCode} limit 1
+        where order_code = #{orderCode} and del_flag = '0' limit 1
     </select>
 
     <insert id="insertSalOrder" parameterType="SalOrder" useGeneratedKeys="true" keyProperty="orderId">
@@ -107,6 +109,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="orderCode != null and orderCode != ''">order_code,</if>
             <if test="orderName != null and orderName != ''">order_name,</if>
+            <if test="signCompany != null and signCompany != ''">sign_company,</if>
             <if test="orderType != null and orderType != ''">order_type,</if>
             <if test="clientId != null">client_id,</if>
             <if test="clientCode != null">client_code,</if>
@@ -146,6 +149,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="orderCode != null and orderCode != ''">#{orderCode},</if>
             <if test="orderName != null and orderName != ''">#{orderName},</if>
+            <if test="signCompany != null and signCompany != ''">#{signCompany},</if>
             <if test="orderType != null and orderType != ''">#{orderType},</if>
             <if test="clientId != null">#{clientId},</if>
             <if test="clientCode != null">#{clientCode},</if>
@@ -189,6 +193,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="orderCode != null and orderCode != ''">order_code = #{orderCode},</if>
             <if test="orderName != null and orderName != ''">order_name = #{orderName},</if>
+            <if test="signCompany != null and signCompany != ''">sign_company = #{signCompany},</if>
             <if test="orderType != null and orderType != ''">order_type = #{orderType},</if>
             <if test="clientId != null">client_id = #{clientId},</if>
             <if test="clientCode != null">client_code = #{clientCode},</if>
@@ -266,7 +271,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         GROUP BY l.order_id
     </select>
 
-    <!-- ERP 重发：清空接单/打回/回写痕迹，回到待接单（显式 factory_id） -->
+    <!-- ERP 重发：清空接单/打回/回写痕迹，回到待接单（显式 factory_id）
+         客户PO号跟着本次下发报文走：ERP 未提供订单编号时必须置空，不能留着上次兜底的值 -->
     <update id="resetForErpResend">
         update qxx_sal_order
         set status = 'PENDING_ACCEPT',
@@ -277,6 +283,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             reject_time = null,
             sync_status = null,
             sync_time = null,
+            client_order_code = #{clientOrderCode},
             external_version = #{externalVersion},
             update_by = #{updateBy},
             update_time = #{updateTime}

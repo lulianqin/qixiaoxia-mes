@@ -26,6 +26,14 @@
       </el-row>
       <el-row>
         <el-col :span="12">
+          <el-form-item label="签约主体" required>
+            <el-select v-model="form.signCompany" filterable clearable placeholder="请选择签约主体" style="width:100%">
+              <el-option v-for="d in companyOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
+            </el-select>
+            <div v-if="matchedCompanyText" class="hint">已按 ERP 采购单供方自动匹配：{{ matchedCompanyText }}</div>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
           <el-form-item label="需求交期">
             <el-date-picker v-model="form.requestDate" type="date" value-format="YYYY-MM-DD"
               placeholder="选择交期" style="width: 100%" />
@@ -71,6 +79,7 @@ import { acceptOrder, getOrderDetail, getAcceptDefaults } from '@/api/mes/sal/or
 import { listClient } from '@/api/mes/md/client'
 import { listItem } from '@/api/mes/md/item'
 import { listUser } from '@/api/system/user'
+import { getDicts } from '@/api/system/dict/data'
 import type { SalOrder, SalOrderLine } from '@/types'
 
 const visible = ref(false)
@@ -80,22 +89,30 @@ const salespersonLoading = ref(false)
 const salespersonOptions = ref<any[]>([])
 const order = ref<SalOrder>({})
 const clientOptions = ref<any[]>([])
-const form = ref<{ requestDate?: string; clientId?: number; salesperson?: string; lines: any[] }>({ lines: [] })
+const companyOptions = ref<any[]>([])
+const form = ref<{ requestDate?: string; clientId?: number; salesperson?: string; signCompany?: string; lines: any[] }>({ lines: [] })
 const emit = defineEmits(['success'])
+
+getDicts('sys_company').then((r: any) => { companyOptions.value = r.data || [] })
 
 const isExternal = computed(() => ['ERP', 'SRM'].includes(order.value.sourceSystem || ''))
 const unmatchedCount = computed(() => form.value.lines.filter(l => !l.productId).length)
+const matchedCompanyText = computed(() => {
+  const d = companyOptions.value.find(o => o.dictValue === order.value.signCompany)
+  return d ? d.dictLabel : ''
+})
 
 async function open(row: SalOrder) {
   visible.value = true
   loading.value = true
-  form.value = { requestDate: row.requestDate, clientId: row.clientId, salesperson: row.salesperson, lines: [] }
+  form.value = { requestDate: row.requestDate, clientId: row.clientId, salesperson: row.salesperson, signCompany: row.signCompany, lines: [] }
   try {
     const res = await getOrderDetail(row.orderId as number)
     order.value = res.data || row
     form.value.requestDate = order.value.requestDate
     form.value.clientId = order.value.clientId
     form.value.salesperson = order.value.salesperson
+    form.value.signCompany = order.value.signCompany
     loadSalespersons(order.value.salesperson)
     form.value.lines = (order.value.lines || []).map((l: SalOrderLine) => ({
       lineId: l.lineId,
@@ -106,7 +123,7 @@ async function open(row: SalOrder) {
       unitOfMeasure: l.unitOfMeasure,
       unitPrice: l.unitPrice,
       requestDate: l.requestDate,
-      _options: l.productId ? [{ itemId: l.productId, itemCode: l.productCode, itemName: l.productName }] : []
+      _options: l.productId ? [{ itemId: l.productId, itemCode: l.productCode, itemName: l.mesProductName || l.productName }] : []
     }))
     // 优先按已记录的两系统映射带出，未关联的再按名称给一次建议
     await applyMappingDefaults()
@@ -195,12 +212,17 @@ async function submit() {
     ElMessage.warning('请选择业务员（MES 员工账号）')
     return
   }
+  if (!form.value.signCompany) {
+    ElMessage.warning('请选择签约主体（ERP 采购单供方未匹配到，请人工选择）')
+    return
+  }
   loading.value = true
   try {
     await acceptOrder(order.value.orderId as number, {
       requestDate: form.value.requestDate,
       clientId: form.value.clientId,
       salesperson: form.value.salesperson,
+      signCompany: form.value.signCompany,
       lines: form.value.lines.map((l) => ({ lineId: l.lineId, requestDate: l.requestDate, productId: l.productId }))
     })
     visible.value = false

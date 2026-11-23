@@ -99,3 +99,10 @@ app/src/
 # --- DB backups ---
 mes_full_backup_*.sql
 mes_full_backup_*.sql.gz
+
+# --- 数据清理（本地临时与备份，不入库）---
+backup/
+.tmp_mes_clean/
+backend/jarcheck/
+.workbuddy/
+.trae/

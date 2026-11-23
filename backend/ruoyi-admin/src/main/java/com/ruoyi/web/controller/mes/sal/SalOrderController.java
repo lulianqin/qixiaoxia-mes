@@ -24,8 +24,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
-import com.ruoyi.web.controller.mes.sal.export.SalOrderDetailExcelExporter;
-import com.ruoyi.web.controller.mes.sal.export.SalOrderPdfExporter;
+import com.ruoyi.web.controller.mes.sal.export.SalOrderDocExporter;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.domain.mes.sal.SalOrder;
 import com.ruoyi.system.domain.mes.sal.SalOrderCreateRequest;
@@ -54,10 +53,7 @@ public class SalOrderController extends BaseController
     private IProWorkorderService proWorkorderService;
 
     @Autowired
-    private SalOrderPdfExporter pdfExporter;
-
-    @Autowired
-    private SalOrderDetailExcelExporter excelExporter;
+    private SalOrderDocExporter docExporter;
 
     @Autowired
     private ISysSyncTaskService syncTaskService;
@@ -107,7 +103,7 @@ public class SalOrderController extends BaseController
         response.setCharacterEncoding("utf-8");
         try
         {
-            pdfExporter.write(detail, response.getOutputStream());
+            docExporter.writePdf(detail, response.getOutputStream());
         }
         catch (Exception e)
         {
@@ -127,7 +123,7 @@ public class SalOrderController extends BaseController
         response.setCharacterEncoding("utf-8");
         try
         {
-            excelExporter.write(detail, response.getOutputStream());
+            docExporter.writeExcel(detail, response.getOutputStream());
         }
         catch (Exception e)
         {

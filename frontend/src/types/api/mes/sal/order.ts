@@ -30,6 +30,8 @@ export interface SalOrder extends BaseEntity {
   factoryId?: number;
   orderCode?: string;
   orderName?: string;
+  /** 签约主体（字典 sys_company，对应 ERP 采购单供方） */
+  signCompany?: string;
   orderType?: string;
   clientId?: number;
   clientCode?: string;
@@ -85,7 +87,10 @@ export interface SalOrderLine extends BaseEntity {
   lineNo?: number;
   productId?: number;
   productCode?: string;
+  /** 产品名称：外部单（ERP/SRM）为源单据名称 */
   productName?: string;
+  /** MES 产品名称：外部单映射到的 MES 物料名称 */
+  mesProductName?: string;
   productSpc?: string;
   unitOfMeasure?: string;
   unitName?: string;

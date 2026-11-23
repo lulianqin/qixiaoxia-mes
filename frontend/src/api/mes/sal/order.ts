@@ -32,6 +32,8 @@ export function cancelOrder(id: number): Promise<AjaxResult> {
 export function acceptOrder(id: number, data?: {
   requestDate?: string
   clientId?: number
+  salesperson?: string
+  signCompany?: string
   lines?: Array<{ lineId: number; requestDate?: string; productId?: number }>
 }): Promise<AjaxResult<number>> {
   return request({ url: '/mes/sal/order/accept/' + id, method: 'put', data: data || {} })
@@ -49,7 +51,10 @@ export function toWorkorder(data: SalOrderToWorkorderRequest): Promise<AjaxResul
 export function delOrder(id: number | number[]): Promise<AjaxResult> {
   return request({ url: '/mes/sal/order/' + id, method: 'delete' })
 }
-/** 一期：人工改订单状态（任意状态互转，后端留痕） */
+/** 销售订单 PDF（返回 blob，用于浏览器打印，不下载） */
+export function fetchOrderPdf(id: number): Promise<Blob> {
+  return request({ url: '/mes/sal/order/exportPdf/' + id, method: 'post', responseType: 'blob' }) as unknown as Promise<Blob>
+}
 export function changeOrderStatus(data: { orderId: number; targetStatus: string; reason?: string }): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/changeStatus', method: 'put', data })
 }

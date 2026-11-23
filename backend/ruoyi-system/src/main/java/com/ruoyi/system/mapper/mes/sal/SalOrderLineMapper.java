@@ -25,4 +25,7 @@ public interface SalOrderLineMapper
      * 用于可转量校验与展示,非计数列,实时算。
      */
     public BigDecimal sumProducedQtyByLineId(Long lineId);
+
+    /** 无工单成品入库：按产品编码匹配最近一张 ERP 销售订单行 */
+    public SalOrderLine selectLatestErpLineByProductCode(String productCode);
 }

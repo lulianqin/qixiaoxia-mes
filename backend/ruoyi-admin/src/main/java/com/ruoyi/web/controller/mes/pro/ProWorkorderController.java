@@ -32,6 +32,9 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.constant.Constants;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
@@ -143,6 +146,7 @@ public class ProWorkorderController extends BaseController
     public TableDataInfo list(ProWorkorder proWorkorder,
             @RequestParam(required = false, defaultValue = "false") boolean includeProgress)
     {
+        applySelfDataScope(proWorkorder);
         startPage();
         List<ProWorkorder> list = proWorkorderService.selectProWorkorderList(proWorkorder);
         if (includeProgress)
@@ -150,6 +154,45 @@ public class ProWorkorderController extends BaseController
             proWorkorderService.enrichProgress(list);
         }
         return getDataTable(list);
+    }
+
+    /**
+     * 工单列表“仅本人数据权限”：无“全部数据”角色、且有“仅本人(5)”角色时，
+     * 只返回本人创建或负责人为本人的工单。仅作用于 /list。
+     */
+    private void applySelfDataScope(ProWorkorder query)
+    {
+        if (query == null || SecurityUtils.isAdmin())
+        {
+            return;
+        }
+        com.ruoyi.common.core.domain.entity.SysUser user = SecurityUtils.getLoginUser().getUser();
+        List<SysRole> roles = user.getRoles();
+        if (roles == null || roles.isEmpty())
+        {
+            return;
+        }
+        boolean selfScope = false;
+        for (SysRole role : roles)
+        {
+            if (!UserConstants.ROLE_NORMAL.equals(role.getStatus()))
+            {
+                continue;
+            }
+            if (Constants.Dept.DATA_SCOPE_ALL.equals(role.getDataScope()))
+            {
+                return;
+            }
+            if (Constants.Dept.DATA_SCOPE_SELF.equals(role.getDataScope()))
+            {
+                selfScope = true;
+            }
+        }
+        if (selfScope)
+        {
+            query.setSelfUserId(user.getUserId());
+            query.setSelfUsername(user.getUserName());
+        }
     }
 
     /**

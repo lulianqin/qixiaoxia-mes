@@ -29,6 +29,9 @@ public class WmProductSalesLine extends BaseEntity
     @Excel(name = "销售订单行ID")
     private Long salesOrderLineId;
 
+    /** 来源出库申请行ID */
+    private Long applyLineId;
+
     @Excel(name = "物料ID")
     private Long itemId;
 
@@ -109,6 +112,8 @@ public class WmProductSalesLine extends BaseEntity
 
     public Long getSalesOrderLineId() { return salesOrderLineId; }
     public void setSalesOrderLineId(Long v) { this.salesOrderLineId = v; }
+    public Long getApplyLineId() { return applyLineId; }
+    public void setApplyLineId(Long v) { this.applyLineId = v; }
 
     public Long getItemId() { return itemId; }
     public void setItemId(Long v) { this.itemId = v; }

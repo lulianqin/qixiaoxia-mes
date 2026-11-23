@@ -107,6 +107,15 @@ public class WmProductSales extends BaseEntity
     @Excel(name = "销售订单编码")
     private String salesOrderCode;
 
+    /** 来源出库申请ID */
+    private Long applyId;
+
+    /** 来源出库申请单号 */
+    private String applyCode;
+
+    /** 来源类型：ERP_APPLY / MANUAL */
+    private String sourceType;
+
     @Excel(name = "状态:DRAFT-草稿")
     private String status;
 
@@ -235,6 +244,15 @@ public class WmProductSales extends BaseEntity
 
     public String getSalesOrderCode() { return salesOrderCode; }
     public void setSalesOrderCode(String v) { this.salesOrderCode = v; }
+
+    public Long getApplyId() { return applyId; }
+    public void setApplyId(Long v) { this.applyId = v; }
+
+    public String getApplyCode() { return applyCode; }
+    public void setApplyCode(String v) { this.applyCode = v; }
+
+    public String getSourceType() { return sourceType; }
+    public void setSourceType(String v) { this.sourceType = v; }
 
     public BigDecimal getPostedQuantity() { return postedQuantity; }
     public void setPostedQuantity(BigDecimal v) { this.postedQuantity = v; }

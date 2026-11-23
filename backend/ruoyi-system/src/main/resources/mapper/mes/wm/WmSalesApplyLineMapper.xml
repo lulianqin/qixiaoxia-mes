@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmSalesApplyLineMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.wm.WmSalesApplyLine" id="WmSalesApplyLineResult">
+        <result property="lineId"             column="line_id"             />
+        <result property="factoryId"          column="factory_id"          />
+        <result property="applyId"            column="apply_id"            />
+        <result property="externalLineId"     column="external_line_id"    />
+        <result property="salesOrderLineId"   column="sales_order_line_id" />
+        <result property="itemId"             column="item_id"             />
+        <result property="itemCode"           column="item_code"           />
+        <result property="itemName"           column="item_name"           />
+        <result property="unitOfMeasure"      column="unit_of_measure"     />
+        <result property="unitName"           column="unit_name"           />
+        <result property="applyQty"           column="apply_qty"           />
+        <result property="postedQty"          column="posted_qty"          />
+        <result property="lineStatus"         column="line_status"         />
+        <result property="remark"             column="remark"              />
+        <result property="createTime"         column="create_time"         />
+        <result property="updateTime"         column="update_time"         />
+    </resultMap>
+
+    <select id="selectLinesByApplyId" resultMap="WmSalesApplyLineResult">
+        select line_id, factory_id, apply_id, external_line_id, sales_order_line_id, item_id, item_code, item_name,
+               unit_of_measure, unit_name, apply_qty, posted_qty, line_status, remark, create_time, update_time
+        from qxx_wm_sales_apply_line
+        where apply_id = #{applyId} and factory_id = #{factoryId}
+        order by line_id
+    </select>
+
+    <insert id="insertWmSalesApplyLine" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApplyLine" useGeneratedKeys="true" keyProperty="lineId">
+        insert into qxx_wm_sales_apply_line
+        (apply_id, external_line_id, sales_order_line_id, item_id, item_code, item_name,
+         unit_of_measure, unit_name, apply_qty, posted_qty, line_status, remark, create_time)
+        values
+        (#{applyId}, #{externalLineId}, #{salesOrderLineId}, #{itemId}, #{itemCode}, #{itemName},
+         #{unitOfMeasure}, #{unitName}, #{applyQty}, #{postedQty}, #{lineStatus}, #{remark}, #{createTime})
+    </insert>
+
+    <update id="updatePosted">
+        update qxx_wm_sales_apply_line
+        set posted_qty = #{postedQty},
+            line_status = #{lineStatus},
+            update_time = now()
+        where apply_id = #{applyId}
+          and factory_id = #{factoryId}
+          and external_line_id = #{externalLineId}
+    </update>
+</mapper>

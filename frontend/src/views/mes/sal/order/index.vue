@@ -43,6 +43,9 @@
         <template #default="s"><el-link type="primary" @click="handleView(s.row)">{{ s.row.orderCode }}</el-link></template>
       </el-table-column>
       <el-table-column label="订单名称" align="center" prop="orderName" min-width="200" :show-overflow-tooltip="true" />
+      <el-table-column label="签约主体" align="center" prop="signCompany" width="200" :show-overflow-tooltip="true">
+        <template #default="s">{{ companyText(s.row.signCompany) }}</template>
+      </el-table-column>
       <el-table-column label="订单类型" align="center" prop="orderType" width="90"><template #default="s"><el-tag :type="orderTypeMeta(s.row.orderType).type" size="small">{{ orderTypeMeta(s.row.orderType).text }}</el-tag></template></el-table-column>
       <el-table-column label="客户" align="center" prop="clientName" min-width="200" :show-overflow-tooltip="true" />
       <el-table-column label="客户PO号" align="center" prop="clientOrderCode" min-width="160" :show-overflow-tooltip="true" />
@@ -83,7 +86,7 @@
             <el-button link type="primary" size="small">导出</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
+                <el-dropdown-item command="print">打印</el-dropdown-item>
                 <el-dropdown-item command="excel">导出 Excel</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -101,7 +104,8 @@
 </template>
 
 <script>
-import { listOrder, closeOrder, cancelOrder, delOrder, changeOrderStatus } from '@/api/mes/sal/order'
+import { listOrder, closeOrder, cancelOrder, delOrder, changeOrderStatus, fetchOrderPdf } from '@/api/mes/sal/order'
+import { printPdfBlob } from '@/utils/pdfPrint'
 import { getDicts } from '@/api/system/dict/data'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import OrderEditDialog from './OrderEditDialog.vue'
@@ -123,11 +127,13 @@ export default {
       salStatusOptions: [],
       // 销售订单类型字典(mes_sal_order_type)
       salOrderTypeOptions: [],
+      // 签约主体字典(sys_company)
+      companyOptions: [],
       queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, externalOrderNo: null, businessLine: null, orderType: null, status: null, source: null },
       twOpen: false, twOrder: {}
     }
   },
-  created() { this.loadStatusDict(); this.loadOrderTypeDict(); this.getList() },
+  created() { this.loadStatusDict(); this.loadOrderTypeDict(); this.loadCompanyDict(); this.getList() },
   methods: {
     /** 进度条展示模型：百分比兜底 0；CLOSED/CANCEL 走 exception，满进度走 success */
     progressBar(row) {
@@ -144,6 +150,13 @@ export default {
     loadStatusDict() { getDicts('mes_sal_order_status').then(r => { this.salStatusOptions = r.data || [] }) },
     /** 加载销售订单类型字典 */
     loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.salOrderTypeOptions = r.data || [] }) },
+    /** 加载签约主体字典 */
+    loadCompanyDict() { getDicts('sys_company').then(r => { this.companyOptions = r.data || [] }) },
+    /** 签约主体字典值 → 名称 */
+    companyText(v) {
+      const d = this.companyOptions.find(o => o.dictValue === v)
+      return d ? d.dictLabel : (v || '-')
+    },
     /** 一期：人工改订单状态（任意状态互转，后端记录变更原因） */
     handleChangeStatus(row, targetStatus) {
       if (targetStatus === row.status) return
@@ -201,9 +214,12 @@ export default {
     },
     handleExport() { this.download('mes/sal/order/export', { ...this.queryParams }, `sal_order_${new Date().getTime()}.xlsx`) },
     handleRowExport(row, cmd) {
-      const url = cmd === 'pdf' ? 'mes/sal/order/exportPdf/' + row.orderId : 'mes/sal/order/exportExcel/' + row.orderId
-      const suffix = cmd === 'pdf' ? 'pdf' : 'xlsx'
-      this.download(url, {}, `sal_order_${row.orderCode}.${suffix}`)
+      // 打印：取 PDF blob 后直接调起系统打印，不下载
+      if (cmd === 'print') {
+        fetchOrderPdf(row.orderId).then(blob => printPdfBlob(blob)).catch(() => {})
+        return
+      }
+      this.download('mes/sal/order/exportExcel/' + row.orderId, {}, `sal_order_${row.orderCode}.xlsx`)
     }
   },
   computed: {

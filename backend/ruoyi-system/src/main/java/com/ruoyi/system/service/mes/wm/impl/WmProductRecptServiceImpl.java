@@ -62,6 +62,9 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
     @Autowired
     private IQcGateService qcGateService;
 
+    @Autowired
+    private com.ruoyi.system.service.mes.wm.WmProductRecptInboundNotifier recptInboundNotifier;
+
     @Override
     public List<WmProductRecpt> selectWmProductRecptList(WmProductRecpt entity) {
         return wmProductRecptMapper.selectWmProductRecptList(entity);
@@ -203,6 +206,8 @@ public class WmProductRecptServiceImpl implements IWmProductRecptService
         wmProductRecptMapper.updateWmProductRecpt(header);
         // 补写产出回库的追溯链路（FEEDBACK → MATERIAL_STOCK），打通产出→销售的全链路
         writeProduceStockinTrace(header);
+        // ERP 采购单入库回写（outbox，不阻断入库）
+        recptInboundNotifier.notifyIfErpOrder(header, lines);
     }
 
     /**

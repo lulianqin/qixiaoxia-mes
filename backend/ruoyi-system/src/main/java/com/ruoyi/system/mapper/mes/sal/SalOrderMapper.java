@@ -62,6 +62,7 @@ public interface SalOrderMapper
     int resetForErpResend(@Param("orderId") Long orderId,
                           @Param("factoryId") Long factoryId,
                           @Param("externalVersion") Integer externalVersion,
+                          @Param("clientOrderCode") String clientOrderCode,
                           @Param("updateBy") String updateBy,
                           @Param("updateTime") Date updateTime);
 

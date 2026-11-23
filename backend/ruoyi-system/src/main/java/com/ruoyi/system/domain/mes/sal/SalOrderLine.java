@@ -31,8 +31,13 @@ public class SalOrderLine extends BaseEntity
     private Long productId;
     private String productCode;
 
+    /** 产品名称：外部单（ERP/SRM）保留源单据名称，手工/CRM 单为 MES 物料名称 */
     @Excel(name = "产品名称")
     private String productName;
+
+    /** MES 产品名称：外部单映射到的 MES 物料名称，与源产品名称并列展示 */
+    @Excel(name = "MES产品名称")
+    private String mesProductName;
 
     private String productSpc;
     private String unitOfMeasure;
@@ -91,6 +96,8 @@ public class SalOrderLine extends BaseEntity
     public void setProductCode(String v) { this.productCode = v; }
     public String getProductName() { return productName; }
     public void setProductName(String v) { this.productName = v; }
+    public String getMesProductName() { return mesProductName; }
+    public void setMesProductName(String v) { this.mesProductName = v; }
     public String getProductSpc() { return productSpc; }
     public void setProductSpc(String v) { this.productSpc = v; }
     public String getUnitOfMeasure() { return unitOfMeasure; }

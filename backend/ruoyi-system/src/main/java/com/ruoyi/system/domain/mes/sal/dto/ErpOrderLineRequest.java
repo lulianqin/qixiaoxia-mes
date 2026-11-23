@@ -25,6 +25,13 @@ public class ErpOrderLineRequest
 
     private String productName;
     private String productSpec;
+
+    /** 材质及工艺（ERP Material），映射到 MES 印刷要求 */
+    private String material;
+
+    /** 包装方式（ERP PackingModeTxt），映射到 MES 包装要求 */
+    private String packingModeTxt;
+
     private String unit;
 
     @NotNull(message = "明细数量不能为空")
@@ -52,6 +59,10 @@ public class ErpOrderLineRequest
     public void setProductName(String v) { this.productName = v; }
     public String getProductSpec() { return productSpec; }
     public void setProductSpec(String v) { this.productSpec = v; }
+    public String getMaterial() { return material; }
+    public void setMaterial(String v) { this.material = v; }
+    public String getPackingModeTxt() { return packingModeTxt; }
+    public void setPackingModeTxt(String v) { this.packingModeTxt = v; }
     public String getUnit() { return unit; }
     public void setUnit(String v) { this.unit = v; }
     public BigDecimal getQuantity() { return quantity; }

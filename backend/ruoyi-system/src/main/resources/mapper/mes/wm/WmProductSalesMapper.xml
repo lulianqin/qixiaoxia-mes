@@ -39,6 +39,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="oqcCode" column="oqc_code" />
         <result property="salesOrderId" column="sales_order_id" />
         <result property="salesOrderCode" column="sales_order_code" />
+        <result property="applyId" column="apply_id" />
+        <result property="applyCode" column="apply_code" />
+        <result property="sourceType" column="source_type" />
         <result property="status" column="status" />
         <result property="qcStatus" column="qc_status" />
         <result property="remark" column="remark" />
@@ -49,7 +52,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmProductSalesVo">
-        select sales_id, factory_id, sales_code, sales_name, client_id, client_code, client_name, client_order_code, salesperson, warehouse_id, warehouse_code, warehouse_name, sales_date, total_quantity, posted_quantity, shipped_quantity, ship_status, plan_ship_date, total_box, total_volume, total_weight, logistics_company, tracking_no, logistics_fee, shipping_address, receiver_name, receiver_tel, pallet_flag, box_label, sales_type, oqc_id, oqc_code, sales_order_id, sales_order_code, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales
+        select sales_id, factory_id, sales_code, sales_name, client_id, client_code, client_name, client_order_code, salesperson, warehouse_id, warehouse_code, warehouse_name, sales_date, total_quantity, posted_quantity, shipped_quantity, ship_status, plan_ship_date, total_box, total_volume, total_weight, logistics_company, tracking_no, logistics_fee, shipping_address, receiver_name, receiver_tel, pallet_flag, box_label, sales_type, oqc_id, oqc_code, sales_order_id, sales_order_code, apply_id, apply_code, source_type, status, remark, create_by, create_time, update_by, update_time from qxx_wm_product_sales
     </sql>
 
     <!-- 列表带 qcStatus 计算列：对本出库单全部 OQC 单状态汇总（最差优先，
@@ -64,7 +67,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                t.plan_ship_date, t.total_box, t.total_volume, t.total_weight, t.logistics_company,
                t.tracking_no, t.logistics_fee, t.shipping_address, t.receiver_name, t.receiver_tel,
                t.pallet_flag, t.box_label, t.sales_type, t.oqc_id, t.oqc_code, t.sales_order_id,
-               t.sales_order_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
+               t.sales_order_code, t.apply_id, t.apply_code, t.source_type, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
                (
                    select case
                        when max(case when o.status = 'COMPLETED' and o.check_result = 'FAIL' then 1 else 0 end) = 1 then 'FAILED'
@@ -163,6 +166,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="oqcCode != null">oqc_code,</if>
             <if test="salesOrderId != null">sales_order_id,</if>
             <if test="salesOrderCode != null">sales_order_code,</if>
+            <if test="applyId != null">apply_id,</if>
+            <if test="applyCode != null">apply_code,</if>
+            <if test="sourceType != null">source_type,</if>
             <if test="status != null">status,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -202,6 +208,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="oqcCode != null">#{oqcCode},</if>
             <if test="salesOrderId != null">#{salesOrderId},</if>
             <if test="salesOrderCode != null">#{salesOrderCode},</if>
+            <if test="applyId != null">#{applyId},</if>
+            <if test="applyCode != null">#{applyCode},</if>
+            <if test="sourceType != null">#{sourceType},</if>
             <if test="status != null">#{status},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -245,6 +254,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="oqcCode != null">oqc_code = #{oqcCode},</if>
             <if test="salesOrderId != null">sales_order_id = #{salesOrderId},</if>
             <if test="salesOrderCode != null">sales_order_code = #{salesOrderCode},</if>
+            <if test="applyId != null">apply_id = #{applyId},</if>
+            <if test="applyCode != null">apply_code = #{applyCode},</if>
+            <if test="sourceType != null">source_type = #{sourceType},</if>
             <if test="status != null">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>

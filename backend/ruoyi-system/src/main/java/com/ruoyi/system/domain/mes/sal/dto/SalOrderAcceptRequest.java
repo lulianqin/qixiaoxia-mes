@@ -22,6 +22,9 @@ public class SalOrderAcceptRequest
     /** 接单时确认的 MES 业务员账号（ERP 采购单未提供下单人时必填） */
     private String salesperson;
 
+    /** 接单时确认的签约主体（字典 sys_company；ERP 供方未匹配到时必填） */
+    private String signCompany;
+
     /** 行级交期调整 + 产品映射 */
     private List<LineDate> lines;
 
@@ -31,6 +34,8 @@ public class SalOrderAcceptRequest
     public void setClientId(Long v) { this.clientId = v; }
     public String getSalesperson() { return salesperson; }
     public void setSalesperson(String v) { this.salesperson = v; }
+    public String getSignCompany() { return signCompany; }
+    public void setSignCompany(String v) { this.signCompany = v; }
     public List<LineDate> getLines() { return lines; }
     public void setLines(List<LineDate> v) { this.lines = v; }
 

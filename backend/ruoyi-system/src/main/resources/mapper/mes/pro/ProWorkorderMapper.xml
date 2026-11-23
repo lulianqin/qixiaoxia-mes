@@ -92,6 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectProWorkorderList" parameterType="ProWorkorder" resultMap="ProWorkorderResult">
         <include refid="selectProWorkorderVo"/>
         <where>
+            and del_flag = '0'
             <if test="workorderCode != null  and workorderCode != ''"> and workorder_code like concat('%', #{workorderCode}, '%')</if>
             <if test="workorderName != null  and workorderName != ''"> and workorder_name like concat('%', #{workorderName}, '%')</if>
             <if test="workorderType != null  and workorderType != ''"> and workorder_type = #{workorderType}</if>
@@ -104,6 +105,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 <foreach collection="statusList" item="item" open="(" separator="," close=")">#{item}</foreach>
             </if>
             <if test="quantityProducedMin != null"> and quantity_produced &gt;= #{quantityProducedMin}</if>
+            <!-- 仅本人数据权限：本人创建或负责人为本人 -->
+            <if test="selfUserId != null">
+                and (create_by = #{selfUsername} or owner_id = #{selfUserId})
+            </if>
         </where>
         order by workorder_id desc
     </select>
@@ -112,6 +117,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="countMobileWorkorders" resultType="int">
         select count(1) from qxx_pro_workorder
         <where>
+            and del_flag = '0'
             <if test="status != null and status != ''"> and status = #{status}</if>
         </where>
     </select>
@@ -126,17 +132,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where t.status not in ('COMPLETED', 'CANCEL')
           and ifnull(t.quantity_produced, 0) &lt; ifnull(t.quantity, 0)
           and w.status not in ('COMPLETED', 'CANCEL', 'CLOSED')
+          and w.del_flag = '0'
           <if test="status != null and status != ''"> and w.status = #{status}</if>
     </select>
 
     <select id="selectProWorkorderByWorkorderId" parameterType="Long" resultMap="ProWorkorderResult">
         <include refid="selectProWorkorderVo"/>
-        where workorder_id = #{workorderId}
+        where workorder_id = #{workorderId} and del_flag = '0'
     </select>
 
     <select id="selectProWorkorderByWorkorderCode" parameterType="String" resultMap="ProWorkorderResult">
         <include refid="selectProWorkorderVo"/>
-        where workorder_code = #{workorderCode}
+        where workorder_code = #{workorderCode} and del_flag = '0'
     </select>
 
     <insert id="insertProWorkorder" parameterType="ProWorkorder" useGeneratedKeys="true" keyProperty="workorderId">

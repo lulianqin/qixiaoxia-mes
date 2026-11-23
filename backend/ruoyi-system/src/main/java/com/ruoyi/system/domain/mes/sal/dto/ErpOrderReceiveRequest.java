@@ -41,6 +41,9 @@ public class ErpOrderReceiveRequest
     /** 客户PO号 */
     private String clientOrderCode;
 
+    /** ERP 采购单供方名称（用于匹配 MES 签约主体 sys_company） */
+    private String supplierName;
+
     private String salesperson;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -75,6 +78,8 @@ public class ErpOrderReceiveRequest
     public void setClientName(String v) { this.clientName = v; }
     public String getClientOrderCode() { return clientOrderCode; }
     public void setClientOrderCode(String v) { this.clientOrderCode = v; }
+    public String getSupplierName() { return supplierName; }
+    public void setSupplierName(String v) { this.supplierName = v; }
     public String getSalesperson() { return salesperson; }
     public void setSalesperson(String v) { this.salesperson = v; }
     public Date getOrderDate() { return orderDate; }

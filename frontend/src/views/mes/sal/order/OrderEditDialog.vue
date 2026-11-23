@@ -24,6 +24,13 @@
       <el-row>
         <el-col :span="6"><el-form-item label="是否外发" prop="outsourceFlag"><el-switch v-model="form.outsourceFlag" active-value="Y" inactive-value="N" @change="onHeadDimensionChange" /></el-form-item></el-col>
         <el-col :span="6"><el-form-item label="是否包装" prop="packageFlag"><el-switch v-model="form.packageFlag" active-value="Y" inactive-value="N" @change="onHeadDimensionChange" /></el-form-item></el-col>
+        <el-col :span="12">
+          <el-form-item label="签约主体" prop="signCompany">
+            <el-select v-model="form.signCompany" placeholder="请选择签约主体" clearable filterable style="width:100%">
+              <el-option v-for="d in companyOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
+            </el-select>
+          </el-form-item>
+        </el-col>
       </el-row>
       <el-row>
         <el-col :span="8"><el-form-item label="订单日期" prop="orderDate"><el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
@@ -43,7 +50,9 @@
       <el-table-column label="数量" align="center" prop="quantity" width="90"  :show-overflow-tooltip="true" />
       <el-table-column label="单价" align="center" prop="unitPrice" width="90"  :show-overflow-tooltip="true" />
       <el-table-column label="行金额" align="center" prop="lineAmount" width="100"  :show-overflow-tooltip="true" />
-      <el-table-column label="尺寸" align="center" prop="productSize" width="130" :show-overflow-tooltip="true" />
+      <el-table-column label="产品尺寸" align="center" width="130" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.productSize || scope.row.productSpc || '-' }}</template>
+      </el-table-column>
       <el-table-column label="工艺路线" align="center" prop="routeName" width="140" :show-overflow-tooltip="true">
         <template #default="scope">{{ scope.row.routeName || '—' }}</template>
       </el-table-column>
@@ -67,6 +76,7 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { resolveRouteProductBatch } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { listUser } from '@/api/system/user'
+import { getDicts } from '@/api/system/dict/data'
 import ClientSelect from '@/components/clientSelect/single.vue'
 import LineEdit from './LineEdit.vue'
 
@@ -83,21 +93,28 @@ export default {
       open: false, optType: undefined, autoGenFlag: true,
       // 业务员选项列表(SysUser,存展示用姓名 nickName,与客户/成品销售的 salesperson 口径一致)
       userOptions: [],
+      // 签约主体字典(sys_company)
+      companyOptions: [],
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
       // 头维度批量重算: loading + 自增序号丢弃过期响应(连续切换/明细变动)
       dimRecalcing: false, headDimReqSeq: 0,
       rules: {
         orderCode: [{ required: true, message: '销售订单号不能为空', trigger: 'blur' }],
-        orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }]
+        orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }],
+        signCompany: [{ required: true, message: '签约主体不能为空', trigger: 'change' }]
       }
     }
   },
   computed: {
     title() { return this.form.orderId ? '修改销售订单' : '新增销售订单' }
   },
-  created() { this.loadUserOptions() },
+  created() { this.loadUserOptions(); this.loadCompanyOptions() },
   methods: {
+    /** 签约主体选项（字典 sys_company） */
+    loadCompanyOptions() {
+      getDicts('sys_company').then(r => { this.companyOptions = r.data || [] })
+    },
     /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
     loadUserOptions() {
       listUser({ pageSize: 999 }).then(r => {
@@ -117,7 +134,7 @@ export default {
       getOrderDetail(id).then(r => { this.form = r.data; this.lineList = r.data.lines || []; this.open = true })
     },
     reset() {
-      this.form = { orderId: null, orderCode: null, orderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, productionRemark: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
+      this.form = { orderId: null, orderCode: null, orderName: null, signCompany: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, productionRemark: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
       this.lineList = []; this.autoGenFlag = true; this.resetForm('form')
     },
     cancel() { this.open = false; this.reset() },

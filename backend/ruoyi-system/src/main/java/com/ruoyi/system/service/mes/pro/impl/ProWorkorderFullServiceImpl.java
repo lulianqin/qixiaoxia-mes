@@ -83,6 +83,10 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         {
             throw new ServiceException("工单信息不能为空");
         }
+        if (body.getWorkorder().getOwnerId() == null)
+        {
+            throw new ServiceException("请选择工单负责人");
+        }
         ensureRouteProductBinding(body.getWorkorder(), body.getRouteProcesses());
         validateSalesOrderLink(body.getWorkorder());
         ProWorkorder wo = workorderService.createWorkorderWithBom(
@@ -129,6 +133,10 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         if (workorderId == null || body == null || body.getWorkorder() == null)
         {
             throw new ServiceException("工单信息不能为空");
+        }
+        if (body.getWorkorder().getOwnerId() == null)
+        {
+            throw new ServiceException("请选择工单负责人");
         }
         ProWorkorder existing = workorderService.selectProWorkorderByWorkorderId(workorderId);
         if (existing == null)

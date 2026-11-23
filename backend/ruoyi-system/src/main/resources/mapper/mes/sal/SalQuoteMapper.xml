@@ -81,17 +81,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSalQuoteByQuoteId" parameterType="Long" resultMap="SalQuoteResult">
         <include refid="selectSalQuoteVo"/>
-        where quote_id = #{quoteId}
+        where quote_id = #{quoteId} and del_flag = '0'
     </select>
 
     <select id="selectSalQuoteByExternalNo" parameterType="String" resultMap="SalQuoteResult">
         <include refid="selectSalQuoteVo"/>
-        where external_quote_no = #{externalQuoteNo} limit 1
+        where external_quote_no = #{externalQuoteNo} and del_flag = '0' limit 1
     </select>
 
     <select id="selectSalQuoteList" parameterType="SalQuote" resultMap="SalQuoteResult">
         <include refid="selectSalQuoteVo"/>
         <where>
+            and del_flag = '0'
             <if test="quoteCode != null and quoteCode != ''"> and quote_code like concat('%', #{quoteCode}, '%')</if>
             <if test="externalQuoteNo != null and externalQuoteNo != ''"> and external_quote_no like concat('%', #{externalQuoteNo}, '%')</if>
             <if test="title != null and title != ''"> and title like concat('%', #{title}, '%')</if>

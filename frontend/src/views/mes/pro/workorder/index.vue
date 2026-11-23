@@ -491,6 +491,7 @@ export default {
         workorderCode: [{ required: true, message: '编码不能为空', trigger: 'blur' }],
         workorderName: [{ required: true, message: '名称不能为空', trigger: 'blur' }],
         productId: [{ required: true, message: '请选择产品', trigger: 'change' }],
+        ownerId: [{ required: true, message: '请选择工单负责人', trigger: 'change' }],
         quantity: [{ required: true, message: '数量不能为空', trigger: 'blur' }],
       },
     }

@@ -196,7 +196,7 @@ function initForm() {
   title.value = src && src.lineId ? '修改明细行' : '新增明细行'
   activeTab.value = 'basic'
   Object.assign(form, {
-    lineId: null, productId: null, productCode: null, productName: null, productSpc: null,
+    lineId: null, productId: null, productCode: null, productName: null, mesProductName: null, productSpc: null,
     unitOfMeasure: null, unitName: null, quantity: undefined, unitPrice: undefined, lineAmount: undefined,
     spacing: null, productSize: null, printingReq: null, ropeSpec: null, packageReq: null,
     shippingReq: null, routeProductId: null, routeCode: null, routeName: null,
@@ -204,7 +204,8 @@ function initForm() {
   }, src || {})
   // 编辑已有行：若带产品，按产品分类拉 schema + 回填扩展属性
   if (src?.productId) {
-    loadExtAttrsByProduct(src.productId, src.lineAttrs)
+    // 编辑已有行不回填物料默认规格，避免覆盖用户/ERP 已填的产品尺寸、印刷、包装
+    loadExtAttrsByProduct(src.productId, src.lineAttrs, false)
     // 已有路线选择(自动带出或手选)时只拉候选不重算, 保留原选择
     loadRouteOptions(!src.routeProductId)
   }
@@ -228,7 +229,11 @@ async function loadRouteOptions(selectResolved = true) {
     routeOptions.value = (bindRes.rows || []).map((rp: any) => ({
       ...rp, _routeName: routeMap[rp.routeId] || ('路线#' + rp.routeId)
     }))
-    if (selectResolved) await applyResolvedRoute(seq, itemId)
+    // 历史路线可能属于其它产品（如 ERP 接单换过产品），不在候选内视为孤儿路线：
+    // 按当前产品重新解析默认路线，解析不到则清空，避免下拉直接显示 recordId
+    const orphan = form.routeProductId != null
+      && !routeOptions.value.some((o: any) => o.recordId === form.routeProductId)
+    if (selectResolved || orphan) await applyResolvedRoute(seq, itemId)
   } catch {
     if (seq === routeReqSeq && form.productId === itemId && showFlag.value) {
       routeOptions.value = []
@@ -255,6 +260,11 @@ async function applyResolvedRoute(seq: number, itemId: number) {
     form.routeProductId = d.routeProductId
     const hit = routeOptions.value.find((o: any) => o.recordId === d.routeProductId)
     if (hit) { form.routeCode = hit.routeCode || null; form.routeName = hit._routeName || null }
+  } else {
+    // 当前产品没有可用路线：清空历史孤儿路线
+    form.routeProductId = null
+    form.routeCode = null
+    form.routeName = null
   }
 }
 
@@ -265,7 +275,7 @@ function onRouteChange(recordId: number | undefined) {
 }
 
 /** 选物料后拉详情：取 extAttrs（物料扩展属性快照）+ 按分类拉 schema */
-function loadExtAttrsByProduct(itemId: number, snapshot?: Record<string, any>) {
+function loadExtAttrsByProduct(itemId: number, snapshot?: Record<string, any>, applyDefaults = false) {
   const seq = ++attrReqSeq
   getItem(itemId).then(r => {
     if (seq !== attrReqSeq || form.productId !== itemId || !showFlag.value) return
@@ -274,7 +284,7 @@ function loadExtAttrsByProduct(itemId: number, snapshot?: Record<string, any>) {
     const hasSnapshot = !!(snapshot && Object.keys(snapshot).length)
     form.lineAttrs = hasSnapshot ? { ...snapshot } : { ...(item.extAttrs || {}) }
     // 新选产品时默认带出物料上维护的规格值（产品尺寸/印刷要求/装箱规格→包装要求），避免重复手输
-    if (!hasSnapshot) {
+    if (applyDefaults) {
       if (item.productSize) form.productSize = item.productSize
       if (item.printingReq) form.printingReq = item.printingReq
       if (item.packageSpec) form.packageReq = item.packageSpec
@@ -329,9 +339,12 @@ function submitSpec() {
 }
 
 function onProductSelected(row: any) {
+  const isNewLine = !form.productId
   form.productId = row.itemId
   form.productCode = row.itemCode
-  form.productName = row.itemName
+  form.mesProductName = row.itemName
+  // 外部单（ERP/SRM）已带源产品名称时保留，只更新 MES 物料名称，避免覆盖采购单名称
+  if (isNewLine || !form.productName) form.productName = row.itemName
   form.productSpc = row.specification
   form.unitOfMeasure = row.unitOfMeasure
   form.unitName = row.unitName
@@ -340,7 +353,8 @@ function onProductSelected(row: any) {
   form.routeCode = null
   form.routeName = null
   if (row.itemId) {
-    loadExtAttrsByProduct(row.itemId)
+    // 真正重新选产品时才带出物料默认规格
+    loadExtAttrsByProduct(row.itemId, undefined, true)
     loadRouteOptions(true)
   }
 }

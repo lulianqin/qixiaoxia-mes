@@ -68,6 +68,37 @@ public class ErpCallbackPayload
         return m;
     }
 
+    /** 出库结果回写 */
+    public static String outboundResult(Long applyId, String applyCode, Long salesId, String salesCode,
+                                        String status, List<Map<String, Object>> lines)
+    {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("externalApplyNo", applyCode);
+        m.put("mesApplyId", applyId);
+        m.put("mesSalesId", salesId);
+        m.put("mesSalesCode", salesCode);
+        m.put("status", status);
+        m.put("outboundTime", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, new Date()));
+        m.put("lines", lines == null ? new ArrayList<>() : lines);
+        return JSON.toJSONString(m);
+    }
+
+    /** 手工直开出库结果回写（旁路：无 ERP 出库申请，按采购单号/订单号回写） */
+    public static String manualOutboundResult(String externalOrderNo, String orderNumber,
+                                              Long salesId, String salesCode,
+                                              String status, List<Map<String, Object>> lines)
+    {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("externalOrderNo", externalOrderNo);
+        m.put("orderNumber", orderNumber);
+        m.put("mesSalesId", salesId);
+        m.put("mesSalesCode", salesCode);
+        m.put("status", status);
+        m.put("outboundTime", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, new Date()));
+        m.put("lines", lines == null ? new ArrayList<>() : lines);
+        return JSON.toJSONString(m);
+    }
+
     /** 报价回写 */
     public static String quoteSubmit(SalQuote quote, List<SalQuoteLine> lines)
     {

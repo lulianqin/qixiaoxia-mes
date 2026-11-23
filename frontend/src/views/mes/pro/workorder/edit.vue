@@ -56,7 +56,7 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="负责人">
+              <el-form-item label="负责人" prop="ownerId">
                 <el-select v-model="form.ownerId" filterable remote clearable :remote-method="searchOwners"
                   :loading="ownerLoading" placeholder="请选择" style="width:100%">
                   <el-option v-for="u in ownerOptions" :key="u.userId" :label="u.nickName || u.userName" :value="u.userId" />
@@ -198,7 +198,7 @@ import {
   createWorkorderFull, updateWorkorderFull, getWorkorderFullDetail, getWorkorderCopyTemplate
 } from '@/api/mes/pro/workorderFull'
 import { listOrder, getOrderDetail } from '@/api/mes/sal/order'
-import { listRouteProduct } from '@/api/mes/pro/routeproduct'
+import { listRouteProduct, getRouteProduct, resolveRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRouteProductBomByRouteId } from '@/api/mes/pro/routeproductbom'
@@ -278,6 +278,7 @@ const rules = {
   workorderCode: [{ required: true, message: '编码不能为空', trigger: 'blur' }],
   workorderName: [{ required: true, message: '名称不能为空', trigger: 'blur' }],
   productId: [{ required: true, message: '请选择产品', trigger: 'change' }],
+  ownerId: [{ required: true, message: '请选择工单负责人', trigger: 'change' }],
   quantity: [{ required: true, message: '数量不能为空', trigger: 'blur' }]
 }
 
@@ -330,7 +331,105 @@ function initFromSalesOrder() {
       itemId: Number(q.productId), itemCode: q.productCode, itemName: q.productName,
       specification: q.productSpc, unitOfMeasure: q.unitOfMeasure, unitName: q.unitName
     })
+    return
   }
+  if (q.sourceOrderCode) loadSalesOrderPrefill(q.sourceOrderCode as string, form.salesOrderLineId)
+}
+
+/** 按销售订单预填工单：产品/路线/名称/交期/尺寸/印刷/包装/发货/备注/图片 */
+async function loadSalesOrderPrefill(orderCode: string, lineId: number | null) {
+  try {
+    const res: any = await listOrder({ pageNum: 1, pageSize: 10, orderCode } as any)
+    const order = (res.rows || []).find((o: any) => o.orderCode === orderCode) || (res.rows || [])[0]
+    if (!order) return
+    const detail: any = await getOrderDetail(order.orderId)
+    const lines = detail.data?.lines || []
+    let line = lineId ? lines.find((l: any) => l.lineId === lineId) : null
+    if (!line) line = lines.find((l: any) => Number(l.quantityConvertible ?? l.quantity ?? 0) > 0) || lines[0]
+    if (!line) return
+    form.sourceCode = order.orderCode
+    form.orderSource = 'SALES_ORDER'
+    form.clientId = order.clientId
+    form.clientCode = order.clientCode
+    form.clientName = order.clientName
+    form.clientOrderCode = order.clientOrderCode
+    form.salesperson = order.salesperson
+    form.orderType = order.orderType || form.orderType
+    form.salesOrderLineId = line.lineId
+    form.quantity = Number(line.quantityConvertible ?? line.quantity) || 1
+    form.requestDate = normalizeDateTime(line.requestDate || order.requestDate)
+    form.productSize = line.productSize || line.productSpc || null
+    form.printingReq = line.printingReq || null
+    form.packageReq = line.packageReq || null
+    // ERP 采购单没有结构化发货/补充说明字段，这两块在订单备注里以标题块存在，按标题提取
+    form.shippingReq = line.shippingReq || extractRemarkSection(order.remark, '包装和出货要求')
+    form.remark = line.remark || order.productionRemark
+      || extractRemarkSection(order.remark, '订单补充说明') || order.remark || null
+    form.workorderName = (line.mesProductName || line.productName || '') + '-' + order.orderCode
+    if (line.productId) {
+      const item: any = (await getItem(line.productId)).data
+      await onProductSelected({
+        itemId: line.productId,
+        itemCode: line.productCode,
+        itemName: line.mesProductName || line.productName || item?.itemName,
+        specification: line.productSpc,
+        unitOfMeasure: line.unitOfMeasure,
+        unitName: line.unitName,
+        imageUrl: item?.imageUrl
+      }, true)
+    }
+    await prefillRouteFromLine(line, order)
+  } catch (e) {
+    // 预填失败不阻塞手工开单
+  }
+}
+
+/** 从订单备注中按标题提取一个区块（如“包装和出货要求：xxx / 订单补充说明：xxx”） */
+function extractRemarkSection(text: any, label: string): string | null {
+  if (!text) return null
+  const lines = String(text).split(/\r?\n/)
+  const idx = lines.findIndex((l: string) => l.replace(/^[\s　]+/, '').startsWith(label))
+  if (idx < 0) return null
+  const first = lines[idx].replace(/^[^：:]*[：:]\s*/, '')
+  const out: string[] = first ? [first] : []
+  for (let i = idx + 1; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (/^[^\s：:]{2,16}[：:]/.test(t)) break
+    if (t) out.push(t)
+  }
+  return out.join('\n').trim() || null
+}
+
+/** 预填销售明细的工艺路线与工序；路线不属于当前产品时按默认重新解析 */
+async function prefillRouteFromLine(line: any, order: any) {
+  let routeProductIdValue = line.routeProductId || null
+  let routeId = null
+  let routeName = line.routeName || null
+  if (routeProductIdValue) {
+    const rp: any = await getRouteProduct(routeProductIdValue)
+    routeId = rp.data?.routeId || null
+  }
+  if (!routeId) {
+    const r: any = await resolveRouteProduct({
+      itemId: line.productId, orderType: form.orderType,
+      outsourceFlag: order?.outsourceFlag, packageFlag: order?.packageFlag
+    })
+    if (r.data?.matched) {
+      routeProductIdValue = r.data.routeProductId
+      routeId = r.data.routeId
+      routeName = r.data.routeName || routeName
+    }
+  }
+  if (!routeProductIdValue) return
+  routeProductId.value = routeProductIdValue
+  form.routeProductId = routeProductIdValue
+  if (!routeOptions.value.some((o: any) => o.recordId === routeProductIdValue)) {
+    routeOptions.value.unshift({
+      recordId: routeProductIdValue, routeId, itemId: form.productId, itemName: form.productName,
+      routeCode: line.routeCode, _routeName: routeName || ('路线#' + routeProductIdValue)
+    })
+  }
+  if (routeId) await loadRouteProcesses(routeId)
 }
 
 function loadDetail(id: number) {
@@ -499,7 +598,7 @@ function onProductSelected(row: any, keepRoute = false) {
     routeOptions.value = []
     routeProcesses.value = []
   }
-  loadRoutes(row.itemId)
+  return loadRoutes(row.itemId)
 }
 
 function loadSchema(productId: number) {
@@ -512,7 +611,7 @@ function loadSchema(productId: number) {
 }
 
 function loadRoutes(itemId: number) {
-  Promise.all([
+  return Promise.all([
     listRouteProduct({ itemId, pageSize: 100 }),
     listRoute({ pageSize: 1000 })
   ]).then(([rpRes, rtRes]: any[]) => {
@@ -536,14 +635,19 @@ function onRouteChange(recordId: number) {
   if (!rp) return
   routeProductId.value = rp.__unbound ? null : recordId
   form.routeProductId = rp.__unbound ? null : recordId
-  listRouteProcessByRouteId(rp.routeId).then((res: any) => {
-    const list = res.data || []
-    routeProcesses.value = list.map((p: any, i: number) => ({
-      ...p, routeId: rp.routeId, orderNum: i + 1, docType: 'PROCESS',
-      planQty: form.quantity || 0, unitPrice: 0, expectedDate: routeConfig.orderDate
-    }))
-    loadBomRows(rp.routeId, form.productId)
-  })
+  loadRouteProcesses(rp.routeId)
+}
+
+/** 按路线加载工序与 BOM（开单页与销售订单预填共用） */
+async function loadRouteProcesses(routeId: number) {
+  if (!routeId) return
+  const res: any = await listRouteProcessByRouteId(routeId)
+  const list = res.data || []
+  routeProcesses.value = list.map((p: any, i: number) => ({
+    ...p, routeId, orderNum: i + 1, docType: 'PROCESS',
+    planQty: form.quantity || 0, unitPrice: 0, expectedDate: routeConfig.orderDate
+  }))
+  loadBomRows(routeId, form.productId)
 }
 
 function getProcessName(pid: number) {
