@@ -18,7 +18,7 @@ description: 生产环境发布 - 本机构建前端/app -> 服务器拉代码/�
 
 - 本机可 SSH 连接服务器（已配置 SSH 密钥免密登录：`ssh qxx`）
 - 服务器 Docker 容器正常运行（MySQL:3307, Redis:6380, MinIO:9010）
-- **服务器仅 1.8GB 内存**：前端构建必须在本机完成，禁止在服务器跑 `vite build`；后端重启必须带内存限制参数（否则 OOM Kill，见故障排查）
+- **服务器仅 1.8GB 内存**：前端构建必须在本机完成，禁止在服务器跑 `vite build`；后端 JVM 内存已在 systemd unit 内限制为 `-Xmx512m`，不要绕开 systemd 用 nohup 启动（见故障排查）
 
 ## 发布步骤
 
@@ -30,6 +30,11 @@ cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend && npx vite build
 
 ### 2. 服务器端：拉代码 -> 编译 -> 重启后端
 
+> ⚠️ **后端由 systemd 托管（`qxx-backend.service`），不是 nohup**。用 nohup 手动起会被 systemd 反复抢占端口。
+> 服务文件：`/etc/systemd/system/qxx-backend.service`，已内置线上参数：
+> `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456 -Dspring.data.redis.port=6380 -Dspring.data.redis.password=qxx123456`
+> 这三个参数缺失会分别报 `Access denied for user 'root'@'172.19.0.1'` 和 Redis `Connection refused`。
+
 ```bash
 ssh qxx << 'EOF'
 cd /var/www/qixiaoxia-mes && git pull --ff-only origin main
@@ -39,19 +44,24 @@ export JAVA_HOME=/usr/lib/jvm/java-17-alibaba-dragonwell-17.0.9.0.10.9-1.al8.x86
 export PATH=$JAVA_HOME/bin:$PATH
 cd backend && mvn clean package -pl ruoyi-admin -am -DskipTests -Dcheckstyle.skip=true -q
 
-# 重启（⚠️ 必须带 -Xmx512m 内存限制，1.8GB 服务器否则 OOM Kill）
-# ⚠️ 必须带 -DQXX_DB_PASSWORD，配置默认值是本地 root，线上密码不同，漏了会启动失败
-kill $(lsof -ti :8081) 2>/dev/null; sleep 2
-nohup java -Xms256m -Xmx512m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m \
-  -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC -Duser.timezone=Asia/Shanghai \
-  -DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456 \
-  -jar /var/www/qixiaoxia-mes/backend/ruoyi-admin/target/ruoyi-admin.jar \
-  --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath \
-  > /tmp/qxx-backend.log 2>&1 &
+# 重启（systemd 托管，JVM 内存参数已在 unit 内限制为 -Xmx512m）
+systemctl restart qxx-backend
+systemctl is-active qxx-backend
 EOF
 ```
 
+> ⚠️ 服务器启动慢（1.8G 内存，Spring Boot 4 全量初始化约 **60–70 秒**）。不要用 sleep 30 就判失败，按下面方式轮询：
+
 > 启动后等 ~10-30 秒 Spring Boot 起来。确认：`ssh qxx 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/'` 应为 200。查看 Flyway 迁移日志：`ssh qxx 'grep -iE "flyway|Successfully applied" /tmp/qxx-backend.log | tail -5'`。
+
+```bash
+# 轮询直到 200（最多 120 秒）
+for i in $(seq 1 24); do
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/)
+  [ "$code" = "200" ] && { echo "backend ready after ${i}x5s"; break; }
+  sleep 5
+done
+```
 
 ### 3. 本机上传前端 + 重载 Nginx
 
@@ -125,10 +135,12 @@ ssh qxx 'curl -s -o /dev/null -w "app页面: %{http_code}\n" http://localhost/ap
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
-| 后端启动后立即退出、日志 0 行 | OOM Kill（1.8GB 服务器，JVM 堆/Metaspace 无界） | 重启命令必须带 `-Xmx512m -XX:MaxMetaspaceSize=192m`（见步骤 2）。项目自带 `ry.sh` 用 `-Xmx1024m` 也偏大，勿直接用 |
-| `pkill -f ruoyi-admin.jar` 导致 SSH 退出码 255 | 命令行含 jar 名，pkill 匹配杀掉 SSH 自身远程进程 | 改用 `kill $(lsof -ti :8081)` |
+| 后端启动后立即退出、日志 0 行 | OOM Kill（1.8GB 服务器，JVM 堆/Metaspace 无界） | 改 `/etc/systemd/system/qxx-backend.service` 的 JVM 参数（现为 `-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m`），`systemctl daemon-reload && systemctl restart qxx-backend` |
+| `pkill -f ruoyi-admin.jar` 导致 SSH 退出码 255 | 命令行含 jar 名，pkill 匹配杀掉 SSH 自身远程进程 | 改用 `systemctl restart qxx-backend` |
 | 后端启动后立即退出（非 OOM） | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
-| `Access denied for user 'root'@'172.19.0.1'` | 启动命令漏了 `-DQXX_DB_PASSWORD`，用了配置里的本地默认密码 root | 重启命令补上 `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456` |
+| `Access denied for user 'root'@'172.19.0.1'` | systemd unit 缺 `-DQXX_DB_PASSWORD`，用了配置里的本地默认密码 root | unit 的 ExecStart 补 `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456`，`daemon-reload` 后 restart |
+| Redis `Unable to connect to localhost:6377` | unit 缺 redis 覆盖参数，用了配置里的本地端口/密码 | unit 补 `-Dspring.data.redis.port=6380 -Dspring.data.redis.password=qxx123456` |
+| 后端反复重启（NRestarts 递增） | 容器未起 或 配置连不上 DB/Redis，systemd `Restart=always` 每 5 秒重拉 | 看 `/tmp/qxx-backend.log` 最后 20 行定位真实异常；修复后 `systemctl restart` |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
 | app 页面只渲染纯文字、无图标无分组 | HBuilderX build easycom 失效，uni-ui 组件未编译进产物 | 页面显式 import uni-ui 组件（含连带依赖）+ `app/utils/uni-ui-register.js` 全局注册，重新 HBuilderX 打包。详见记忆 `app-h5-build-deploy` |

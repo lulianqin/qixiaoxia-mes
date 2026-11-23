@@ -147,6 +147,40 @@ Mapper 改造后按生成 SQL 实测（含 `del_flag='0'` 与拦截器注入的 
 4. 上传新 `ruoyi-admin.jar`，重启后端
 5. 实测：物料列表 743 条、工艺路线 1 条、工单列表 0 条、库存列表 282 条
 
+## 5.1 线上执行结果（2026-11-24 00:22~00:40 已完成）
+
+线上库备份：`/root/db_backup/mes_before_reset_20261124_002123.sql.gz`
+
+| 步骤 | 结果 |
+|---|---|
+| V206 加列 | 8 张业务表 `del_flag` + 索引全部创建 |
+| V207 组织 | 部门 9 个（根 200 → 生产质检部 201 → 生产/质检/仓库）、16 用户、8 角色、菜单授权完成 |
+| V208 主数据 | 物料 743 有效 / 30 已删，工艺路线 1 条 + 8 道工序 |
+| V209 业务 | 工单 47 / 订单 31 / 采购 16 / 报价 1 全部软删；期初库存 282 条（原料 152 / 成品 130） |
+| 后端部署 | 编译成功，systemd 重启，`Started RuoYiApplication in 64.21s`，Flyway 应用 V203~V205 至 205 |
+| 前端部署 | dist 已 scp，`nginx -s reload` 成功 |
+
+**接口实测**（线上 admin 账号）：
+
+```
+后端页面      200
+物料列表      total = 743   ✅
+工单列表      total = 0     ✅（软删除生效）
+工艺路线      total = 1     ✅
+前端页面      200
+Nginx prod-api 200
+```
+
+### ⚠️ 发布时踩到的配置坑（已修）
+
+线上后端由 **systemd（`qxx-backend.service`）** 托管，不是 nohup。本地开发用的 `application.yml` / `application-druid.yml` 含本地库配置（DB `root/root`、Redis `6377/Asdf1234567!`），推到线上后服务连不上库和缓存。已做如下处理：
+
+1. `application-druid.yml` 的账号密码改为 `${QXX_DB_USERNAME:root}` / `${QXX_DB_PASSWORD:root}`
+2. `qxx-backend.service` 的 ExecStart 补上线上参数：
+   `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456 -Dspring.data.redis.port=6380 -Dspring.data.redis.password=qxx123456`
+3. `deploy` skill 已同步更新（改为 `systemctl restart`、记录参数与 60~70 秒启动时长）
+
+
 ## 6. 待确认
 
 1. **陈广奇 / 陈光奇**：需求里出现两种写法，脚本按"陈广奇"处理。
