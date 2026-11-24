@@ -26,6 +26,18 @@ zcat backup/mes_online_20261123_233017.sql.gz | docker exec -i qxx-mysql mysql -
 | `sql/V207__org_restructure.sql` | 部门树 / 岗位 / 16 个用户 / 8 个角色 / 菜单授权 |
 | `sql/V208__master_data.sql` | 纸张三级分类 / 743 条物料 / 工艺路线 + 8 道工序 |
 | `sql/V209__business_reset.sql` | 单据软删 / 客户停用 / 供应商补充 / 282 条期初库存 |
+| `sql/V210__fix_stock_units.sql` | 修正 V209 缺陷：单位存成 unit_id、缺装箱规格/箱数/PO号 |
+
+### V210 修正了什么
+
+V209 有两处导入缺陷，V210 全部纠正（幂等，可重复执行）：
+
+1. **`unit_of_measure` 误写为 `unit_id`**（200/201/204），应为单位编码。已改为 `PCS`(324 成品) / `KG`(411 纸张) / `PAIR`(8 辅料绳)；库存行按物料回填，成品库存从错误的 `KG` 修正为 `PCS`。
+2. **未导入装箱规格与订单信息**，现已补：
+   - 物料：`unit2='BOX'`、`unit2_name='箱'`、`conversion_rate`=每箱数量、`package_spec`="200个/箱"
+   - 库存：`quantity_onhand2`=剩余箱数、`quantity_available2` 同步、`conversion_rate`=该批次装箱数
+   - 库存新增 `po_no`（客户PO号）、`source_order_code`（系统订单号）两列并落值
+
 
 生成器：`gen_reset_sql.py`（读 `.tmp_mes_clean/` 下三个 Excel，可重跑）
 执行器：`exec_sql.py local` / `exec_sql.py <env> V207`（支持 DELIMITER，逐条报错即停）
