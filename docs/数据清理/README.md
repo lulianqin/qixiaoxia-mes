@@ -28,7 +28,7 @@ zcat backup/mes_online_20261123_233017.sql.gz | docker exec -i qxx-mysql mysql -
 | `sql/V209__business_reset.sql` | 单据软删 / 客户停用 / 供应商补充 / 282 条期初库存 |
 | `sql/V210__fix_stock_units.sql` | 修正 V209 缺陷：单位存成 unit_id、缺装箱规格/箱数/PO号 |
 | `sql/V211__cleanup_business_docs.sql` | 15 张业务主表逻辑删除 + 操作/登录日志物理清空 |
-| `sql/V212__cleanup_wm_transaction.sql` | 库存事务物理删除（150 条 + 指向它的物料追溯 64 条），库存现有量不动 |
+| `sql/V212__cleanup_wm_transaction.sql` | 库存事务物理清空（TRUNCATE + 重置自增）并清理指向它的物料追溯，库存现有量不动 |
 
 ### V211 清理了哪些页面
 

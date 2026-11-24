@@ -7,14 +7,14 @@
 --       否则物料/库存页面会跟着归零。
 -- 关联：qxx_pro_material_trace.transaction_id 逻辑引用事务（无物理外键），
 --       事务删掉后这些追溯行会指向不存在的记录，故一并删除，避免追溯页出现空引用。
--- 幂等：DELETE 重复执行影响 0 行，可安全重跑。
+-- 幂等：DELETE 重复执行影响 0 行；TRUNCATE 空表同样安全，可重复执行。
 -- ============================================================
 
 -- ---------- 1. 清理指向事务的物料追溯行（避免悬空引用） ----------
 DELETE FROM qxx_pro_material_trace WHERE transaction_id IS NOT NULL;
 
--- ---------- 2. 物理删除全部库存事务 ----------
-DELETE FROM qxx_wm_transaction;
-
--- ---------- 3. 重置自增，让后续新事务号从 1 开始 ----------
-ALTER TABLE qxx_wm_transaction AUTO_INCREMENT = 1;
+-- ---------- 2. 清空库存事务并重置自增 ----------
+-- 用 TRUNCATE 而不是 DELETE + ALTER AUTO_INCREMENT：
+-- MySQL 8 的 ALTER TABLE ... AUTO_INCREMENT 只允许调高，无法把计数降回 1。
+-- 本表无物理外键引用，清理目标就是全表清空，TRUNCATE 语义正好。
+TRUNCATE TABLE qxx_wm_transaction;
