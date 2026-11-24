@@ -78,6 +78,14 @@
         </el-col>
       </el-row>
       <el-row :gutter="12">
+        <el-col :span="12">
+          <el-form-item label="客户PO号"><el-input v-model="form.poNo" placeholder="客户下单PO号，可空" clearable /></el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="系统订单号"><el-input v-model="form.sourceOrderCode" placeholder="来源系统订单号，可空" clearable /></el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="盘点日期">
             <el-date-picker v-model="form.stocktakeDate" type="date" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
@@ -202,6 +210,8 @@ function init() {
     clientId: r.clientId,
     clientName: r.clientName,
     batchCode: r.batchCode,
+    poNo: r.poNo,
+    sourceOrderCode: r.sourceOrderCode,
     stocktakeDate: r.stocktakeDate,
     remark: r.remark
   })
