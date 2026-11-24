@@ -27,6 +27,36 @@ zcat backup/mes_online_20261123_233017.sql.gz | docker exec -i qxx-mysql mysql -
 | `sql/V208__master_data.sql` | 纸张三级分类 / 743 条物料 / 工艺路线 + 8 道工序 |
 | `sql/V209__business_reset.sql` | 单据软删 / 客户停用 / 供应商补充 / 282 条期初库存 |
 | `sql/V210__fix_stock_units.sql` | 修正 V209 缺陷：单位存成 unit_id、缺装箱规格/箱数/PO号 |
+| `sql/V211__cleanup_business_docs.sql` | 15 张业务主表逻辑删除 + 操作/登录日志物理清空 |
+
+### V211 清理了哪些页面
+
+| 页面 | 表 | 结果 |
+|---|---|---|
+| 客户 /mes/md/client | qxx_md_client | 9 → 软删 |
+| 加工单 /mes/pro/outsource | qxx_wm_outsource_order | 21 → 软删 |
+| 排产任务 /mes/pro/task | qxx_pro_task | 212 → 软删 |
+| 生产报工 /mes/pro/feedback | qxx_pro_feedback | 70 → 软删 |
+| 异常台账 /mes/pro/exception | qxx_pro_exception | 4 → 软删 |
+| 采购入库 /mes/wm/item_recpt | qxx_wm_item_recpt | 22 → 软删 |
+| 采购退货 /mes/wm/rt_vendor | qxx_wm_rt_vendor | 2 → 软删 |
+| 产品入库 /mes/wm/product_recpt | qxx_wm_product_recpt | 15 → 软删 |
+| 生产领料 /mes/wm/issue | qxx_wm_issue_header | 51 → 软删 |
+| 生产退料 /mes/wm/rtissue | qxx_wm_rt_issue | 3 → 软删 |
+| 销售出库 /mes/wm/product_sales | qxx_wm_product_sales | 17 → 软删 |
+| 来料检验 /mes/qc/qciqc | qxx_qc_iqc | 10 → 软删 |
+| 过程检验 /mes/qc/qcipqc | qxx_qc_ipqc | 4 → 软删 |
+| 编码记录 /mes/sys/autocoderesult | sys_auto_code_result | 137 → 软删 |
+| 待办事项 /mes/sys/todolist | sys_todo_list | 17 → 软删 |
+| 操作日志 /mes/sys/log/operlog | sys_oper_log | **物理删除**（1370 条） |
+| 登录日志 /mes/sys/log/logininfor | sys_logininfor | **物理删除**（955 条） |
+
+配套改动：15 个 Mapper 共 51 处查询补 `del_flag='0'`，覆盖列表、详情、`/listAll` 全量接口、唯一校验、报工可选任务、移动端我的工单、异常完工硬拦、首页待办角标统计。
+
+两个刻意例外：
+- `selectSysAutoCodeResultForUpdate`（编码取号）**不过滤**，否则已删记录代表号段被跳过会导致重号
+- `WmProductRecptMapper` 的客户左连接把 `c.del_flag='0'` 放在 **ON** 上，放 WHERE 会让左连接退化为内连接、客户被删的入库单整行消失
+
 
 ### V210 修正了什么
 
