@@ -15,6 +15,12 @@ public interface IMdItemService
 
     public List<MdItem> selectMdItemList(MdItem mdItem);
 
+    /**
+     * 将 itemTypeId 展开为「自身+所有子分类」的 itemTypeIds（内部有 DB 查询）。
+     * 必须在 startPage() 之前调用，否则会消费 PageHelper 的分页参数导致列表不分页。
+     */
+    public void expandItemTypeFilter(MdItem mdItem);
+
     /** 查询物料详情（含行业子表数据） */
     public MdItem selectMdItemById(Long itemId);
 

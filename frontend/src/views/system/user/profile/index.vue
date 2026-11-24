@@ -102,10 +102,30 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 个人信息左侧图标：限制尺寸与间距，避免 el-icon 随父级字号放大且紧贴文字 */
+/* 个人信息左侧图标：固定宽高 + 不参与 flex 伸缩。
+   el-icon 默认 font-size:inherit + width/height:1em，一旦父级 li 是 flex/字号被放大，
+   图标会跟着撑满整行；这里显式钉死 14px 并禁止 grow/shrink。 */
 .list-group-item :deep(.el-icon) {
-  font-size: 14px;
-  margin-right: 6px;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  flex: 0 0 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+
+.list-group-item :deep(.el-icon svg) {
+  width: 14px;
+  height: 14px;
+}
+
+/* 兼容 iconClass 未命中 el-icon 映射、走 svg-icon 分支的情况 */
+.list-group-item :deep(.svg-icon) {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  flex: 0 0 14px;
+  margin-right: 8px;
   vertical-align: -2px;
 }
 </style>

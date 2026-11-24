@@ -41,6 +41,9 @@ public class MdItemController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(MdItem mdItem)
     {
+        // 展开分类条件（内部会查一次库）必须在 startPage() 之前完成，
+        // 否则 PageHelper 的分页参数会被这次查询消费，导致列表返回全量数据
+        mdItemService.expandItemTypeFilter(mdItem);
         startPage();
         List<MdItem> list = mdItemService.selectMdItemList(mdItem);
         return getDataTable(list);

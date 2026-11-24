@@ -51,16 +51,29 @@ public class MdItemServiceImpl implements IMdItemService
     @Override
     public List<MdItem> selectMdItemList(MdItem mdItem)
     {
-        // 点击父分类时，展开为「自身+所有子分类」ID 列表，使子分类下的物料也能被查出
-        if (mdItem.getItemTypeId() != null && mdItem.getItemTypeId() != 0)
-        {
-            List<Long> descendantIds = itemTypeMapper.selectDescendantIds(mdItem.getItemTypeId());
-            // CTE 返回空说明该分类ID不存在，塞入-1使 IN(-1) 不命中任何记录（主键永不为负）
-            mdItem.setItemTypeIds(descendantIds.isEmpty()
-                ? Collections.singletonList(-1L) : descendantIds);
-            mdItem.setItemTypeId(null);
-        }
+        expandItemTypeFilter(mdItem);
         return mdItemMapper.selectMdItemList(mdItem);
+    }
+
+    /**
+     * 将 itemTypeId 展开为「自身+所有子分类」的 itemTypeIds。
+     * <p>该方法内部会查询一次数据库，**必须在 Controller 的 startPage() 之前调用**，
+     * 否则 PageHelper 的分页参数会被这次查询消费掉，导致随后的列表查询不分页。
+     * <p>幂等：展开后 itemTypeId 被置空，重复调用不会再次查库。
+     */
+    @Override
+    public void expandItemTypeFilter(MdItem mdItem)
+    {
+        if (mdItem == null || mdItem.getItemTypeId() == null || mdItem.getItemTypeId() == 0)
+        {
+            return;
+        }
+        // 点击父分类时，展开为「自身+所有子分类」ID 列表，使子分类下的物料也能被查出
+        List<Long> descendantIds = itemTypeMapper.selectDescendantIds(mdItem.getItemTypeId());
+        // CTE 返回空说明该分类ID不存在，塞入-1使 IN(-1) 不命中任何记录（主键永不为负）
+        mdItem.setItemTypeIds(descendantIds.isEmpty()
+            ? Collections.singletonList(-1L) : descendantIds);
+        mdItem.setItemTypeId(null);
     }
 
     @Override
