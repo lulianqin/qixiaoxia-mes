@@ -102,30 +102,25 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 个人信息左侧图标：固定宽高 + 不参与 flex 伸缩。
-   el-icon 默认 font-size:inherit + width/height:1em，一旦父级 li 是 flex/字号被放大，
-   图标会跟着撑满整行；这里显式钉死 14px 并禁止 grow/shrink。 */
-.list-group-item :deep(.el-icon) {
+/* 个人信息左侧图标统一 14px。
+   两套选择器都要有：正常情况图标被 el-icon 包裹，构建差异时可能只剩裸 svg，
+   只写 .el-icon 会失效（线上就是这个原因一直没改掉）。 */
+.list-group-item :deep(.el-icon),
+.list-group-item :deep(svg) {
   width: 14px;
   height: 14px;
-  min-width: 14px;
-  flex: 0 0 14px;
+  flex: none;
   margin-right: 8px;
   vertical-align: -2px;
+}
+
+.list-group-item :deep(.el-icon) {
+  min-width: 14px;
 }
 
 .list-group-item :deep(.el-icon svg) {
   width: 14px;
   height: 14px;
-}
-
-/* 兼容 iconClass 未命中 el-icon 映射、走 svg-icon 分支的情况 */
-.list-group-item :deep(.svg-icon) {
-  width: 14px;
-  height: 14px;
-  min-width: 14px;
-  flex: 0 0 14px;
-  margin-right: 8px;
-  vertical-align: -2px;
+  margin-right: 0;
 }
 </style>

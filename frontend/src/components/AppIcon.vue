@@ -1,6 +1,7 @@
 <template>
-  <el-icon v-if="elIcon" :size="size" :color="color">
-    <component :is="elIcon" />
+  <!-- 图标尺寸自带 width/height，作为兜底：即使外层样式没命中也不会撑满父容器 -->
+  <el-icon v-if="epIcon" :size="size" :color="color" class="app-icon">
+    <component :is="epIcon" width="1em" height="1em" />
   </el-icon>
   <svg-icon v-else :icon-class="iconClass" :class-name="className" :color="color" />
 </template>
@@ -117,7 +118,10 @@ const iconMap: Record<string, string> = {
   'money': 'Money',
 }
 
-const elIcon = computed(() => {
+// 注意：变量名不能叫 elIcon。Vue 编译 <el-icon> 时会把标签名转驼峰去匹配 setup 绑定，
+// 一旦存在同名变量，<el-icon> 就会被解析成这个变量（图标组件本身），
+// Element Plus 的 el-icon 包装层不会渲染，图标失去 1em 尺寸约束、撑满父容器。
+const epIcon = computed(() => {
   if (!props.iconClass) return null
   // Try direct mapping
   const mapped = iconMap[props.iconClass]
