@@ -84,7 +84,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from qxx_wm_product_sales t
         <where>
             and t.del_flag = '0'
-            t.sales_id is not null
+            and t.sales_id is not null
             <if test="salesCode != null and salesCode != ''"> and t.sales_code like concat('%', #{salesCode}, '%')</if>
             <if test="salesName != null and salesName != ''"> and t.sales_name like concat('%', #{salesName}, '%')</if>
             <if test="clientId != null"> and t.client_id = #{clientId}</if>

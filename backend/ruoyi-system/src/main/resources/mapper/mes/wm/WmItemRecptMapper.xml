@@ -63,7 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from qxx_wm_item_recpt t
         <where>
             and t.del_flag = '0'
-            t.recpt_id is not null
+            and t.recpt_id is not null
             <if test="recptCode != null and recptCode != ''"> and t.recpt_code like concat('%', #{recptCode}, '%')</if>
             <if test="recptName != null and recptName != ''"> and t.recpt_name like concat('%', #{recptName}, '%')</if>
             <if test="purOrderId != null"> and t.pur_order_id = #{purOrderId}</if>

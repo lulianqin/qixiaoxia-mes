@@ -71,7 +71,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join qxx_md_client c on c.client_id = t.client_id and c.factory_id = t.factory_id
         <where>
             and t.del_flag = '0'
-            t.recpt_id is not null
+            and t.recpt_id is not null
             <if test="recptCode != null and recptCode != ''"> and t.recpt_code like concat('%', #{recptCode}, '%')</if>
             <if test="recptName != null and recptName != ''"> and t.recpt_name like concat('%', #{recptName}, '%')</if>
             <if test="produceId != null"> and t.produce_id = #{produceId}</if>

@@ -94,7 +94,7 @@
         from qxx_wm_outsource_order t
         <where>
             and t.del_flag = '0'
-            t.order_id is not null
+            and t.order_id is not null
             <if test="orderCode != null and orderCode != ''"> and order_code like concat('%', #{orderCode}, '%')</if>
             <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
             <if test="vendorName != null and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
