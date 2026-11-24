@@ -155,45 +155,57 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         group by status
     </select>
 
-    <!-- ========== 首页我的待办：按业务待处理状态统计（当前工厂范围） ========== -->
+    <!-- ========== 首页我的待办：按业务待处理状态统计，数据限定到当前用户 ========== -->
 
-    <!-- 审批：全部待审批采购单（与采购订单列表 status 筛选一致） -->
+    <!-- 审批：我创建的待审批采购单（create_by 口径，与采购单据归属一致） -->
     <select id="countHomePendingPurOrder" resultType="int">
         select count(1) from qxx_pur_order
         where factory_id = #{factoryId}
           and status = 'DRAFT'
           and del_flag = '0'
+          and create_by = #{username}
     </select>
 
-    <!-- 生产：全部待审核报工（与报工列表 status 筛选一致） -->
+    <!-- 生产：我报的工，或我负责任务/工单上的待审核报工（复用移动端「我的报工」口径）。
+         OR 条件整体括号包裹：FactoryIdInterceptor 会在 WHERE 追加 AND factory_id，裸 OR 会破坏优先级导致跨厂泄漏 -->
     <select id="countHomePendingFeedback" resultType="int">
-        select count(1) from qxx_pro_feedback
-        where factory_id = #{factoryId}
-          and status = 'PREPARE'
-          and del_flag = '0'
+        select count(1) from qxx_pro_feedback t
+        where t.factory_id = #{factoryId}
+          and t.status = 'PREPARE'
+          and t.del_flag = '0'
+          and (t.user_id = #{userId} or exists (select 1 from qxx_pro_task tk
+               join qxx_pro_workorder two on two.workorder_id = tk.workorder_id and two.factory_id = tk.factory_id
+               where tk.task_id = t.task_id and tk.factory_id = t.factory_id
+                 and (tk.leader_id = #{userId} or (tk.leader_id is null and two.owner_id = #{userId}))))
     </select>
 
-    <!-- 质检：全部待检验过程检验单（与过程检验列表 status 筛选一致） -->
+    <!-- 质检：我创建的过程检验单（PENDING 阶段 inspector 尚未写入，故按 create_by 归属） -->
     <select id="countHomePendingIpqc" resultType="int">
         select count(1) from qxx_qc_ipqc
         where factory_id = #{factoryId}
           and status = 'PENDING'
+          and create_by = #{username}
     </select>
 
-    <!-- 采购/仓库：全部待发料领料单（与库存发料列表 pendingOnly 筛选一致） -->
+    <!-- 采购/仓库：我创建的待发料领料单 -->
     <select id="countHomePendingIssue" resultType="int">
         select count(1) from qxx_wm_issue_header
         where factory_id = #{factoryId}
           and status in ('PENDING', 'APPROVED', 'ALLOCATED')
           and del_flag = '0'
+          and create_by = #{username}
     </select>
 
-    <!-- 外协代录：全部待签收/待录结果/补录外协单（与外协列表 pendingOnly 筛选一致） -->
+    <!-- 外协代录：厂商账号看本厂商，内部员工看本人创建的单（复用外协列表 vendor_id 隔离口径） -->
     <select id="countHomePendingOutsource" resultType="int">
         select count(1) from qxx_wm_outsource_order
         where factory_id = #{factoryId}
           and status in ('ISSUED', 'VENDOR_RCVD', 'PROCESSING')
           and del_flag = '0'
+          <choose>
+              <when test="vendorId != null"> and vendor_id = #{vendorId}</when>
+              <otherwise> and create_by = #{username}</otherwise>
+          </choose>
     </select>
 
     <delete id="deleteSysTodoListByTodoId" parameterType="Long">

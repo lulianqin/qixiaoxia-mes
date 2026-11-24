@@ -39,6 +39,9 @@ public class SalOrderLine extends BaseEntity
     @Excel(name = "MES产品名称")
     private String mesProductName;
 
+    /** 产品图片（ERP 采购单明细 ProductPhoto，完整 URL） */
+    private String productPhoto;
+
     private String productSpc;
     private String unitOfMeasure;
     private String unitName;
@@ -96,6 +99,8 @@ public class SalOrderLine extends BaseEntity
     public void setProductCode(String v) { this.productCode = v; }
     public String getProductName() { return productName; }
     public void setProductName(String v) { this.productName = v; }
+    public String getProductPhoto() { return productPhoto; }
+    public void setProductPhoto(String v) { this.productPhoto = v; }
     public String getMesProductName() { return mesProductName; }
     public void setMesProductName(String v) { this.mesProductName = v; }
     public String getProductSpc() { return productSpc; }

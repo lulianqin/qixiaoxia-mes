@@ -34,6 +34,10 @@ public class SalOrder extends BaseEntity
     @Excel(name = "订单类型", readConverterExp = "STANDARD=标品,SMALL_BATCH=小批量,GIFT=礼品,STOCK=备货订单,PLATE=制版")
     private String orderType;
 
+    /** 源订单类型（SRM 订单 Type，字典 mes_source_order_type：0未知 1新单 2翻单 3异常单 4打样），与 MES 自身订单类型并存 */
+    @Excel(name = "源订单类型", dictType = "mes_source_order_type")
+    private String sourceOrderType;
+
     @Excel(name = "客户编码")
     private String clientCode;
 
@@ -154,6 +158,8 @@ public class SalOrder extends BaseEntity
     public void setSignCompany(String v) { this.signCompany = v; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String v) { this.orderType = v; }
+    public String getSourceOrderType() { return sourceOrderType; }
+    public void setSourceOrderType(String v) { this.sourceOrderType = v; }
     public Long getClientId() { return clientId; }
     public void setClientId(Long v) { this.clientId = v; }
     public String getClientCode() { return clientCode; }

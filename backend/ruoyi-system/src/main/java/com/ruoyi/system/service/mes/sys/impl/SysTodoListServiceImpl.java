@@ -61,12 +61,12 @@ public class SysTodoListServiceImpl implements ISysTodoListService
     }
 
     @Override
-    public java.util.Map<String, Object> homeSummary(Long factoryId) {
-        int approval = sysTodoListMapper.countHomePendingPurOrder(factoryId);
-        int production = sysTodoListMapper.countHomePendingFeedback(factoryId);
-        int quality = sysTodoListMapper.countHomePendingIpqc(factoryId);
-        int purchase = sysTodoListMapper.countHomePendingIssue(factoryId);
-        int outsource = sysTodoListMapper.countHomePendingOutsource(factoryId);
+    public java.util.Map<String, Object> homeSummary(Long factoryId, Long userId, String username, Long vendorId) {
+        int approval = sysTodoListMapper.countHomePendingPurOrder(factoryId, username);
+        int production = sysTodoListMapper.countHomePendingFeedback(factoryId, userId);
+        int quality = sysTodoListMapper.countHomePendingIpqc(factoryId, username);
+        int purchase = sysTodoListMapper.countHomePendingIssue(factoryId, username);
+        int outsource = sysTodoListMapper.countHomePendingOutsource(factoryId, vendorId, username);
 
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("approval", approval);

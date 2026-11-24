@@ -17,10 +17,11 @@
     <div v-loading="loading">
       <el-card shadow="never" class="mb16">
         <template #header><span>订单信息</span></template>
-        <el-descriptions :column="3" size="small" border>
+        <el-descriptions :column="3" size="small" border label-width="100px" class="order-info">
           <el-descriptions-item label="订单名称">{{ order.orderName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="签约主体">{{ signCompanyText }}</el-descriptions-item>
           <el-descriptions-item label="订单类型">{{ orderTypeText }}</el-descriptions-item>
+          <el-descriptions-item v-if="order.sourceOrderType" label="源订单类型">{{ sourceOrderTypeText }}</el-descriptions-item>
           <el-descriptions-item label="订单来源">{{ sourceText }}</el-descriptions-item>
           <el-descriptions-item label="客户编码">{{ order.clientCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="客户名称">{{ order.clientName || '-' }}</el-descriptions-item>
@@ -37,7 +38,7 @@
             <span style="font-weight:bold;color:#f56c6c">{{ order.totalAmount ?? '-' }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="付款方式">{{ order.paymentMethod || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="生产备注" :span="2">{{ order.productionRemark || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="生产备注" >{{ order.productionRemark || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ order.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
@@ -45,30 +46,43 @@
       <!-- 明细行 -->
       <el-card shadow="never">
         <template #header><span>明细行（共 {{ lines.length }} 行）</span></template>
-        <el-table :data="lines" size="small" border>
-          <el-table-column label="行号" align="center" prop="lineNo" width="60"  :show-overflow-tooltip="true" />
-          <el-table-column label="产品编码" align="center" prop="productCode" width="140"  :show-overflow-tooltip="true" />
-          <el-table-column label="产品名称" align="center" prop="productName" :show-overflow-tooltip="true" />
-          <el-table-column v-if="isExternalSource" label="MES产品名称" align="center" prop="mesProductName" :show-overflow-tooltip="true">
+        <el-table :data="lines" size="small" border class="line-table">
+          <el-table-column label="行号" align="center" prop="lineNo" width="60" />
+          <el-table-column label="产品图片" align="center" width="80">
+            <template #default="s">
+              <el-image
+                v-if="s.row.productPhoto"
+                :src="s.row.productPhoto"
+                :preview-src-list="[s.row.productPhoto]"
+                preview-teleported
+                fit="cover"
+                style="width:48px;height:48px"
+              />
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="产品编码" align="center" prop="productCode" width="140" />
+          <el-table-column label="产品名称" align="center" prop="productName" min-width="140" />
+          <el-table-column v-if="isExternalSource" label="MES产品名称" align="center" prop="mesProductName" min-width="140">
             <template #default="s">{{ s.row.mesProductName || '-' }}</template>
           </el-table-column>
-          <el-table-column label="产品尺寸" align="center" width="130" :show-overflow-tooltip="true">
+          <el-table-column label="产品尺寸" align="center" width="130">
             <template #default="s">{{ s.row.productSize || s.row.productSpc || '-' }}</template>
           </el-table-column>
-          <el-table-column label="数量" align="center" prop="quantity" width="90"  :show-overflow-tooltip="true" />
-          <el-table-column label="单位" align="center" prop="unitName" width="70"  :show-overflow-tooltip="true" />
-          <el-table-column label="单价" align="center" prop="unitPrice" width="90"  :show-overflow-tooltip="true" />
-          <el-table-column label="行金额" align="center" prop="lineAmount" width="100"  :show-overflow-tooltip="true" />
-          <el-table-column label="已转工单" align="center" prop="quantityProduced" width="90" :show-overflow-tooltip="true">
+          <el-table-column label="数量" align="center" prop="quantity" width="90" />
+          <el-table-column label="单位" align="center" prop="unitName" width="70" />
+          <el-table-column label="单价" align="center" prop="unitPrice" width="90" />
+          <el-table-column label="行金额" align="center" prop="lineAmount" width="100" />
+          <el-table-column label="已转工单" align="center" prop="quantityProduced" width="90">
             <template #default="s">{{ s.row.quantityProduced || 0 }}</template>
           </el-table-column>
-          <el-table-column label="可转数量" align="center" prop="quantityConvertible" width="90"  :show-overflow-tooltip="true" />
+          <el-table-column label="可转数量" align="center" prop="quantityConvertible" width="90" />
           <el-table-column label="需求交期" align="center" width="110">
             <template #default="s">{{ fmtDate(s.row.requestDate) }}</template>
           </el-table-column>
-          <el-table-column label="材质及工艺" align="center" prop="printingReq" min-width="120" :show-overflow-tooltip="true" />
-          <el-table-column label="包装方式" align="center" prop="packageReq" min-width="120" :show-overflow-tooltip="true" />
-          <el-table-column label="工艺路线" align="center" prop="routeName" min-width="130" :show-overflow-tooltip="true">
+          <el-table-column label="材质及工艺" align="left" prop="printingReq" min-width="260" />
+          <el-table-column label="包装方式" align="left" prop="packageReq" min-width="220" />
+          <el-table-column label="工艺路线" align="center" prop="routeName" min-width="130">
             <template #default="s">{{ s.row.routeName || '-' }}</template>
           </el-table-column>
         </el-table>
@@ -125,7 +139,7 @@ import { printPdfBlob } from '@/utils/pdfPrint'
 import type { SalOrder, SalOrderLine } from '@/types'
 
 const { proxy } = getCurrentInstance() as any
-const { mes_sal_order_status: statusDict, mes_sal_order_type: orderTypeDict, sys_company: signCompanyDict } = proxy.useDict('mes_sal_order_status', 'mes_sal_order_type', 'sys_company')
+const { mes_sal_order_status: statusDict, mes_sal_order_type: orderTypeDict, mes_source_order_type: sourceOrderTypeDict, sys_company: signCompanyDict } = proxy.useDict('mes_sal_order_status', 'mes_sal_order_type', 'mes_source_order_type', 'sys_company')
 
 const route = useRoute()
 const router = useRouter()
@@ -147,6 +161,11 @@ const statusTagType = computed(() => {
 const orderTypeText = computed(() => {
   const v = order.value.orderType
   const d = orderTypeDict.value?.find((x: any) => x.value === v || x.dictValue === v)
+  return d ? (d.label || d.dictLabel) : (v || '-')
+})
+const sourceOrderTypeText = computed(() => {
+  const v = order.value.sourceOrderType
+  const d = sourceOrderTypeDict.value?.find((x: any) => x.value === v || x.dictValue === v)
   return d ? (d.label || d.dictLabel) : (v || '-')
 })
 const businessLineText = computed(() => ({ DOMESTIC: '内贸', FOREIGN: '外贸', SPOT: '现货' }[order.value.businessLine || ''] || order.value.businessLine || '-'))
@@ -215,6 +234,30 @@ loadDetail()
 .mt16 { margin-top: 16px; }
 .header-title { font-weight: bold; font-size: 16px; margin-right: 8px; }
 .audit-footer { color: #909399; font-size: 12px; margin-top: 12px; text-align: right; }
+/* 订单信息：标题列固定 100px 不换行，内容列等宽（固定表格布局），避免长内容撑变形 */
+.order-info :deep(.el-descriptions__table) {
+  table-layout: fixed;
+  width: 100%;
+}
+.order-info :deep(.el-descriptions__label) {
+  width: 100px;
+  min-width: 100px;
+  white-space: nowrap;
+}
+.order-info :deep(.el-descriptions__content) {
+  width: auto;
+  white-space: normal;
+  word-break: break-all;
+}
+/* 明细行：完整展示内容，按需自动换行，不隐藏 */
+.line-table :deep(.el-table__cell) { vertical-align: top; }
+.line-table :deep(.cell) {
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.5;
+}
 .wo-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .wo-chip {
   display: inline-flex; align-items: center; gap: 4px; font-size: 12px;

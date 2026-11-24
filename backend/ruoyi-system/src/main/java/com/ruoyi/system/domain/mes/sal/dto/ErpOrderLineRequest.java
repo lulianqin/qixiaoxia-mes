@@ -26,6 +26,9 @@ public class ErpOrderLineRequest
     private String productName;
     private String productSpec;
 
+    /** 产品图片（ERP 采购单明细 ProductPhoto，已由 ERP 补齐完整域名） */
+    private String productPhoto;
+
     /** 材质及工艺（ERP Material），映射到 MES 印刷要求 */
     private String material;
 
@@ -59,6 +62,8 @@ public class ErpOrderLineRequest
     public void setProductName(String v) { this.productName = v; }
     public String getProductSpec() { return productSpec; }
     public void setProductSpec(String v) { this.productSpec = v; }
+    public String getProductPhoto() { return productPhoto; }
+    public void setProductPhoto(String v) { this.productPhoto = v; }
     public String getMaterial() { return material; }
     public void setMaterial(String v) { this.material = v; }
     public String getPackingModeTxt() { return packingModeTxt; }

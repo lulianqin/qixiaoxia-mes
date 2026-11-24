@@ -23,20 +23,22 @@ public interface SysTodoListMapper
 
     // ========== 首页我的待办：按业务待处理状态统计（当前工厂范围） ==========
 
-    /** 审批-待审批采购单 */
-    public int countHomePendingPurOrder(@Param("factoryId") Long factoryId);
+    /** 审批-我创建的待审批采购单 */
+    public int countHomePendingPurOrder(@Param("factoryId") Long factoryId, @Param("username") String username);
 
-    /** 生产-待审核报工 */
-    public int countHomePendingFeedback(@Param("factoryId") Long factoryId);
+    /** 生产-我报的工或我负责任务上的报工（待审核） */
+    public int countHomePendingFeedback(@Param("factoryId") Long factoryId, @Param("userId") Long userId);
 
-    /** 质检-待检验过程检验单 */
-    public int countHomePendingIpqc(@Param("factoryId") Long factoryId);
+    /** 质检-我创建的过程检验单（待检验） */
+    public int countHomePendingIpqc(@Param("factoryId") Long factoryId, @Param("username") String username);
 
-    /** 采购/仓库-待发料领料单 */
-    public int countHomePendingIssue(@Param("factoryId") Long factoryId);
+    /** 采购/仓库-我创建的待发料领料单 */
+    public int countHomePendingIssue(@Param("factoryId") Long factoryId, @Param("username") String username);
 
-    /** 外协代录-待签收/待录结果/补录的外协单 */
-    public int countHomePendingOutsource(@Param("factoryId") Long factoryId);
+    /** 外协代录-厂商账号看本厂商、内部员工看本人创建/代录的单 */
+    public int countHomePendingOutsource(@Param("factoryId") Long factoryId,
+                                         @Param("vendorId") Long vendorId,
+                                         @Param("username") String username);
 
     /**
      * 按业务来源查待处理（PENDING/PROCESSING）待办（质检判定完成后回写用）

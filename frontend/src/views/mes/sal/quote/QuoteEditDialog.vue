@@ -22,6 +22,18 @@
       <el-table :data="form.lines" size="small" border max-height="430">
         <el-table-column label="行号" prop="lineNo" width="55" align="center" />
         <el-table-column label="产品名称" prop="productName" min-width="140" show-overflow-tooltip />
+        <el-table-column label="产品图片" align="center" width="70">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.productPhoto"
+              :src="row.productPhoto"
+              :preview-src-list="[row.productPhoto]"
+              fit="cover"
+              style="width:40px;height:40px"
+            />
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="尺寸" prop="productSize" width="110" show-overflow-tooltip />
         <el-table-column label="材质/工艺" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ [row.material, row.printingMode].filter(Boolean).join(' / ') || '-' }}</template>

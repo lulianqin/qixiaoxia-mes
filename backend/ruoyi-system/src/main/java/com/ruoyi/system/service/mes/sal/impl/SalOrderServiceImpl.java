@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -74,6 +76,8 @@ import com.ruoyi.system.service.mes.sys.integration.ErpCallbackPayload;
 @Service
 public class SalOrderServiceImpl implements ISalOrderService
 {
+    private static final Logger log = LoggerFactory.getLogger(SalOrderServiceImpl.class);
+
     @Autowired
     private SalOrderMapper salOrderMapper;
 
@@ -255,6 +259,7 @@ public class SalOrderServiceImpl implements ISalOrderService
     public SalOrder receiveFromErp(ErpOrderReceiveRequest req)
     {
         String system = StringUtils.isEmpty(req.getSourceSystem()) ? SalConstants.SYSTEM_ERP : req.getSourceSystem();
+        log.info("接收ERP采购单{}：sourceOrderType={}", req.getExternalOrderNo(), req.getSourceOrderType());
         SalOrder existing = salOrderMapper.selectSalOrderByExternalNo(system, req.getExternalOrderNo());
         SalOrder order;
         if (existing == null)
@@ -673,6 +678,11 @@ public class SalOrderServiceImpl implements ISalOrderService
     private void fillErpHeader(SalOrder order, ErpOrderReceiveRequest req)
     {
         order.setExternalOrderId(req.getExternalOrderId());
+        // 源订单类型取 SRM 订单 Type，与 MES 自身订单类型（决定工艺路线）分开存放
+        if (StringUtils.isNotEmpty(req.getSourceOrderType()))
+        {
+            order.setSourceOrderType(req.getSourceOrderType());
+        }
         order.setOrderName(req.getOrderName());
         order.setClientCode(req.getClientCode());
         order.setClientName(req.getClientName());
@@ -703,6 +713,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         line.setExternalLineId(dto.getExternalLineId());
         // 产品名称保留 ERP 采购单名称（对单口径一致），映射到的 MES 物料名称另存 mes_product_name
         line.setProductName(dto.getProductName());
+        line.setProductPhoto(dto.getProductPhoto());
         line.setProductCode(dto.getProductCode());
         // 产品尺寸：ERP 可能只传 productSpec 或 productSize，两者互为兜底，保证 MES 侧有值
         line.setProductSpc(StringUtils.isNotEmpty(dto.getProductSpec())

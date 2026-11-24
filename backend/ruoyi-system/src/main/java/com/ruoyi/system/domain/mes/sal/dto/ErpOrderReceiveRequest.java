@@ -29,6 +29,9 @@ public class ErpOrderReceiveRequest
     /** 外部单据版本,重发时递增 */
     private Integer externalVersion;
 
+    /** 源订单类型（SRM 订单 Type，字典 sys订单类型：0未知 1新单 2翻单 3异常单 4打样） */
+    private String sourceOrderType;
+
     @NotBlank(message = "订单名称不能为空")
     private String orderName;
 
@@ -70,6 +73,8 @@ public class ErpOrderReceiveRequest
     public void setExternalOrderNo(String v) { this.externalOrderNo = v; }
     public Integer getExternalVersion() { return externalVersion; }
     public void setExternalVersion(Integer v) { this.externalVersion = v; }
+    public String getSourceOrderType() { return sourceOrderType; }
+    public void setSourceOrderType(String v) { this.sourceOrderType = v; }
     public String getOrderName() { return orderName; }
     public void setOrderName(String v) { this.orderName = v; }
     public String getClientCode() { return clientCode; }

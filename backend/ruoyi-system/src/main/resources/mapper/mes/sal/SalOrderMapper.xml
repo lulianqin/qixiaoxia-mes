@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="orderName"        column="order_name"        />
         <result property="signCompany"      column="sign_company"      />
         <result property="orderType"        column="order_type"        />
+        <result property="sourceOrderType"  column="source_order_type"  />
         <result property="clientId"         column="client_id"         />
         <result property="clientCode"       column="client_code"       />
         <result property="clientName"       column="client_name"       />
@@ -50,7 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectSalOrderVo">
-        select order_id, factory_id, order_code, order_name, sign_company, order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, source_system, external_order_id, external_order_no, external_version, accept_status, accept_time, reject_reason, reject_by, reject_time, sync_status, sync_time, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
+        select order_id, factory_id, order_code, order_name, sign_company, order_type, source_order_type, client_id, client_code, client_name, client_nick, client_order_code, production_remark, salesperson, business_line, sample_flag, outsource_flag, package_flag, source, source_system, external_order_id, external_order_no, external_version, accept_status, accept_time, reject_reason, reject_by, reject_time, sync_status, sync_time, order_date, request_date, total_amount, payment_method, status, approve_by, approve_time, approve_remark, remark, create_by, create_time, update_by, update_time from qxx_sal_order
     </sql>
 
     <select id="selectSalOrderList" parameterType="SalOrder" resultMap="SalOrderResult">
@@ -111,6 +112,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="orderName != null and orderName != ''">order_name,</if>
             <if test="signCompany != null and signCompany != ''">sign_company,</if>
             <if test="orderType != null and orderType != ''">order_type,</if>
+            <if test="sourceOrderType != null and sourceOrderType != ''">source_order_type,</if>
             <if test="clientId != null">client_id,</if>
             <if test="clientCode != null">client_code,</if>
             <if test="clientName != null">client_name,</if>
@@ -151,6 +153,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="orderName != null and orderName != ''">#{orderName},</if>
             <if test="signCompany != null and signCompany != ''">#{signCompany},</if>
             <if test="orderType != null and orderType != ''">#{orderType},</if>
+            <if test="sourceOrderType != null and sourceOrderType != ''">#{sourceOrderType},</if>
             <if test="clientId != null">#{clientId},</if>
             <if test="clientCode != null">#{clientCode},</if>
             <if test="clientName != null">#{clientName},</if>
@@ -195,6 +198,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="orderName != null and orderName != ''">order_name = #{orderName},</if>
             <if test="signCompany != null and signCompany != ''">sign_company = #{signCompany},</if>
             <if test="orderType != null and orderType != ''">order_type = #{orderType},</if>
+            <if test="sourceOrderType != null and sourceOrderType != ''">source_order_type = #{sourceOrderType},</if>
             <if test="clientId != null">client_id = #{clientId},</if>
             <if test="clientCode != null">client_code = #{clientCode},</if>
             <if test="clientName != null">client_name = #{clientName},</if>
