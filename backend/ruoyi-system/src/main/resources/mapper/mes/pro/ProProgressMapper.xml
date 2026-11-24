@@ -50,7 +50,8 @@
            ROUND(IFNULL(w.quantity_produced,0)/NULLIF(w.quantity,0)*100,0) AS progress_percent
     FROM qxx_pro_workorder w
     <where>
-      w.status IN ('PREPARE','PRODUCING')
+      w.del_flag = '0'
+      AND w.status IN ('PREPARE','PRODUCING')
       AND w.request_date IS NOT NULL
       <choose>
         <when test="riskLevel == 'DELAY'">AND w.request_date &lt; CURDATE()</when>
@@ -66,7 +67,8 @@
         AND EXISTS (
           SELECT 1 FROM qxx_pro_task pt
           INNER JOIN qxx_md_workstation mws ON mws.workstation_id = pt.workstation_id AND mws.factory_id = pt.factory_id
-          WHERE pt.workorder_id = w.workorder_id AND pt.factory_id = w.factory_id AND mws.workshop_id = #{workshopId}
+          WHERE pt.workorder_id = w.workorder_id AND pt.factory_id = w.factory_id AND pt.del_flag = '0'
+          AND mws.workshop_id = #{workshopId}
         )
       </if>
       <if test="keyword != null and keyword != ''">
@@ -85,16 +87,18 @@
            DATEDIFF(NOW(), t.end_time) AS overdue_days,
            ROUND(IFNULL(t.quantity_produced,0)/NULLIF(t.quantity,0)*100,0) AS progress_percent
     FROM qxx_pro_task t
-    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id AND w.del_flag = '0'
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
     LEFT JOIN qxx_md_workshop wshop ON wshop.workshop_id = ws.workshop_id AND wshop.factory_id = t.factory_id
     <where>
-      t.status IN ('PREPARE','NORMAL','PRODUCING','PAUSED')
+      t.del_flag = '0'
+      AND t.status IN ('PREPARE','NORMAL','PRODUCING','PAUSED')
       AND t.end_time IS NOT NULL
       <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
       <if test="teamId != null">
         AND EXISTS (SELECT 1 FROM qxx_pro_feedback fb
-          WHERE fb.task_id = t.task_id AND fb.factory_id = t.factory_id AND fb.team_id = #{teamId} LIMIT 1)
+          WHERE fb.task_id = t.task_id AND fb.factory_id = t.factory_id AND fb.del_flag = '0'
+          AND fb.team_id = #{teamId} LIMIT 1)
       </if>
       <choose>
         <when test="riskLevel == 'DELAY'">AND t.end_time &lt; NOW()</when>

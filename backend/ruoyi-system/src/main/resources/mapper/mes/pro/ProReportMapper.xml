@@ -2,6 +2,14 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.system.mapper.mes.pro.ProReportMapper">
 
+  <!-- 工时记录 qxx_pro_workrecord 没有 del_flag：以所属工序任务是否已删除为准 -->
+  <sql id="workrecordTaskAlive">
+    AND (r.task_id IS NULL OR EXISTS (
+      SELECT 1 FROM qxx_pro_task rt
+      WHERE rt.task_id = r.task_id AND rt.factory_id = r.factory_id AND rt.del_flag = '0'
+    ))
+  </sql>
+
   <!-- ════════ Overview ════════ -->
   <select id="selectOverviewCounts" resultType="java.util.HashMap">
     SELECT
@@ -12,13 +20,14 @@
       SUM(CASE WHEN w.status = 'PRODUCING' THEN 1 ELSE 0 END) AS workorderInProgress
     FROM qxx_pro_workorder w
     <where>
-      w.create_time BETWEEN #{begin} AND #{end}
+      w.del_flag = '0'
+      AND w.create_time BETWEEN #{begin} AND #{end}
       AND w.status &lt;&gt; 'CANCEL'
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND EXISTS (
           SELECT 1 FROM qxx_pro_task t
           JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
-          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id AND t.del_flag = '0'
           AND ws.workshop_id IN
           <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         )
@@ -26,7 +35,7 @@
       <if test="teamIds != null and teamIds.size() > 0">
         AND EXISTS (
           SELECT 1 FROM qxx_pro_feedback fb
-          WHERE fb.workorder_id = w.workorder_id AND fb.factory_id = w.factory_id
+          WHERE fb.workorder_id = w.workorder_id AND fb.factory_id = w.factory_id AND fb.del_flag = '0'
           AND fb.team_id IN
           <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         )
@@ -39,7 +48,8 @@
     FROM qxx_pro_task t
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
     <where>
-      t.status &lt;&gt; 'CANCEL'
+      t.del_flag = '0'
+      AND t.status &lt;&gt; 'CANCEL'
       AND (t.finish_date BETWEEN #{begin} AND #{end} OR t.status = 'PRODUCING')
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND ws.workshop_id IN
@@ -48,7 +58,7 @@
       <if test="teamIds != null and teamIds.size() > 0">
         AND EXISTS (
           SELECT 1 FROM qxx_pro_feedback fb
-          WHERE fb.workorder_id = t.workorder_id AND fb.factory_id = t.factory_id
+          WHERE fb.workorder_id = t.workorder_id AND fb.factory_id = t.factory_id AND fb.del_flag = '0'
           AND fb.team_id IN
           <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         )
@@ -62,6 +72,7 @@
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = r.workstation_id AND ws.factory_id = r.factory_id
     <where>
       r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <include refid="workrecordTaskAlive"/>
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND ws.workshop_id IN
         <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -95,9 +106,10 @@
     FROM qxx_pro_task t
     JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
     LEFT JOIN qxx_md_workshop wshop ON wshop.workshop_id = ws.workshop_id AND wshop.factory_id = t.factory_id
-    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id AND w.del_flag = '0'
     <where>
-      (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
+      t.del_flag = '0'
+      AND (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
       <include refid="workshopExistsFilter"/>
     </where>
     GROUP BY ws.workshop_id, wshop.workshop_name
@@ -116,9 +128,10 @@
       IFNULL(SUM(t.quantity_unqualified),0) AS scrapQty
     FROM qxx_pro_task t
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
-    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id AND w.del_flag = '0'
     <where>
-      (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
+      t.del_flag = '0'
+      AND (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
       <include refid="workshopExistsFilter"/>
     </where>
     GROUP BY t.workstation_id
@@ -137,9 +150,10 @@
       IFNULL(SUM(t.quantity_unqualified),0) AS scrapQty
     FROM qxx_pro_task t
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
-    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = t.workorder_id AND w.factory_id = t.factory_id AND w.del_flag = '0'
     <where>
-      (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
+      t.del_flag = '0'
+      AND (t.finish_date BETWEEN #{begin} AND #{end} OR t.status IN ('PRODUCING','NORMAL','PREPARE','PAUSED'))
       <include refid="workshopExistsFilter"/>
     </where>
     GROUP BY t.process_id
@@ -157,10 +171,11 @@
       IFNULL(SUM(fb.quantity_qualified),0) AS qualifiedQty,
       IFNULL(SUM(fb.quantity_unqualified),0) AS scrapQty
     FROM qxx_pro_feedback fb
-    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = fb.workorder_id AND w.factory_id = fb.factory_id
-    LEFT JOIN qxx_pro_task t ON t.task_id = fb.task_id AND t.factory_id = fb.factory_id
+    LEFT JOIN qxx_pro_workorder w ON w.workorder_id = fb.workorder_id AND w.factory_id = fb.factory_id AND w.del_flag = '0'
+    LEFT JOIN qxx_pro_task t ON t.task_id = fb.task_id AND t.factory_id = fb.factory_id AND t.del_flag = '0'
     <where>
-      fb.status = 'AUDITED' AND fb.feedback_time BETWEEN #{begin} AND #{end}
+      fb.del_flag = '0'
+      AND fb.status = 'AUDITED' AND fb.feedback_time BETWEEN #{begin} AND #{end}
       AND fb.team_id IS NOT NULL
       <if test="teamIds != null and teamIds.size() > 0">
         AND fb.team_id IN
@@ -177,6 +192,7 @@
     JOIN qxx_md_workstation ws ON ws.workstation_id = r.workstation_id AND ws.factory_id = r.factory_id
     <where>
       r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <include refid="workrecordTaskAlive"/>
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND ws.workshop_id IN
         <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -190,6 +206,7 @@
     FROM qxx_pro_workrecord r
     <where>
       r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <include refid="workrecordTaskAlive"/>
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND r.workstation_id IN (
           SELECT ws2.workstation_id FROM qxx_md_workstation ws2 WHERE ws2.factory_id = r.factory_id
@@ -203,10 +220,11 @@
   <select id="selectProcessHours" resultType="java.util.HashMap">
     SELECT t.process_id AS groupId, MAX(t.process_name) AS groupName, IFNULL(SUM(r.work_duration),0) AS actualMinutes
     FROM qxx_pro_workrecord r
-    JOIN qxx_pro_task t ON t.task_id = r.task_id AND t.factory_id = r.factory_id
+    JOIN qxx_pro_task t ON t.task_id = r.task_id AND t.factory_id = r.factory_id AND t.del_flag = '0'
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
     <where>
       r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <include refid="workrecordTaskAlive"/>
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND ws.workshop_id IN
         <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -219,7 +237,8 @@
     SELECT r.team_id AS groupId, MAX(r.team_name) AS groupName, IFNULL(SUM(r.work_duration),0) AS actualMinutes
     FROM qxx_pro_workrecord r
     <where>
-      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end} AND r.team_id IS NOT NULL
+      r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <include refid="workrecordTaskAlive"/> AND r.team_id IS NOT NULL
       <if test="teamIds != null and teamIds.size() > 0">
         AND r.team_id IN
         <foreach collection="teamIds" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -237,7 +256,8 @@
     FROM qxx_pro_task t
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
     <where>
-      t.status = 'COMPLETED' AND t.finish_date BETWEEN #{begin} AND #{end}
+      t.del_flag = '0'
+      AND t.status = 'COMPLETED' AND t.finish_date BETWEEN #{begin} AND #{end}
       <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
     </where>
     GROUP BY DATE(t.finish_date)
@@ -247,12 +267,13 @@
     SELECT DATE(w.create_time) AS statDate, COUNT(*) AS createdCount
     FROM qxx_pro_workorder w
     <where>
-      w.create_time BETWEEN #{begin} AND #{end} AND w.status &lt;&gt; 'CANCEL'
+      w.del_flag = '0'
+      AND w.create_time BETWEEN #{begin} AND #{end} AND w.status &lt;&gt; 'CANCEL'
       <if test="workshopIds != null and workshopIds.size() > 0">
         AND EXISTS (
           SELECT 1 FROM qxx_pro_task t
           JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
-          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id AND t.del_flag = '0'
           AND ws.workshop_id IN
           <foreach collection="workshopIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         )
@@ -267,6 +288,7 @@
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = r.workstation_id AND ws.factory_id = r.factory_id
     <where>
       r.status = 'CLOSED' AND r.clock_in_time BETWEEN #{begin} AND #{end}
+      <include refid="workrecordTaskAlive"/>
       <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
     </where>
     GROUP BY DATE(r.clock_in_time)
@@ -278,7 +300,8 @@
     FROM qxx_pro_task t
     LEFT JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
     <where>
-      t.create_time BETWEEN #{begin} AND #{end}
+      t.del_flag = '0'
+      AND t.create_time BETWEEN #{begin} AND #{end}
       <if test="workshopId != null"> AND ws.workshop_id = #{workshopId}</if>
     </where>
     GROUP BY t.status
@@ -293,17 +316,20 @@
       ROUND(IFNULL(w.quantity_produced,0)/NULLIF(w.quantity,0)*100,0) AS completionRate
     FROM qxx_pro_workorder w
     <where>
-      w.create_time BETWEEN #{begin} AND #{end}
+      w.del_flag = '0'
+      AND w.create_time BETWEEN #{begin} AND #{end}
       <if test="workshopId != null">
         AND EXISTS (
           SELECT 1 FROM qxx_pro_task t
           JOIN qxx_md_workstation ws ON ws.workstation_id = t.workstation_id AND ws.factory_id = t.factory_id
-          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id AND ws.workshop_id = #{workshopId}
+          WHERE t.workorder_id = w.workorder_id AND t.factory_id = w.factory_id
+            AND t.del_flag = '0' AND ws.workshop_id = #{workshopId}
         )
       </if>
       <if test="teamId != null">
         AND EXISTS (SELECT 1 FROM qxx_pro_feedback fb
-          WHERE fb.workorder_id = w.workorder_id AND fb.factory_id = w.factory_id AND fb.team_id = #{teamId})
+          WHERE fb.workorder_id = w.workorder_id AND fb.factory_id = w.factory_id
+            AND fb.del_flag = '0' AND fb.team_id = #{teamId})
       </if>
     </where>
     ORDER BY w.create_time DESC
