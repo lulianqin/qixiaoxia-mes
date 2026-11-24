@@ -81,6 +81,12 @@
           {{ scope.row.quantityOnhand2 ?? '-' }}{{ scope.row.unit2Name ? ' ' + scope.row.unit2Name : '' }}
         </template>
       </el-table-column>
+      <el-table-column label="客户PO号" align="center" prop="poNo" width="110" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.poNo || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="系统订单号" align="center" prop="sourceOrderCode" width="130" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.sourceOrderCode || '-' }}</template>
+      </el-table-column>
       <el-table-column label="物料属性" align="center" min-width="180">
         <template #default="scope">
           <span>{{ attrText(scope.row.itemExtAttrs) }}</span>

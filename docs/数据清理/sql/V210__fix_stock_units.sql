@@ -352,9 +352,10 @@ INSERT INTO tmp_fin_spec (item_code,packing,boxes,po_no,order_no) VALUES
 ('FIN-ORD-0232',300.0,23.5,'邓生明','DD20261107007'),
 ('FIN-ORD-0233',300.0,65.0,'邓生明','DD20261107005');
 
--- 物料：辅助单位=箱，换算率=每箱数量
+-- 物料：辅助单位=箱，换算率=每箱数量，装箱规格文本
 UPDATE qxx_md_item i JOIN tmp_fin_spec t ON i.item_code = t.item_code
-   SET i.unit2='BOX', i.unit2_name='箱', i.conversion_rate=t.packing
+   SET i.unit2='BOX', i.unit2_name='箱', i.conversion_rate=t.packing,
+       i.package_spec=CONCAT(CAST(t.packing AS UNSIGNED), '个/箱')
  WHERE i.factory_id=1 AND t.packing IS NOT NULL AND t.packing > 0;
 
 -- 库存：辅助单位/换算率/辅助数量（箱数）/PO号/订单号

@@ -922,9 +922,10 @@ def write_v210(fin, log):
         sep = "," if i < len(rows) - 1 else ";"
         a(f"('{code}',{num_or_null(packing)},{num_or_null(boxes)},{esc(po or None)},{esc(ono or None)}){sep}")
     a("")
-    a("-- 物料：辅助单位=箱，换算率=每箱数量")
+    a("-- 物料：辅助单位=箱，换算率=每箱数量，装箱规格文本")
     a("UPDATE qxx_md_item i JOIN tmp_fin_spec t ON i.item_code = t.item_code")
-    a("   SET i.unit2='BOX', i.unit2_name='箱', i.conversion_rate=t.packing")
+    a("   SET i.unit2='BOX', i.unit2_name='箱', i.conversion_rate=t.packing,")
+    a("       i.package_spec=CONCAT(CAST(t.packing AS UNSIGNED), '个/箱')")
     a(" WHERE i.factory_id=1 AND t.packing IS NOT NULL AND t.packing > 0;")
     a("")
     a("-- 库存：辅助单位/换算率/辅助数量（箱数）/PO号/订单号")

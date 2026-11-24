@@ -125,6 +125,12 @@ public class WmMaterialStock extends BaseEntity
     @Excel(name = "生产批号")
     private String lotNumber;
 
+    /** 客户PO号 */
+    private String poNo;
+
+    /** 来源系统订单号 */
+    private String sourceOrderCode;
+
     @Excel(name = "质量状态:NORMAL-正常")
     private String qualityStatus;
 
@@ -261,6 +267,14 @@ public class WmMaterialStock extends BaseEntity
     public void setExpireDate(Date v) { this.expireDate = v; }
 
     public String getLotNumber() { return lotNumber; }
+
+    public String getPoNo() { return poNo; }
+
+    public void setPoNo(String v) { this.poNo = v; }
+
+    public String getSourceOrderCode() { return sourceOrderCode; }
+
+    public void setSourceOrderCode(String v) { this.sourceOrderCode = v; }
     public void setLotNumber(String v) { this.lotNumber = v; }
 
     public String getQualityStatus() { return qualityStatus; }

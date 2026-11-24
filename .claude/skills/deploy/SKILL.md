@@ -31,9 +31,11 @@ cd /Users/huangwenhua/company/self/qixiaoxia-mes/frontend && npx vite build
 ### 2. 服务器端：拉代码 -> 编译 -> 重启后端
 
 > ⚠️ **后端由 systemd 托管（`qxx-backend.service`），不是 nohup**。用 nohup 手动起会被 systemd 反复抢占端口。
-> 服务文件：`/etc/systemd/system/qxx-backend.service`，已内置线上参数：
-> `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456 -Dspring.data.redis.port=6380 -Dspring.data.redis.password=qxx123456`
-> 这三个参数缺失会分别报 `Access denied for user 'root'@'172.19.0.1'` 和 Redis `Connection refused`。
+> 环境差异统一走 **`application-prod.yml`**（DB 密码、Redis 6380），systemd 启动参数只加：
+> `--spring.profiles.active=druid,prod --server.port=8081 --ruoyi.profile=/var/www/qixiaoxia-mes/uploadPath`
+>
+> 新增线上差异配置时**只改 `application-prod.yml`**，不要再往 unit 里堆 `-D` 参数。
+> 本地开发不激活 prod，直接读 `application.yml` / `application-druid.yml` 的本地值。
 
 ```bash
 ssh qxx << 'EOF'
@@ -138,8 +140,8 @@ ssh qxx 'curl -s -o /dev/null -w "app页面: %{http_code}\n" http://localhost/ap
 | 后端启动后立即退出、日志 0 行 | OOM Kill（1.8GB 服务器，JVM 堆/Metaspace 无界） | 改 `/etc/systemd/system/qxx-backend.service` 的 JVM 参数（现为 `-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m`），`systemctl daemon-reload && systemctl restart qxx-backend` |
 | `pkill -f ruoyi-admin.jar` 导致 SSH 退出码 255 | 命令行含 jar 名，pkill 匹配杀掉 SSH 自身远程进程 | 改用 `systemctl restart qxx-backend` |
 | 后端启动后立即退出（非 OOM） | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
-| `Access denied for user 'root'@'172.19.0.1'` | systemd unit 缺 `-DQXX_DB_PASSWORD`，用了配置里的本地默认密码 root | unit 的 ExecStart 补 `-DQXX_DB_USERNAME=root -DQXX_DB_PASSWORD=qxx123456`，`daemon-reload` 后 restart |
-| Redis `Unable to connect to localhost:6377` | unit 缺 redis 覆盖参数，用了配置里的本地端口/密码 | unit 补 `-Dspring.data.redis.port=6380 -Dspring.data.redis.password=qxx123456` |
+| `Access denied for user 'root'@'172.19.0.1'` | `application-prod.yml` 未生效或未被激活，用了本地默认密码 root | 确认 unit 带 `--spring.profiles.active=druid,prod`，且 prod 里配了 `spring.datasource.druid.master.password` |
+| Redis `Unable to connect to localhost:6377` | 同上，prod 未激活，用了本地 6377 | 确认 prod 里配了 `spring.data.redis.port=6380` 与密码 |
 | 后端反复重启（NRestarts 递增） | 容器未起 或 配置连不上 DB/Redis，systemd `Restart=always` 每 5 秒重拉 | 看 `/tmp/qxx-backend.log` 最后 20 行定位真实异常；修复后 `systemctl restart` |
 | Nginx 502 | 后端未就绪 | 等 `curl :8081` 返回 200 后再重载 |
 | 前端 404 | dist/ 未上传或路径错误 | 确认 scp 目标路径 `/var/www/qixiaoxia-mes/frontend/dist/` |
