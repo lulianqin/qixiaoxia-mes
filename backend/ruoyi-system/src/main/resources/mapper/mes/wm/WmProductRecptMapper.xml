@@ -40,7 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                t.ipqc_id, t.ipqc_code, t.status, t.remark, t.create_by, t.create_time, t.update_by, t.update_time,
                c.client_name
         from qxx_wm_product_recpt t
-        left join qxx_md_client c on c.client_id = t.client_id and c.factory_id = t.factory_id
+        left join qxx_md_client c on c.client_id = t.client_id and c.factory_id = t.factory_id and c.del_flag = '0'
     </sql>
 
     <!-- 列表带 qcStatus 计算列：对本入库单全部 IPQC 完工检单状态汇总（最差优先，
@@ -70,6 +70,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from qxx_wm_product_recpt t
         left join qxx_md_client c on c.client_id = t.client_id and c.factory_id = t.factory_id
         <where>
+            and t.del_flag = '0'
             t.recpt_id is not null
             <if test="recptCode != null and recptCode != ''"> and t.recpt_code like concat('%', #{recptCode}, '%')</if>
             <if test="recptName != null and recptName != ''"> and t.recpt_name like concat('%', #{recptName}, '%')</if>
@@ -92,11 +93,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmProductRecptAll" resultMap="WmProductRecptResult">
         <include refid="selectWmProductRecptVo"/>
+        where del_flag = '0'
     </select>
 
     <select id="selectWmProductRecptByRecptId" parameterType="Long" resultMap="WmProductRecptResult">
         <include refid="selectWmProductRecptVo"/>
-        where t.recpt_id = #{recptId}
+        where t.recpt_id = #{recptId} and t.del_flag = '0'
     </select>
 
     <insert id="insertWmProductRecpt" parameterType="WmProductRecpt" useGeneratedKeys="true" keyProperty="recptId">

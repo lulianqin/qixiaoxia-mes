@@ -36,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectSysTodoListList" parameterType="com.ruoyi.system.domain.mes.sys.SysTodoList" resultMap="SysTodoListResult">
         <include refid="selectSysTodoListVo"/>
         <where>
+            and del_flag = '0'
             <if test="userId != null"> and user_id = #{userId}</if>
             <if test="todoTitle != null  and todoTitle != ''"> and todo_title like concat('%', #{todoTitle}, '%')</if>
             <if test="todoType != null  and todoType != ''"> and todo_type = #{todoType}</if>
@@ -52,7 +53,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSysTodoListByTodoId" parameterType="Long" resultMap="SysTodoListResult">
         <include refid="selectSysTodoListVo"/>
-        where todo_id = #{todoId}
+        where todo_id = #{todoId} and del_flag = '0'
     </select>
 
     <!-- 按业务来源查待处理待办：恒真条件保证 WHERE 必渲染，供 FactoryIdInterceptor 追加 factory_id -->
@@ -71,6 +72,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and source_doc_id = #{sourceDocId}
           and source_doc_code = #{sourceDocCode}
           and status = 'PENDING'
+          and del_flag = '0'
         limit 1
     </select>
 
@@ -149,7 +151,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="countByStatus" resultType="java.util.HashMap">
         select status, count(1) as cnt from sys_todo_list
-        where user_id = #{userId}
+        where user_id = #{userId} and del_flag = '0'
         group by status
     </select>
 
@@ -160,6 +162,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select count(1) from qxx_pur_order
         where factory_id = #{factoryId}
           and status = 'DRAFT'
+          and del_flag = '0'
     </select>
 
     <!-- 生产：全部待审核报工（与报工列表 status 筛选一致） -->
@@ -167,6 +170,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select count(1) from qxx_pro_feedback
         where factory_id = #{factoryId}
           and status = 'PREPARE'
+          and del_flag = '0'
     </select>
 
     <!-- 质检：全部待检验过程检验单（与过程检验列表 status 筛选一致） -->
@@ -181,6 +185,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select count(1) from qxx_wm_issue_header
         where factory_id = #{factoryId}
           and status in ('PENDING', 'APPROVED', 'ALLOCATED')
+          and del_flag = '0'
     </select>
 
     <!-- 外协代录：全部待签收/待录结果/补录外协单（与外协列表 pendingOnly 筛选一致） -->
@@ -188,6 +193,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select count(1) from qxx_wm_outsource_order
         where factory_id = #{factoryId}
           and status in ('ISSUED', 'VENDOR_RCVD', 'PROCESSING')
+          and del_flag = '0'
     </select>
 
     <delete id="deleteSysTodoListByTodoId" parameterType="Long">

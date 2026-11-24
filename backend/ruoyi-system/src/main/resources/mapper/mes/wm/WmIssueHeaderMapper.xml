@@ -67,6 +67,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectWmIssueHeaderList" parameterType="WmIssueHeader" resultMap="WmIssueHeaderResult">
         <include refid="selectWmIssueHeaderVo"/>
         <where>
+            and del_flag = '0'
             <if test="issueCode != null  and issueCode != ''"> and issue_code = #{issueCode}</if>
             <if test="issueName != null  and issueName != ''"> and issue_name like concat('%', #{issueName}, '%')</if>
             <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
@@ -87,7 +88,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmIssueHeaderByIssueId" parameterType="Long" resultMap="WmIssueHeaderResult">
         <include refid="selectWmIssueHeaderVo"/>
-        where issue_id = #{issueId}
+        where issue_id = #{issueId} and del_flag = '0'
     </select>
 
     <insert id="insertWmIssueHeader" parameterType="WmIssueHeader" useGeneratedKeys="true" keyProperty="issueId">

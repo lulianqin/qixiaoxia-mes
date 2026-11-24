@@ -44,6 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMdClientList" parameterType="com.ruoyi.system.domain.mes.md.MdClient" resultMap="MdClientResult">
         <include refid="selectMdClientVo"/>
         <where>
+            and del_flag = '0'
             <if test="clientCode != null  and clientCode != ''"> and client_code = #{clientCode}</if>
             <if test="clientName != null  and clientName != ''"> and client_name like concat('%', #{clientName}, '%')</if>
             <if test="clientNick != null  and clientNick != ''"> and client_nick like concat('%', #{clientNick}, '%')</if>
@@ -55,17 +56,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMdClientAllEnabled" resultMap="MdClientResult">
         <include refid="selectMdClientVo"/>
-        where enable_flag = '1'
+        where enable_flag = '1' and del_flag = '0'
     </select>
 
     <select id="checkClientCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdClient" resultMap="MdClientResult">
         <include refid="selectMdClientVo"/>
-        where client_code = #{clientCode} limit 1
+        where client_code = #{clientCode} and del_flag = '0' limit 1
     </select>
 
     <select id="selectMdClientByClientId" parameterType="Long" resultMap="MdClientResult">
         <include refid="selectMdClientVo"/>
-        where client_id = #{clientId}
+        where client_id = #{clientId} and del_flag = '0'
     </select>
 
     <insert id="insertMdClient" parameterType="com.ruoyi.system.domain.mes.md.MdClient" useGeneratedKeys="true" keyProperty="clientId">

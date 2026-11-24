@@ -98,6 +98,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                ) as ipqc_id
         from qxx_pro_feedback t
         <where>
+            and t.del_flag = '0'
             t.record_id is not null
             <if test="feedbackCode != null  and feedbackCode != ''"> and t.feedback_code = #{feedbackCode}</if>
             <if test="feedbackType != null  and feedbackType != ''"> and t.feedback_type = #{feedbackType}</if>
@@ -128,7 +129,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectProFeedbackByRecordId" parameterType="Long" resultMap="ProFeedbackResult">
         <include refid="selectProFeedbackVo"/>
-        where record_id = #{recordId}
+        where record_id = #{recordId} and del_flag = '0'
     </select>
 
     <select id="selectProFeedbackByRecordIdForUpdate" parameterType="Long" resultMap="ProFeedbackResult">

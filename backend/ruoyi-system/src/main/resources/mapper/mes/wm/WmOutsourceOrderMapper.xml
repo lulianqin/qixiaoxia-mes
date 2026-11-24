@@ -93,6 +93,7 @@
                ) as qc_status
         from qxx_wm_outsource_order t
         <where>
+            and t.del_flag = '0'
             t.order_id is not null
             <if test="orderCode != null and orderCode != ''"> and order_code like concat('%', #{orderCode}, '%')</if>
             <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
@@ -114,13 +115,13 @@
 
     <select id="selectByWorkorderId" parameterType="Long" resultMap="WmOutsourceOrderResult">
         <include refid="selectVo"/>
-        where workorder_id = #{workorderId}
+        where workorder_id = #{workorderId} and del_flag = '0'
         order by order_id desc
     </select>
 
     <select id="selectOutsourceOrderByOrderId" parameterType="Long" resultMap="WmOutsourceOrderResult">
         <include refid="selectVo"/>
-        where order_id = #{orderId}
+        where order_id = #{orderId} and del_flag = '0'
     </select>
 
     <insert id="insertOutsourceOrder" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder" useGeneratedKeys="true" keyProperty="orderId">

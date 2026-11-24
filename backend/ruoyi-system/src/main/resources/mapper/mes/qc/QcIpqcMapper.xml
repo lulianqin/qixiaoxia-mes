@@ -75,6 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectQcIpqcList" parameterType="com.ruoyi.system.domain.mes.qc.QcIpqc" resultMap="QcIpqcResult">
         <include refid="selectQcIpqcVo"/>
         <where>
+            and del_flag = '0'
             <if test="ipqcCode != null and ipqcCode != ''"> and ipqc_code like concat('%', #{ipqcCode}, '%')</if>
             <if test="ipqcName != null and ipqcName != ''"> and ipqc_name like concat('%', #{ipqcName}, '%')</if>
             <if test="ipqcType != null and ipqcType != ''"> and ipqc_type = #{ipqcType}</if>
@@ -99,7 +100,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectQcIpqcByIpqcId" parameterType="Long" resultMap="QcIpqcResult">
         <include refid="selectQcIpqcVo"/>
-        where ipqc_id = #{ipqcId}
+        where ipqc_id = #{ipqcId} and del_flag = '0'
     </select>
 
     <select id="checkIpqcCodeUnique" parameterType="String" resultMap="QcIpqcResult">

@@ -79,6 +79,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectProTaskList" parameterType="ProTask" resultMap="ProTaskResult">
         <include refid="selectProTaskVo"/>
         <where>
+            and del_flag = '0'
             <if test="taskCode != null  and taskCode != ''"> and task_code = #{taskCode}</if>
             <if test="taskName != null  and taskName != ''"> and task_name like concat('%', #{taskName}, '%')</if>
             <if test="workorderId != null"> and workorder_id = #{workorderId}</if>
@@ -113,6 +114,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         inner join qxx_pro_workorder wo on wo.workorder_id = t.workorder_id
         left join qxx_pro_route_process rp on rp.route_id = t.route_id and rp.process_id = t.process_id
         <where>
+            and t.del_flag = '0'
             t.status = 'PRODUCING'
             and t.workstation_code != 'VENDOR'
             and wo.status in ('PREPARE', 'PRODUCING')
@@ -152,6 +154,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from qxx_pro_task t
         inner join qxx_pro_workorder wo on wo.workorder_id = t.workorder_id
         <where>
+            and t.del_flag = '0'
             t.status = 'PRODUCING'
             and wo.status in ('PREPARE', 'PRODUCING')
             <!-- 任务负责人优先；任务未设置负责人时回退工单负责人 -->
@@ -163,13 +166,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectProTaskByTaskId" parameterType="Long" resultMap="ProTaskResult">
         <include refid="selectProTaskVo"/>
-        where task_id = #{taskId}
+        where task_id = #{taskId} and del_flag = '0'
     </select>
 
     <!-- 按任务ID批量查（qcBlockState 消除 N+1）；foreach 非空由调用方保证，factory_id 由拦截器注入 -->
     <select id="selectProTaskByTaskIds" resultMap="ProTaskResult">
         <include refid="selectProTaskVo"/>
-        where task_id in
+        where del_flag = '0' and task_id in
         <foreach collection="taskIds" item="tid" open="(" separator="," close=")">
             #{tid}
         </foreach>

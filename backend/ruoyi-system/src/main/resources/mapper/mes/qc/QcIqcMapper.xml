@@ -65,6 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectQcIqcList" parameterType="com.ruoyi.system.domain.mes.qc.QcIqc" resultMap="QcIqcResult">
         <include refid="selectQcIqcVo"/>
         <where>
+            and del_flag = '0'
             <if test="iqcCode != null and iqcCode != ''"> and iqc_code like concat('%', #{iqcCode}, '%')</if>
             <if test="iqcName != null and iqcName != ''"> and iqc_name like concat('%', #{iqcName}, '%')</if>
             <if test="templateId != null"> and template_id = #{templateId}</if>
@@ -84,7 +85,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectQcIqcByIqcId" parameterType="Long" resultMap="QcIqcResult">
         <include refid="selectQcIqcVo"/>
-        where iqc_id = #{iqcId}
+        where iqc_id = #{iqcId} and del_flag = '0'
     </select>
 
     <select id="checkIqcCodeUnique" parameterType="String" resultMap="QcIqcResult">

@@ -65,6 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                ) as qc_status
         from qxx_wm_rt_issue t
         <where>
+            and t.del_flag = '0'
             t.rt_id is not null
             <if test="rtCode != null  and rtCode != ''"> and t.rt_code = #{rtCode}</if>
             <if test="rtName != null  and rtName != ''"> and t.rt_name like concat('%', #{rtName}, '%')</if>
@@ -80,7 +81,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectWmRtIssueByRtId" parameterType="Long" resultMap="WmRtIssueResult">
         <include refid="selectWmRtIssueVo"/>
-        where rt_id = #{rtId}
+        where rt_id = #{rtId} and del_flag = '0'
     </select>
 
     <insert id="insertWmRtIssue" parameterType="WmRtIssue" useGeneratedKeys="true" keyProperty="rtId">

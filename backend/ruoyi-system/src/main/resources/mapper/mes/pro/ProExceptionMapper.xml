@@ -78,6 +78,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             resultMap="ProExceptionResult">
         <include refid="selectProExceptionVo"/>
         <where>
+            and del_flag = '0'
             <if test="exceptionCode != null and exceptionCode != ''"> and exception_code like concat('%', #{exceptionCode}, '%')</if>
             <if test="exceptionType != null and exceptionType != ''"> and exception_type = #{exceptionType}</if>
             <if test="status != null and status != ''"> and status = #{status}</if>
@@ -99,7 +100,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectProExceptionByExceptionId" parameterType="Long" resultMap="ProExceptionResult">
         <include refid="selectProExceptionVo"/>
-        where exception_id = #{exceptionId}
+        where exception_id = #{exceptionId} and del_flag = '0'
     </select>
 
     <!-- factory_id 由 FactoryIdInterceptor 注入，业务 INSERT 不写 factory_id 列 -->
@@ -293,14 +294,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 未关闭=待处理+处理中；已关闭/已作废均不硬拦完工（VOID 见 V158） -->
     <select id="selectOpenByWorkorderId" resultMap="ProExceptionResult">
         <include refid="selectOpenExceptionBriefVo"/>
-        where workorder_id = #{workorderId}
+        where workorder_id = #{workorderId} and del_flag = '0'
           and status in ('OPEN', 'PROCESSING')
         order by occur_time asc, exception_id asc
     </select>
 
     <select id="selectOpenByWorkorderIds" resultMap="ProExceptionResult">
         <include refid="selectOpenExceptionBriefVo"/>
-        where status in ('OPEN', 'PROCESSING')
+        where status in ('OPEN', 'PROCESSING') and del_flag = '0'
           and workorder_id in
         <foreach collection="workorderIds" item="wid" open="(" separator="," close=")">
             #{wid}
