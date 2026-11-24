@@ -1,0 +1,17 @@
+# ============================================================
+# 生产环境覆盖配置
+# 使用方式：线上启动加 --spring.profiles.active=druid,prod
+# 本地开发不激活该 profile，默认走 application.yml / application-druid.yml
+# 只放与本地不同的项，不要重复配置已一致的内容
+# ============================================================
+spring:
+    datasource:
+        druid:
+            master:
+                username: root
+                password: qxx123456
+    data:
+        redis:
+            # 服务器 Redis 容器映射端口（本地为 6377）
+            port: 6380
+            password: qxx123456

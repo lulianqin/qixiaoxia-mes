@@ -100,3 +100,12 @@ onMounted(() => {
   getUser()
 })
 </script>
+
+<style scoped>
+/* 个人信息左侧图标：限制尺寸与间距，避免 el-icon 随父级字号放大且紧贴文字 */
+.list-group-item :deep(.el-icon) {
+  font-size: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+</style>

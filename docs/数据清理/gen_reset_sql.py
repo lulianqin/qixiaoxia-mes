@@ -159,21 +159,25 @@ def load_finished():
         name = clean_name(r[0])
         if not name:
             continue
-        spot.append({"name": name, "spec": clean_name(r[1]), "qty": r[4]})
+        spot.append({"name": name, "spec": clean_name(r[1]), "qty": r[4],
+                     "packing": r[3], "boxes": r[5], "po": "", "order_no": ""})
 
     ws = wb["外采"]
     for r in ws.iter_rows(min_row=3, max_row=ws.max_row, max_col=15, values_only=True):
         name = clean_name(r[0])
         if not name:
             continue
-        wai.append({"name": name, "spec": "", "qty": r[12], "vendor": clean_name(r[6])})
+        wai.append({"name": name, "spec": "", "qty": r[12], "vendor": clean_name(r[6]),
+                    "packing": None, "boxes": None, "po": "", "order_no": ""})
 
     ws = wb["订单"]
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=8, values_only=True):
         name = clean_name(r[1])
         if not name:
             continue
-        order.append({"name": name, "spec": "", "qty": r[6], "remark": clean_name(r[4]), "po": clean_name(r[2])})
+        order.append({"name": name, "spec": "", "qty": r[6], "remark": clean_name(r[4]),
+                      "po": clean_name(r[2]), "order_no": clean_name(r[3]),
+                      "packing": r[5], "boxes": r[7]})
     return spot, wai, order
 
 
@@ -315,7 +319,9 @@ def main():
             continue
         seen.add(r["name"])
         code = f"FIN-SPOT-{i:04d}"
-        fin[code] = {"name": r["name"], "spec": r["spec"], "qty": r["qty"], "src": "现货", "batch": ""}
+        fin[code] = {"name": r["name"], "spec": r["spec"], "qty": r["qty"], "src": "现货", "batch": "",
+                     "packing": r.get("packing"), "boxes": r.get("boxes"),
+                     "po": r.get("po", ""), "order_no": r.get("order_no", "")}
     n = 0
     for r in wai:
         if r["name"] in seen:
@@ -323,7 +329,9 @@ def main():
         seen.add(r["name"])
         n += 1
         code = f"FIN-WAI-{n:04d}"
-        fin[code] = {"name": r["name"], "spec": "", "qty": r["qty"], "src": "外采", "batch": r.get("vendor", "")}
+        fin[code] = {"name": r["name"], "spec": "", "qty": r["qty"], "src": "外采", "batch": r.get("vendor", ""),
+                     "packing": r.get("packing"), "boxes": r.get("boxes"),
+                     "po": r.get("po", ""), "order_no": r.get("order_no", "")}
     m = 0
     for r in order:
         if r["name"] in seen:
@@ -334,7 +342,9 @@ def main():
         # 只有标注"库存货/库存"的才计入期初库存
         is_stock = r["remark"] in ("库存货", "库存")
         fin[code] = {"name": r["name"], "spec": "", "qty": r["qty"] if is_stock else 0,
-                     "src": "订单", "batch": r["po"]}
+                     "src": "订单", "batch": r["po"],
+                     "packing": r.get("packing"), "boxes": r.get("boxes"),
+                     "po": r.get("po", ""), "order_no": r.get("order_no", "")}
     log.append(f"成品物料: {len(fin)} (现货去重后{len(spot)} / 外采新增{n} / 订单新增{m})")
     stock_fin = [k for k, v in fin.items() if v["qty"] not in (None, 0, "")]
     log.append(f"成品有库存数量: {len(stock_fin)}")
@@ -352,6 +362,7 @@ def main():
     write_v207(log)
     write_v208(spu, sku, edge_sku, rope_items, fin, log)
     write_v209(sku, edge_sku, rope_items, fin, vendors, log)
+    write_v210(fin, log)
 
     print("\n".join(log))
 
@@ -841,6 +852,105 @@ def write_v209(sku, edge_sku, rope_items, fin, vendors, log):
     with open(os.path.join(OUT_DIR, "V209__business_reset.sql"), "w", encoding="utf-8") as f:
         f.write("\n".join(L))
     log.append("V209 已生成")
+
+
+# ---------------------------------------------------------------- V210 修正
+def write_v210(fin, log):
+    """修正 V209 的两处缺陷：单位存成 unit_id、缺装箱规格/辅助数量/PO号"""
+    L = []
+    a = L.append
+    a("-- ============================================================")
+    a("-- V210 修正期初数据的计量单位与辅助单位")
+    a("-- 修正 V209 两处缺陷：")
+    a("--   1) unit_of_measure 误写为 unit_id（200/201/204），应为单位编码（PCS/KG/PAIR）")
+    a("--   2) 未导入装箱数量（conversion_rate）、剩余箱数（quantity_onhand2）、PO号、系统订单号")
+    a("-- 幂等")
+    a("-- ============================================================")
+    a("")
+    a("SET @now = NOW();")
+    a("SET @op = 'admin';")
+    a("")
+    a("-- ---------- 1. 库存表新增 PO 号 / 系统订单号 ----------")
+    a("DROP PROCEDURE IF EXISTS qxx_add_stock_doc_cols;")
+    a("DELIMITER $$")
+    a("CREATE PROCEDURE qxx_add_stock_doc_cols()")
+    a("BEGIN")
+    a("  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE()")
+    a("                  AND table_name = 'qxx_wm_material_stock' AND column_name = 'po_no') THEN")
+    a("    ALTER TABLE `qxx_wm_material_stock` ADD COLUMN `po_no` varchar(64) DEFAULT NULL COMMENT '客户PO号' AFTER `lot_number`;")
+    a("  END IF;")
+    a("  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE()")
+    a("                  AND table_name = 'qxx_wm_material_stock' AND column_name = 'source_order_code') THEN")
+    a("    ALTER TABLE `qxx_wm_material_stock` ADD COLUMN `source_order_code` varchar(64) DEFAULT NULL COMMENT '来源系统订单号' AFTER `po_no`;")
+    a("  END IF;")
+    a("END$$")
+    a("DELIMITER ;")
+    a("CALL qxx_add_stock_doc_cols();")
+    a("DROP PROCEDURE IF EXISTS qxx_add_stock_doc_cols;")
+    a("")
+    a("-- ---------- 2. 单位字段从 unit_id 改为单位编码 ----------")
+    a("UPDATE qxx_md_item SET unit_of_measure='PCS'  WHERE factory_id=1 AND unit_of_measure='200';")
+    a("UPDATE qxx_md_item SET unit_of_measure='KG'   WHERE factory_id=1 AND unit_of_measure='201';")
+    a("UPDATE qxx_md_item SET unit_of_measure='PAIR' WHERE factory_id=1 AND unit_of_measure='204';")
+    a("")
+    a("-- 库存行按物料回填主单位（V209 里成品被误写成 KG）")
+    a("UPDATE qxx_wm_material_stock s")
+    a("  JOIN qxx_md_item i ON s.item_id = i.item_id AND i.factory_id = 1")
+    a("   SET s.unit_of_measure = i.unit_of_measure, s.unit_name = i.unit_name")
+    a(" WHERE s.factory_id = 1 AND s.del_flag = '0';")
+    a("")
+    a("-- ---------- 3. 成品装箱规格 / 箱数 / PO号 / 订单号 ----------")
+    rows = []
+    for code, v in fin.items():
+        packing = v.get("packing")
+        boxes = v.get("boxes")
+        po = v.get("po") or ""
+        ono = v.get("order_no") or ""
+        if packing in (None, "", 0) and boxes in (None, "") and not po and not ono:
+            continue
+        rows.append((code, packing, boxes, po, ono))
+    a("DROP TEMPORARY TABLE IF EXISTS tmp_fin_spec;")
+    a("CREATE TEMPORARY TABLE tmp_fin_spec (")
+    a("  item_code VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL PRIMARY KEY,")
+    a("  packing DECIMAL(14,4) DEFAULT NULL,")
+    a("  boxes DECIMAL(14,4) DEFAULT NULL,")
+    a("  po_no VARCHAR(64) DEFAULT NULL,")
+    a("  order_no VARCHAR(64) DEFAULT NULL")
+    a(");")
+    a("INSERT INTO tmp_fin_spec (item_code,packing,boxes,po_no,order_no) VALUES")
+    for i, (code, packing, boxes, po, ono) in enumerate(rows):
+        sep = "," if i < len(rows) - 1 else ";"
+        a(f"('{code}',{num_or_null(packing)},{num_or_null(boxes)},{esc(po or None)},{esc(ono or None)}){sep}")
+    a("")
+    a("-- 物料：辅助单位=箱，换算率=每箱数量")
+    a("UPDATE qxx_md_item i JOIN tmp_fin_spec t ON i.item_code = t.item_code")
+    a("   SET i.unit2='BOX', i.unit2_name='箱', i.conversion_rate=t.packing")
+    a(" WHERE i.factory_id=1 AND t.packing IS NOT NULL AND t.packing > 0;")
+    a("")
+    a("-- 库存：辅助单位/换算率/辅助数量（箱数）/PO号/订单号")
+    a("UPDATE qxx_wm_material_stock s JOIN tmp_fin_spec t ON s.item_code = t.item_code")
+    a("   SET s.unit2='BOX', s.unit2_name='箱',")
+    a("       s.conversion_rate=IFNULL(NULLIF(t.packing,0),1),")
+    a("       s.quantity_onhand2=IFNULL(t.boxes,0),")
+    a("       s.quantity_available2=IFNULL(t.boxes,0),")
+    a("       s.po_no=NULLIF(t.po_no,''),")
+    a("       s.source_order_code=NULLIF(t.order_no,'')")
+    a(" WHERE s.factory_id=1 AND s.del_flag='0';")
+    a("")
+    a("DROP TEMPORARY TABLE IF EXISTS tmp_fin_spec;")
+    a("")
+    with open(os.path.join(OUT_DIR, "V210__fix_stock_units.sql"), "w", encoding="utf-8") as f:
+        f.write("\n".join(L))
+    log.append(f"V210 已生成（装箱规格 {len(rows)} 条）")
+
+
+def num_or_null(v):
+    if v is None or v == "":
+        return "NULL"
+    try:
+        return str(float(v))
+    except (TypeError, ValueError):
+        return "NULL"
 
 
 if __name__ == "__main__":

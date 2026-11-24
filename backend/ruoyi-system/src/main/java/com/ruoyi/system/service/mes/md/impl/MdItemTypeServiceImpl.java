@@ -6,9 +6,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.TreeSelect;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.md.MdItemType;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemTypeMapper;
 import com.ruoyi.system.service.mes.md.IMdItemTypeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +28,9 @@ public class MdItemTypeServiceImpl implements IMdItemTypeService
 {
     @Autowired
     private MdItemTypeMapper mdItemTypeMapper;
+
+    @Autowired
+    private MdItemMapper mdItemMapper;
 
     @Override
     public List<MdItemType> selectMdItemTypeList(MdItemType mdItemType)
@@ -170,6 +176,37 @@ public class MdItemTypeServiceImpl implements IMdItemTypeService
     @Override
     public int deleteMdItemTypeByIds(Long[] itemTypeIds)
     {
+        for (Long itemTypeId : itemTypeIds)
+        {
+            checkChildExists(itemTypeId);
+            checkItemReferenced(itemTypeId);
+        }
         return mdItemTypeMapper.deleteMdItemTypeByIds(itemTypeIds);
+    }
+
+    /** 存在子分类时不允许删除，避免产生孤儿节点 */
+    private void checkChildExists(Long itemTypeId)
+    {
+        MdItemType query = new MdItemType();
+        query.setParentTypeId(itemTypeId);
+        if (!mdItemTypeMapper.selectMdItemTypeList(query).isEmpty())
+        {
+            MdItemType self = mdItemTypeMapper.selectMdItemTypeById(itemTypeId);
+            String name = self == null ? String.valueOf(itemTypeId) : self.getItemTypeName();
+            throw new ServiceException("分类【" + name + "】下存在子分类，不允许删除");
+        }
+    }
+
+    /** 分类下存在未删除物料时不允许删除 */
+    private void checkItemReferenced(Long itemTypeId)
+    {
+        MdItem query = new MdItem();
+        query.setItemTypeId(itemTypeId);
+        if (!mdItemMapper.selectMdItemList(query).isEmpty())
+        {
+            MdItemType self = mdItemTypeMapper.selectMdItemTypeById(itemTypeId);
+            String name = self == null ? String.valueOf(itemTypeId) : self.getItemTypeName();
+            throw new ServiceException("分类【" + name + "】下存在物料，不允许删除");
+        }
     }
 }

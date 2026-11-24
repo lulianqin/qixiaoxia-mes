@@ -52,8 +52,10 @@ public class MdItemTypeController extends BaseController
     @GetMapping("/treeselect")
     public AjaxResult treeselect()
     {
-        // 查询全部分类（不按 enableFlag 过滤），确保树结构完整
-        List<MdItemType> list = mdItemTypeService.selectMdItemTypeList(new MdItemType());
+        // 只返回启用的分类：停用的分类不应出现在左侧树和物料表单的分类选择器中
+        MdItemType query = new MdItemType();
+        query.setEnableFlag("1");
+        List<MdItemType> list = mdItemTypeService.selectMdItemTypeList(query);
         List<TreeSelect> trees = mdItemTypeService.buildItemTypeTreeSelect(list);
         return AjaxResult.success(trees);
     }

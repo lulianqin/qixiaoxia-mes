@@ -50,11 +50,12 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="操作" align="center" width="280" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="320" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:itemtype:edit']">修改</el-button>
           <el-button v-if="scope.row.parentTypeId" link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['mes:md:itemtype:add']">新增</el-button>
           <el-button link type="primary" icon="Setting" @click="handleAttrBind(scope.row)" v-hasPermi="['mes:md:itemtype:attr']">扩展属性</el-button>
+          <el-button v-if="scope.row.parentTypeId" link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:md:itemtype:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
