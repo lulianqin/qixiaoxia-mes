@@ -133,10 +133,30 @@ ssh qxx 'curl -s -o /dev/null -w "app页面: %{http_code}\n" http://localhost/ap
 
 期望返回 `200`。
 
+## 手工执行数据清理 SQL（docs/数据清理/sql）
+
+这类脚本不在 Flyway 目录，需手工跑。**DB 密码不要硬编码**，直接从 prod 配置读，避免用过期密码：
+
+```bash
+ssh qxx << 'EOF'
+cd /var/www/qixiaoxia-mes/backend/ruoyi-admin/src/main/resources
+PW=$(sed -n 's/^ *password: *//p' application-prod.yml | head -1 | tr -d '"')
+cd /var/www/qixiaoxia-mes/docs/数据清理/sql
+docker exec -i qxx-mysql mysql -uroot -p"$PW" mes < V2xx__xxx.sql
+EOF
+```
+
+- 破坏性脚本（DELETE/TRUNCATE）执行前先备份：
+  `docker exec qxx-mysql mysqldump -uroot -p"$PW" --single-transaction --skip-lock-tables --set-gtid-purged=OFF --databases mes | gzip > /root/db_backup/mes_before_xxx_$(date +%Y%m%d_%H%M%S).sql.gz`
+- 备份后必须确认大小正常（非 0 字节）再动手
+
 ## 故障排查
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
+| `mysqldump`/`mysql` 报 `Access denied for user 'root'@'localhost'` | 命令里用了过期密码（历史上写过 mbt972930，现已在 `application-prod.yml` 更新过） | 从 `application-prod.yml` 读密码再连接，不要凭记忆硬编码 |
+| `DELETE` 后 `ALTER TABLE ... AUTO_INCREMENT=1` 不生效 | MySQL 8 只允许把自增调高，不能降低 | 表可清空时用 `TRUNCATE TABLE`（自带自增重置）；已在 V212 采用 |
+| `information_schema` 显示旧的自增/行数 | MySQL 8 默认缓存表统计（`information_schema_stats_expiry=86400`） | 查询前 `SET SESSION information_schema_stats_expiry=0` 才是实时值 |
 | 后端启动后立即退出、日志 0 行 | OOM Kill（1.8GB 服务器，JVM 堆/Metaspace 无界） | 改 `/etc/systemd/system/qxx-backend.service` 的 JVM 参数（现为 `-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m`），`systemctl daemon-reload && systemctl restart qxx-backend` |
 | `pkill -f ruoyi-admin.jar` 导致 SSH 退出码 255 | 命令行含 jar 名，pkill 匹配杀掉 SSH 自身远程进程 | 改用 `systemctl restart qxx-backend` |
 | 后端启动后立即退出（非 OOM） | Docker 容器未启动 | `docker start qxx-mysql qxx-redis qxx-minio` |
