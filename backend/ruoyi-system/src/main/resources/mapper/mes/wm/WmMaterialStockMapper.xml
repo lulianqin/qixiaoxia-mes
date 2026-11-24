@@ -74,7 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                s.batch_id, s.batch_code, s.warehouse_id, s.warehouse_code, s.warehouse_name,
                s.location_id, s.location_code, s.location_name, s.area_id, s.area_code, s.area_name,
                s.vendor_id, s.vendor_code, s.vendor_name, s.client_id, s.client_name,
-               s.workorder_id, s.workorder_code, s.expire_date, s.lot_number, s.quality_status,
+               s.workorder_id, s.workorder_code, s.expire_date, s.lot_number, s.po_no, s.source_order_code, s.quality_status,
                s.status, s.enable_flag, s.stocktake_date, s.remark,
                s.create_by, s.create_time, s.update_by, s.update_time,
                i.item_type_id, i.item_type_code, i.item_type_name, i.package_spec,
