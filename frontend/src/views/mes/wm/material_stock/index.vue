@@ -10,6 +10,12 @@
       <el-form-item label="批次号" prop="batchCode">
         <el-input v-model="queryParams.batchCode" placeholder="请输入批次号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="客户PO号" prop="poNo">
+        <el-input v-model="queryParams.poNo" placeholder="请输入客户PO号" clearable style="width:150px" @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="系统订单号" prop="sourceOrderCode">
+        <el-input v-model="queryParams.sourceOrderCode" placeholder="请输入系统订单号" clearable style="width:170px" @keyup.enter="handleQuery" />
+      </el-form-item>
       <el-form-item label="物料分类" prop="itemTypeId">
         <el-tree-select v-model="queryParams.itemTypeId" :data="itemTypeTree" check-strictly node-key="id"
                         :props="{ value: 'id', label: 'label', children: 'children' }"

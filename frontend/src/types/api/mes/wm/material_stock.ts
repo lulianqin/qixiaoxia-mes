@@ -10,6 +10,10 @@ export interface WmMaterialStockQueryParams extends PageDomain {
   itemTypeId?: number
   warehouseId?: number
   batchCode?: string
+  /** 客户PO号 */
+  poNo?: string
+  /** 系统订单号 */
+  sourceOrderCode?: string
   qualityStatus?: string
   vendorId?: number
   clientId?: number

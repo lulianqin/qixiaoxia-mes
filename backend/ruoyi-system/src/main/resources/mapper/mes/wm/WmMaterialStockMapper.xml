@@ -111,6 +111,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="workorderId != null"> and s.workorder_id = #{workorderId}</if>
             <if test="workorderCode != null and workorderCode != ''"> and s.workorder_code like concat('%', #{workorderCode}, '%')</if>
             <if test="lotNumber != null and lotNumber != ''"> and s.lot_number like concat('%', #{lotNumber}, '%')</if>
+            <if test="poNo != null and poNo != ''"> and s.po_no like concat('%', #{poNo}, '%')</if>
+            <if test="sourceOrderCode != null and sourceOrderCode != ''"> and s.source_order_code like concat('%', #{sourceOrderCode}, '%')</if>
             <if test="qualityStatus != null and qualityStatus != ''"> and s.quality_status like concat('%', #{qualityStatus}, '%')</if>
             <if test="status != null and status != ''"> and s.status like concat('%', #{status}, '%')</if>
             <if test="enableFlag != null and enableFlag != ''"> and s.enable_flag like concat('%', #{enableFlag}, '%')</if>
