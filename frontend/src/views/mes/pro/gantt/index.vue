@@ -163,7 +163,7 @@ import { listWorkstation } from '@/api/mes/md/workstation'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { addTask, updateTask, delTask } from '@/api/mes/pro/task'
 import { listUserWorkstation } from '@/api/mes/pro/userworkstation'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import GanttChart from '@/components/GanttChart/index.vue'
 // import SnapShotPanel from './SnapShotPanel.vue'  // 排产快照面板暂时下线，恢复时取消注释
 import WorkOrderQueue from './WorkOrderQueue.vue'
@@ -265,8 +265,8 @@ async function doSearchUsers(kw: string, opts: typeof workerOptions, loading: ty
   try {
     // 系统用户列表仅支持账号/手机号模糊（不支持姓名），两路并发查询后按 userId 去重合并
     const [byName, byPhone] = await Promise.all([
-      listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
-      listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
+      listUserOptions({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
+      listUserOptions({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
     ])
     const rows: any[] = [...((byName as any)?.rows || []), ...((byPhone as any)?.rows || [])]
     const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)

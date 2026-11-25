@@ -824,7 +824,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
     @Override
     public boolean checkWorkorderCodeUnique(ProWorkorder proWorkorder)
     {
-        ProWorkorder existing = qxxProWorkorderMapper.selectProWorkorderByWorkorderCode(proWorkorder.getWorkorderCode());
+        ProWorkorder existing = qxxProWorkorderMapper.checkWorkorderCodeUnique(proWorkorder.getWorkorderCode());
         if (existing == null) return true;
         if (existing.getWorkorderId().equals(proWorkorder.getWorkorderId())) return true;
         throw new ServiceException("工单编码[" + proWorkorder.getWorkorderCode() + "]已存在");

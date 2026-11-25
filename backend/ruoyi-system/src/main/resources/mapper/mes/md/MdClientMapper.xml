@@ -61,7 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="checkClientCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdClient" resultMap="MdClientResult">
         <include refid="selectMdClientVo"/>
-        where client_code = #{clientCode} and del_flag = '0' limit 1
+        where client_code = #{clientCode} limit 1
     </select>
 
     <select id="selectMdClientByClientId" parameterType="Long" resultMap="MdClientResult">
@@ -153,14 +153,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where client_id = #{clientId}
     </update>
 
-    <delete id="deleteMdClientByClientId" parameterType="Long">
-        delete from qxx_md_client where client_id = #{clientId}
-    </delete>
+    <update id="deleteMdClientByClientId" parameterType="Long">
+        update qxx_md_client set del_flag = '2' where client_id = #{clientId}
+    </update>
 
-    <delete id="deleteMdClientByClientIds" parameterType="String">
-        delete from qxx_md_client where client_id in
+    <update id="deleteMdClientByClientIds" parameterType="String">
+        update qxx_md_client set del_flag = '2' where client_id in
         <foreach item="clientId" collection="array" open="(" separator="," close=")">
             #{clientId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

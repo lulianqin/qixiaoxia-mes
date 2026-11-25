@@ -4,7 +4,7 @@
     <el-page-header @back="goBack" class="mb16">
       <template #content>
         <span class="header-title">销售订单详情</span>
-        <el-tag v-if="order.orderCode" type="info" class="ml8">{{ order.orderCode }}</el-tag>
+        <el-tag v-if="order.clientOrderCode || order.orderCode" type="info" class="ml8">{{ order.clientOrderCode || order.orderCode }}</el-tag>
         <el-tag v-if="order.status" :type="statusTagType" class="ml8">{{ statusLabel }}</el-tag>
         <el-progress v-if="order.orderCode" :percentage="Number(order.progressPercent || 0)" :stroke-width="12" style="width:220px;display:inline-flex;vertical-align:middle;margin-left:12px" />
       </template>
@@ -18,8 +18,10 @@
       <el-card shadow="never" class="mb16">
         <template #header><span>订单信息</span></template>
         <el-descriptions :column="3" size="small" border label-width="100px" class="order-info">
+          <el-descriptions-item label="销售订单号">{{ order.orderCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="订单名称">{{ order.orderName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="签约主体">{{ signCompanyText }}</el-descriptions-item>
+          <el-descriptions-item label="供方主体">{{ signCompanyText }}</el-descriptions-item>
+          <el-descriptions-item label="需方主体">{{ order.demanderName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="订单类型">{{ orderTypeText }}</el-descriptions-item>
           <el-descriptions-item v-if="order.sourceOrderType" label="源订单类型">{{ sourceOrderTypeText }}</el-descriptions-item>
           <el-descriptions-item label="订单来源">{{ sourceText }}</el-descriptions-item>

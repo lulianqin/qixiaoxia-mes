@@ -25,6 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectPostList" parameterType="SysPost" resultMap="SysPostResult">
 	    <include refid="selectPostVo"/>
 		<where>
+			AND del_flag = '0'
 			<if test="postCode != null and postCode != ''">
 				AND post_code like concat('%', #{postCode}, '%')
 			</if>
@@ -39,11 +40,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	
 	<select id="selectPostAll" resultMap="SysPostResult">
 		<include refid="selectPostVo"/>
+		where del_flag = '0'
 	</select>
 	
 	<select id="selectPostById" parameterType="Long" resultMap="SysPostResult">
 		<include refid="selectPostVo"/>
-		where post_id = #{postId}
+		where post_id = #{postId} and del_flag = '0'
 	</select>
 	
 	<select id="selectPostListByUserId" parameterType="Long" resultType="Long">
@@ -108,15 +110,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  		)
 	</insert>
 	
-	<delete id="deletePostById" parameterType="Long">
-		delete from sys_post where post_id = #{postId}
-	</delete>
+	<update id="deletePostById" parameterType="Long">
+		update sys_post set del_flag = '2' where post_id = #{postId}
+	</update>
 	
-	<delete id="deletePostByIds" parameterType="Long">
- 		delete from sys_post where post_id in
+	<update id="deletePostByIds" parameterType="Long">
+ 		update sys_post set del_flag = '2' where post_id in
  		<foreach collection="array" item="postId" open="(" separator="," close=")">
  			#{postId}
-        </foreach> 
- 	</delete>
+        </foreach>
+ 	</update>
 
 </mapper> 

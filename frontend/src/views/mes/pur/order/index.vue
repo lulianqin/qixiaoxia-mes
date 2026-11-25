@@ -377,7 +377,7 @@ import { printPdfBlob } from "@/utils/pdfPrint"
 import { listAllOrder } from "@/api/mes/sal/order"
 import { genSerialCode } from "@/api/mes/sys/autocoderule"
 import { listAllVendor } from "@/api/mes/md/vendor"
-import { listUser } from "@/api/system/user"
+import { listUserOptions } from "@/api/system/user"
 import { ElMessageBox, ElMessage } from "element-plus"
 import useUserStore from '@/store/modules/user'
 import VendorSelect from "@/components/vendorSelect/single.vue"
@@ -481,7 +481,7 @@ export default {
     },
     /** 加载人员选项列表 */
     loadUserOptions() {
-      listUser({ pageSize: 999 }).then(response => {
+      listUserOptions({ pageSize: 999 }).then(response => {
         this.userOptions = response.rows || []
       })
     },

@@ -64,6 +64,17 @@ public class PurOrderController extends BaseController
     }
 
     /**
+     * 采购订单下拉选项（任意登录用户可访问，供入库/退货等页面跨域选择采购单）
+     */
+    @GetMapping("/options")
+    public TableDataInfo options(PurOrder purOrder)
+    {
+        startPage();
+        List<PurOrderVO> list = purOrderService.selectPurOrderList(purOrder);
+        return getDataTable(list);
+    }
+
+    /**
      * 导出采购订单头列表
      */
     @PreAuthorize("@ss.hasPermi('mes:pur:order:export')")

@@ -27,9 +27,13 @@ public class SalOrder extends BaseEntity
     @Excel(name = "订单名称")
     private String orderName;
 
-    /** 签约主体（字典 sys_company，对应 ERP 采购单供方） */
-    @Excel(name = "签约主体", dictType = "sys_company")
+    /** 供方主体（字典 sys_company，对应 ERP 采购单供方） */
+    @Excel(name = "供方主体", dictType = "sys_company")
     private String signCompany;
+
+    /** 需方主体（ERP 采购单需方名称，外部来源原样保存） */
+    @Excel(name = "需方主体")
+    private String demanderName;
 
     @Excel(name = "订单类型", readConverterExp = "STANDARD=标品,SMALL_BATCH=小批量,GIFT=礼品,STOCK=备货订单,PLATE=制版")
     private String orderType;
@@ -156,6 +160,8 @@ public class SalOrder extends BaseEntity
     public void setOrderName(String v) { this.orderName = v; }
     public String getSignCompany() { return signCompany; }
     public void setSignCompany(String v) { this.signCompany = v; }
+    public String getDemanderName() { return demanderName; }
+    public void setDemanderName(String v) { this.demanderName = v; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String v) { this.orderType = v; }
     public String getSourceOrderType() { return sourceOrderType; }

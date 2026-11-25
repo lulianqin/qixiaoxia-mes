@@ -9,6 +9,15 @@ export function listOrder(query) {
   })
 }
 
+// 查询采购订单下拉选项（任意登录用户可访问，供入库/退货等页面选择）
+export function listOrderOptions(query) {
+  return request({
+    url: '/mes/pur/order/options',
+    method: 'get',
+    params: query
+  })
+}
+
 // 查询采购订单头详细
 export function getOrder(orderId) {
   return request({

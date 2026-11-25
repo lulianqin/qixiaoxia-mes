@@ -21,6 +21,9 @@ public interface SalQuoteMapper
     public int insertSalQuote(SalQuote salQuote);
     public int updateSalQuote(SalQuote salQuote);
 
+    /** 软删除报价单（del_flag=2，明细保留） */
+    public int deleteSalQuoteByQuoteId(Long quoteId);
+
     /** 回写任务更新同步状态（无登录上下文，显式 factoryId） */
     @SkipFactoryId
     int updateSyncStatus(@Param("quoteId") Long quoteId,

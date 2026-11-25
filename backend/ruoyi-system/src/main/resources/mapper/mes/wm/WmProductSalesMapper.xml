@@ -269,20 +269,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where sales_id = #{salesId}
     </update>
 
-    <delete id="deleteWmProductSalesBySalesId" parameterType="Long">
-        delete from qxx_wm_product_sales where sales_id = #{salesId}
-    </delete>
+    <update id="deleteWmProductSalesBySalesId" parameterType="Long">
+        update qxx_wm_product_sales set del_flag = '2' where sales_id = #{salesId}
+    </update>
 
     <!-- 仅回写 OQC 挂点两列（factory 生成出货检验单后回填，避免并发覆盖整头） -->
     <update id="updateSalesHeaderRefs">
         update qxx_wm_product_sales set oqc_id = #{oqcId}, oqc_code = #{oqcCode} where sales_id = #{salesId}
     </update>
 
-    <delete id="deleteWmProductSalesBySalesIds" parameterType="String">
-        delete from qxx_wm_product_sales where sales_id in
+    <update id="deleteWmProductSalesBySalesIds" parameterType="String">
+        update qxx_wm_product_sales set del_flag = '2' where sales_id in
         <foreach item="salesId" collection="array" open="(" separator="," close=")">
             #{salesId}
         </foreach>
-    </delete>
+    </update>
 
 </mapper>

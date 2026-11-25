@@ -35,16 +35,20 @@ public class ErpOrderReceiveRequest
     @NotBlank(message = "订单名称不能为空")
     private String orderName;
 
-    /** 客户编码(ERP) */
+    /** 客户编码(ERP 销售订单客户编码) */
     private String clientCode;
 
+    /** 客户名称(ERP 销售订单客户名称，接单时按名称匹配/创建 MES 客户) */
     @NotBlank(message = "客户名称不能为空")
     private String clientName;
 
     /** 客户PO号 */
     private String clientOrderCode;
 
-    /** ERP 采购单供方名称（用于匹配 MES 签约主体 sys_company） */
+    /** 需方主体(ERP 采购单需方名称，原样保存展示) */
+    private String demanderName;
+
+    /** 供方主体(ERP 采购单供方名称，用于匹配 MES 字典 sys_company) */
     private String supplierName;
 
     private String salesperson;
@@ -83,6 +87,8 @@ public class ErpOrderReceiveRequest
     public void setClientName(String v) { this.clientName = v; }
     public String getClientOrderCode() { return clientOrderCode; }
     public void setClientOrderCode(String v) { this.clientOrderCode = v; }
+    public String getDemanderName() { return demanderName; }
+    public void setDemanderName(String v) { this.demanderName = v; }
     public String getSupplierName() { return supplierName; }
     public void setSupplierName(String v) { this.supplierName = v; }
     public String getSalesperson() { return salesperson; }

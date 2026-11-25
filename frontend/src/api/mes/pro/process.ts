@@ -9,10 +9,10 @@ export function listProcess(query) {
   })
 }
 
-// 查询所有生产工序
+// 查询所有生产工序（免授权选项，供业务页面下拉选择）
 export function listAllProcess() {
   return request({
-    url: '/mes/pro/process/listAll',
+    url: '/mes/pro/process/options',
     method: 'get'
   })
 }

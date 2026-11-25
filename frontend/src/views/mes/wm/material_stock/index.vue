@@ -53,7 +53,7 @@
         <el-button type="primary" plain icon="Upload" size="small" @click="importVisible = true" v-hasPermi="['mes:wm:material_stock:import']">导入</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:stock:export']">导出</el-button>
+        <el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:material_stock:export']">导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>

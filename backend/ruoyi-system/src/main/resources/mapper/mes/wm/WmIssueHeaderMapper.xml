@@ -219,14 +219,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where issue_id = #{issueId}
     </update>
 
-    <delete id="deleteWmIssueHeaderByIssueId" parameterType="Long">
-        delete from qxx_wm_issue_header where issue_id = #{issueId}
-    </delete>
+    <update id="deleteWmIssueHeaderByIssueId" parameterType="Long">
+        update qxx_wm_issue_header set del_flag = '2' where issue_id = #{issueId}
+    </update>
 
-    <delete id="deleteWmIssueHeaderByIssueIds">
-        delete from qxx_wm_issue_header where issue_id in
+    <update id="deleteWmIssueHeaderByIssueIds">
+        update qxx_wm_issue_header set del_flag = '2' where issue_id in
         <foreach item="issueId" collection="array" open="(" separator="," close=")">
             #{issueId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

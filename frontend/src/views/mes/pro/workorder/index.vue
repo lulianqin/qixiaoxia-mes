@@ -440,7 +440,7 @@ import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import KitDashboard from './KitDashboard.vue'
 import FlowSheetDialog from './FlowSheetDialog.vue'
 import { listAllProcess } from '@/api/mes/pro/process'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
 import { openExceptionState, openExceptionByWorkorder } from '@/api/mes/pro/exception'
@@ -616,8 +616,8 @@ export default {
     searchOwners(kw) {
       this.ownerLoading = true
       Promise.all([
-        listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 }),
-        listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
+        listUserOptions({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 }),
+        listUserOptions({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
       ]).then(([byName, byPhone]) => {
         const rows = [...(byName.rows || []), ...(byPhone.rows || [])]
         const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)

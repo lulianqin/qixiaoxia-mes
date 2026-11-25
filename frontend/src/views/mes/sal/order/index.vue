@@ -43,9 +43,10 @@
         <template #default="s"><el-link type="primary" @click="handleView(s.row)">{{ s.row.orderCode }}</el-link></template>
       </el-table-column>
       <el-table-column label="订单名称" align="center" prop="orderName" min-width="200" :show-overflow-tooltip="true" />
-      <el-table-column label="签约主体" align="center" prop="signCompany" width="200" :show-overflow-tooltip="true">
+      <el-table-column label="供方主体" align="center" prop="signCompany" width="200" :show-overflow-tooltip="true">
         <template #default="s">{{ companyText(s.row.signCompany) }}</template>
       </el-table-column>
+      <el-table-column label="需方主体" align="center" prop="demanderName" width="180" :show-overflow-tooltip="true" />
       <el-table-column label="订单类型" align="center" prop="orderType" width="90"><template #default="s"><el-tag :type="orderTypeMeta(s.row.orderType).type" size="small">{{ orderTypeMeta(s.row.orderType).text }}</el-tag></template></el-table-column>
       <el-table-column label="客户" align="center" prop="clientName" min-width="200" :show-overflow-tooltip="true" />
       <el-table-column label="客户PO号" align="center" prop="clientOrderCode" min-width="160" :show-overflow-tooltip="true" />
@@ -65,13 +66,13 @@
       <el-table-column label="状态" align="center" prop="status" width="90"><template #default="s"><el-tag :type="statusMeta(s.row.status).type">{{ statusMeta(s.row.status).text }}</el-tag></template></el-table-column>
       <el-table-column fixed="right" label="操作" align="center" width="220" class-name="op-col">
         <template #default="scope">
-          <el-button link type="primary" size="small" @click="handleView(scope.row)">查看</el-button>
-          <el-button v-if="scope.row.status==='PENDING_ACCEPT'" link type="success" size="small" @click="handleAccept(scope.row)" v-hasPermi="['mes:sal:order:edit']">接单</el-button>
+          <el-button link type="primary" size="small" @click="handleView(scope.row)" v-hasPermi="['mes:sal:order:query']">查看</el-button>
+          <el-button v-if="scope.row.status==='PENDING_ACCEPT'" link type="success" size="small" @click="handleAccept(scope.row)" v-hasPermi="['mes:sal:order:accept']">接单</el-button>
           <el-button v-if="scope.row.status==='PENDING_ACCEPT' && scope.row.sourceSystem==='ERP'" link type="danger" size="small" @click="handleReject(scope.row)" v-hasPermi="['mes:sal:order:reject']">打回</el-button>
           <el-button v-if="canModify(scope.row)" link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:sal:order:edit']">修改</el-button>
           <el-button v-if="scope.row.status==='CONFIRMED' || scope.row.status==='PRODUCING'" link type="warning" size="small" @click="handleToWorkorder(scope.row)" v-hasPermi="['mes:sal:order:workorder']">生成工单</el-button>
-          <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:edit']">结单</el-button>
-          <el-button v-if="['PENDING_ACCEPT','CONFIRMED','PRODUCING'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:edit']">取消</el-button>
+          <el-button v-if="scope.row.status==='SHIPPED'" link type="success" size="small" @click="handleClose(scope.row)" v-hasPermi="['mes:sal:order:close']">结单</el-button>
+          <el-button v-if="['PENDING_ACCEPT','CONFIRMED','PRODUCING'].includes(scope.row.status)" link type="danger" size="small" @click="handleCancel(scope.row)" v-hasPermi="['mes:sal:order:cancel']">取消</el-button>
           <el-button v-if="canModify(scope.row)" link type="danger" size="small" @click="handleDelete(scope.row)" v-hasPermi="['mes:sal:order:remove']">删除</el-button>
           <el-dropdown @command="(cmd) => handleChangeStatus(scope.row, cmd)" v-hasPermi="['mes:sal:order:changeStatus']">
             <el-button link type="primary" size="small">改状态</el-button>
@@ -127,7 +128,7 @@ export default {
       salStatusOptions: [],
       // 销售订单类型字典(mes_sal_order_type)
       salOrderTypeOptions: [],
-      // 签约主体字典(sys_company)
+      // 供方主体字典(sys_company)
       companyOptions: [],
       queryParams: { pageNum: 1, pageSize: 10, orderCode: null, orderName: null, clientName: null, clientOrderCode: null, externalOrderNo: null, businessLine: null, orderType: null, status: null, source: null },
       twOpen: false, twOrder: {}
@@ -150,9 +151,9 @@ export default {
     loadStatusDict() { getDicts('mes_sal_order_status').then(r => { this.salStatusOptions = r.data || [] }) },
     /** 加载销售订单类型字典 */
     loadOrderTypeDict() { getDicts('mes_sal_order_type').then(r => { this.salOrderTypeOptions = r.data || [] }) },
-    /** 加载签约主体字典 */
+    /** 加载供方主体字典 */
     loadCompanyDict() { getDicts('sys_company').then(r => { this.companyOptions = r.data || [] }) },
-    /** 签约主体字典值 → 名称 */
+    /** 供方主体字典值 → 名称 */
     companyText(v) {
       const d = this.companyOptions.find(o => o.dictValue === v)
       return d ? d.dictLabel : (v || '-')
@@ -208,7 +209,8 @@ export default {
           mode: 'add',
           sourceOrderCode: row.orderCode,
           clientOrderCode: row.clientOrderCode,
-          orderType: row.orderType
+          // 工单订单类型取销售订单的源订单类型（ERP 原类型：新单/翻单/异常单/打样）
+          orderType: row.sourceOrderType || undefined
         }
       })
     },

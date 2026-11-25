@@ -13,3 +13,6 @@ export function saveQuote(data: SalQuoteSubmitRequest): Promise<AjaxResult<SalQu
 export function submitQuote(data: SalQuoteSubmitRequest): Promise<AjaxResult<number>> {
   return request({ url: '/mes/sal/quote/submit', method: 'post', data })
 }
+export function delQuote(id: number): Promise<AjaxResult> {
+  return request({ url: '/mes/sal/quote/' + id, method: 'delete' })
+}

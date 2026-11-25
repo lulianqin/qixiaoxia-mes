@@ -56,7 +56,7 @@
 
 <script setup lang="ts" name="PurOrderSelect">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
-import { listOrder } from '@/api/mes/pur/order'
+import { listOrderOptions } from '@/api/mes/pur/order'
 import { ElMessage } from 'element-plus'
 import type { PurOrder } from '@/types/api/mes/pur/order'
 import VendorSelect from '@/components/vendorSelect/single.vue'
@@ -91,7 +91,7 @@ const { queryParams } = toRefs(data)
 
 function getList() {
   loading.value = true
-  listOrder(queryParams.value).then(r => { orderList.value = r.rows; total.value = r.total; loading.value = false })
+  listOrderOptions(queryParams.value).then(r => { orderList.value = r.rows; total.value = r.total; loading.value = false })
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() {

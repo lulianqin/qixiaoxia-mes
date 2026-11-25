@@ -28,6 +28,7 @@ vi.mock('@/api/system/dict/data', () => ({
 }))
 vi.mock('@/api/system/user', () => ({
   listUser: vi.fn().mockResolvedValue({ rows: [] }),
+  listUserOptions: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 vi.mock('@/api/mes/sys/autocoderule', () => ({
   genSerialCode: vi.fn().mockResolvedValue({ data: 'SO20260715001' }),

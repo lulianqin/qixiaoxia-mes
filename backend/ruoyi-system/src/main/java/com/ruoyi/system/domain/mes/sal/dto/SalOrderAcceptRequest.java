@@ -16,13 +16,13 @@ public class SalOrderAcceptRequest
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date requestDate;
 
-    /** 接单时确认的 MES 客户ID（ERP/SRM 订单必填，首次接单会记录映射） */
+    /** 接单时确认的 MES 客户ID（可选，留空则按外部客户名称自动匹配/创建） */
     private Long clientId;
 
-    /** 接单时确认的 MES 业务员账号（ERP 采购单未提供下单人时必填） */
+    /** 接单时填写的业务员名称（外部系统名称，不强制关联本地账号） */
     private String salesperson;
 
-    /** 接单时确认的签约主体（字典 sys_company；ERP 供方未匹配到时必填） */
+    /** 接单时确认的供方主体（字典 sys_company；ERP 供方未匹配到时必填） */
     private String signCompany;
 
     /** 行级交期调整 + 产品映射 */

@@ -74,6 +74,17 @@ public class SalOrderController extends BaseController
         return getDataTable(list);
     }
 
+    /**
+     * 销售订单下拉选项（任意登录用户可访问，供销售出库等页面跨域选择销售订单）
+     */
+    @GetMapping("/options")
+    public TableDataInfo options(SalOrder salOrder)
+    {
+        startPage();
+        List<SalOrder> list = salOrderService.selectSalOrderList(salOrder);
+        return getDataTable(list);
+    }
+
     @PreAuthorize("@ss.hasPermi('mes:sal:order:list')")
     @GetMapping("/listAll")
     public AjaxResult listAll()
@@ -183,7 +194,7 @@ public class SalOrderController extends BaseController
         return AjaxResult.success(salOrderService.updateWithLines(req));
     }
 
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:close')")
     @Log(title = "销售订单结单", businessType = BusinessType.UPDATE)
     @PutMapping("/close/{orderId}")
     public AjaxResult close(@PathVariable("orderId") Long orderId)
@@ -191,7 +202,7 @@ public class SalOrderController extends BaseController
         return toAjax(salOrderService.closeOrder(orderId));
     }
 
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:cancel')")
     @Log(title = "销售订单取消", businessType = BusinessType.UPDATE)
     @PutMapping("/cancel/{orderId}")
     public AjaxResult cancel(@PathVariable("orderId") Long orderId)
@@ -199,7 +210,7 @@ public class SalOrderController extends BaseController
         return toAjax(salOrderService.cancelOrder(orderId));
     }
 
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:accept')")
     @Log(title = "销售订单接单", businessType = BusinessType.UPDATE)
     @PutMapping("/accept/{orderId}")
     public AjaxResult accept(@PathVariable("orderId") Long orderId,
@@ -211,7 +222,7 @@ public class SalOrderController extends BaseController
     }
 
     /** 接单默认关联：按已记录的两系统映射回填 MES 客户/产品 */
-    @PreAuthorize("@ss.hasPermi('mes:sal:order:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:sal:order:accept')")
     @GetMapping("/acceptDefaults/{orderId}")
     public AjaxResult acceptDefaults(@PathVariable("orderId") Long orderId)
     {

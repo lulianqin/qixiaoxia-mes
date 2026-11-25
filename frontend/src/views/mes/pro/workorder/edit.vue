@@ -48,10 +48,10 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="工艺路线">
+              <el-form-item label="工艺路线" prop="routeProductId">
                 <el-select v-model="routeProductId" placeholder="请选择" style="width:100%" filterable @change="onRouteChange">
-                  <el-option v-for="r in routeOptions" :key="r.recordId"
-                    :label="(r._routeName || '路线#' + r.routeId) + ' — ' + r.itemName" :value="r.recordId" />
+                  <el-option v-for="r in routeOptions" :key="r.routeId"
+                    :label="r._routeName" :value="r.routeId" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -109,17 +109,31 @@
           </el-row>
           <el-row :gutter="12">
             <el-col :span="24">
-              <el-form-item label="印刷要求"><el-input v-model="form.printingReq" placeholder="如1色满版黑印刷" /></el-form-item>
+              <el-form-item label="印刷要求">
+                <el-input v-model="form.printingReq" type="textarea" :autosize="{ minRows: 2 }" placeholder="如1色满版黑印刷" />
+              </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="12">
             <el-col :span="24">
-              <el-form-item label="包装要求"><el-input v-model="form.packageReq" placeholder="如250个/箱,贴唛头" /></el-form-item>
+              <el-form-item label="包装要求">
+                <el-input v-model="form.packageReq" type="textarea" :autosize="{ minRows: 2 }" placeholder="如250个/箱,贴唛头" />
+              </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="12">
             <el-col :span="24">
-              <el-form-item label="发货要求"><el-input v-model="form.shippingReq" placeholder="分批发货、指定物流" /></el-form-item>
+              <el-form-item label="发货要求">
+                <el-input v-model="form.shippingReq" type="textarea" :autosize="{ minRows: 2 }" placeholder="分批发货、指定物流" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="24">
+              <el-form-item label="工艺流程">
+                <el-input v-model="form.processFlow" type="textarea" :autosize="{ minRows: 2 }"
+                  placeholder="默认按工艺路线的工序节点自动生成，可手动调整" />
+              </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="12">
@@ -132,7 +146,7 @@
           </el-row>
           <el-row :gutter="12">
             <el-col :span="24">
-              <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item>
+              <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :autosize="{ minRows: 2 }" /></el-form-item>
             </el-col>
           </el-row>
 
@@ -191,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue'
+import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -205,7 +219,7 @@ import { listRouteProductBomByRouteId } from '@/api/mes/pro/routeproductbom'
 import { listBom } from '@/api/mes/md/bom'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
 import { getDicts } from '@/api/system/dict/data'
@@ -223,7 +237,7 @@ const mode = ref<'add' | 'edit' | 'view' | 'copy'>('add')
 const workorderId = ref<number | null>(null)
 const activeTab = ref('base')
 const submitting = ref(false)
-const autoGen = ref(false)
+const autoGen = ref(true)
 
 const formRef = ref()
 const extAttrRef = ref()
@@ -236,7 +250,10 @@ const processOptions = ref<any[]>([])
 const routeProcesses = ref<any[]>([])
 const attrSchema = ref<any[]>([])
 const orderTypeOptions = ref<any[]>([])
+/** 当前选中的工艺路线ID（下拉选项为全部可用路线，与产品无关） */
 const routeProductId = ref<number | null>(null)
+/** 当前产品已建立的「产品+路线」绑定（用于路线切换时回填绑定ID） */
+const itemRouteBindings = ref<any[]>([])
 
 const purchaseDocs = ref<any[]>([])
 const processDocs = ref<any[]>([])
@@ -268,8 +285,8 @@ const form = reactive<any>({
   workorderCode: null, workorderName: null, workorderType: 'SELF', orderSource: 'MANUAL',
   productId: null, productCode: null, productName: null, productSpc: null,
   unitOfMeasure: 'PCS', unitName: '个', quantity: 1, status: 'PREPARE',
-  clientOrderCode: null, orderType: 'STANDARD', productSize: null, printingReq: null,
-  packageReq: null, shippingReq: null, productImage: null, lineAttrs: {},
+  clientOrderCode: null, orderType: null, productSize: null, printingReq: null,
+  packageReq: null, shippingReq: null, processFlow: null, productImage: null, lineAttrs: {},
   requestDate: null, remark: null, ownerId: null, ownerName: null,
   sourceCode: null, salesOrderLineId: null, routeProductId: null
 })
@@ -279,7 +296,16 @@ const rules = {
   workorderName: [{ required: true, message: '名称不能为空', trigger: 'blur' }],
   productId: [{ required: true, message: '请选择产品', trigger: 'change' }],
   ownerId: [{ required: true, message: '请选择工单负责人', trigger: 'change' }],
-  quantity: [{ required: true, message: '数量不能为空', trigger: 'blur' }]
+  quantity: [{ required: true, message: '数量不能为空', trigger: 'blur' }],
+  // 未绑定产品的路线以负 recordId 作为临时选项，校验以当前选中值为准
+  routeProductId: [{
+    required: true,
+    trigger: 'change',
+    validator: (_rule: any, _value: any, callback: any) => {
+      if (routeProductId.value) callback()
+      else callback(new Error('请选择工艺路线'))
+    }
+  }]
 }
 
 const readonly = computed(() => mode.value === 'view')
@@ -298,19 +324,32 @@ const docCount = computed(() => purchaseDocs.value.length + processDocs.value.le
 const productAttrs = computed(() => (attrSchema.value || []).filter((a: any) => (a.attrScope || 'PRODUCT') === 'PRODUCT'))
 const productionAttrs = computed(() => (attrSchema.value || []).filter((a: any) => a.attrScope === 'PRODUCTION'))
 
+/** 工艺流程：新增工单时随工艺路线/工序增删改实时刷新（工序节点以「-」拼接）；编辑工单不自动变动 */
+function syncProcessFlow() {
+  if (mode.value !== 'add') return
+  form.processFlow = routeProcesses.value.map((p: any) => p.processName).filter(Boolean).join('-')
+}
+watch(routeProcesses, syncProcessFlow, { deep: true })
+
 onMounted(() => {
   const id = route.query.workorderId ? Number(route.query.workorderId) : null
   const sourceId = route.query.sourceWorkorderId ? Number(route.query.sourceWorkorderId) : null
   mode.value = (route.query.mode as any) || (id ? 'edit' : 'add')
   workorderId.value = id
   loadProcessOptions()
+  loadAllRoutes()
   routeConfig.purchaser = useUserStore().name || ''
-  getDicts('mes_sal_order_type').then((r: any) => { orderTypeOptions.value = r.data || [] })
+  getDicts('mes_source_order_type').then((r: any) => { orderTypeOptions.value = r.data || [] })
   searchOwners('')
   if (mode.value === 'copy' && sourceId) loadCopyTemplate(sourceId)
   else if (id) loadDetail(id)
   else initFromSalesOrder()
-  if ((mode.value === 'add' || mode.value === 'copy') && !form.workorderCode) form.workorderCode = ''
+  if (mode.value === 'add') {
+    // 新增工单默认自动生成编码，关闭开关后可手动输入
+    genSerialCode('WORKORDER_NO').then((r: any) => { form.workorderCode = r.data })
+  } else if (mode.value === 'copy' && !form.workorderCode) {
+    form.workorderCode = ''
+  }
 })
 
 function loadProcessOptions() {
@@ -354,7 +393,8 @@ async function loadSalesOrderPrefill(orderCode: string, lineId: number | null) {
     form.clientName = order.clientName
     form.clientOrderCode = order.clientOrderCode
     form.salesperson = order.salesperson
-    form.orderType = order.orderType || form.orderType
+    // 订单类型取销售订单的源订单类型（ERP 采购单原类型：新单/翻单/异常单/打样）
+    form.orderType = order.sourceOrderType || form.orderType || null
     form.salesOrderLineId = line.lineId
     form.quantity = Number(line.quantityConvertible ?? line.quantity) || 1
     form.requestDate = normalizeDateTime(line.requestDate || order.requestDate)
@@ -402,34 +442,21 @@ function extractRemarkSection(text: any, label: string): string | null {
 
 /** 预填销售明细的工艺路线与工序；路线不属于当前产品时按默认重新解析 */
 async function prefillRouteFromLine(line: any, order: any) {
-  let routeProductIdValue = line.routeProductId || null
+  const routeProductIdValue = line.routeProductId || null
   let routeId = null
-  let routeName = line.routeName || null
   if (routeProductIdValue) {
     const rp: any = await getRouteProduct(routeProductIdValue)
     routeId = rp.data?.routeId || null
   }
   if (!routeId) {
     const r: any = await resolveRouteProduct({
-      itemId: line.productId, orderType: form.orderType,
+      itemId: line.productId, orderType: order?.orderType || form.orderType,
       outsourceFlag: order?.outsourceFlag, packageFlag: order?.packageFlag
     })
-    if (r.data?.matched) {
-      routeProductIdValue = r.data.routeProductId
-      routeId = r.data.routeId
-      routeName = r.data.routeName || routeName
-    }
+    if (r.data?.matched) routeId = r.data.routeId
   }
-  if (!routeProductIdValue) return
-  routeProductId.value = routeProductIdValue
-  form.routeProductId = routeProductIdValue
-  if (!routeOptions.value.some((o: any) => o.recordId === routeProductIdValue)) {
-    routeOptions.value.unshift({
-      recordId: routeProductIdValue, routeId, itemId: form.productId, itemName: form.productName,
-      routeCode: line.routeCode, _routeName: routeName || ('路线#' + routeProductIdValue)
-    })
-  }
-  if (routeId) await loadRouteProcesses(routeId)
+  if (!routeId) return
+  await selectRoute(routeId)
 }
 
 function loadDetail(id: number) {
@@ -438,7 +465,12 @@ function loadDetail(id: number) {
     Object.assign(form, d.workorder || {})
     form.requestDate = normalizeDateTime(form.requestDate)
     if (!form.lineAttrs) form.lineAttrs = {}
-    routeProductId.value = form.routeProductId
+    // 已保存的是「产品+路线」绑定ID，需解析回路线ID用于下拉回显
+    if (form.routeProductId) {
+      getRouteProduct(form.routeProductId).then((rp: any) => {
+        routeProductId.value = rp.data?.routeId || null
+      })
+    }
     routeProcesses.value = d.routeProcesses || []
     bomRows.value = d.bomList || []
     routeConfig.productName = form.productName || ''
@@ -463,7 +495,11 @@ function loadCopyTemplate(sourceId: number) {
     form.status = 'PREPARE'
     form.requestDate = normalizeDateTime(form.requestDate)
     if (!form.lineAttrs) form.lineAttrs = {}
-    routeProductId.value = form.routeProductId
+    if (form.routeProductId) {
+      getRouteProduct(form.routeProductId).then((rp: any) => {
+        routeProductId.value = rp.data?.routeId || null
+      })
+    }
     routeProcesses.value = d.routeProcesses || []
     bomRows.value = d.bomList || []
     routeConfig.productName = form.productName || ''
@@ -582,7 +618,7 @@ function pickOrderLine(line: any) {
   ElMessage.success('已关联销售订单行，可继续微调数量、交期与单据')
 }
 
-function onProductSelected(row: any, keepRoute = false) {
+async function onProductSelected(row: any, keepRoute = false) {
   if (!row) return
   form.productId = row.itemId
   form.productCode = row.itemCode
@@ -593,12 +629,21 @@ function onProductSelected(row: any, keepRoute = false) {
   form.unitName = row.unitName
   if (!form.productImage && row.imageUrl) form.productImage = row.imageUrl
   loadSchema(row.itemId)
-  if (!keepRoute) {
-    routeProductId.value = null
-    routeOptions.value = []
+  if (!routeOptions.value.length) await loadAllRoutes()
+  await loadItemRouteBindings(row.itemId)
+  if (keepRoute) return
+  // 切换产品只重新选中该产品关联的路线；无关联时保留当前路线，仅按新产品刷新工序与 BOM
+  const availableBound = itemRouteBindings.value.filter((b: any) =>
+    routeOptions.value.some((o: any) => o.routeId === b.routeId))
+  const associated = availableBound.find((b: any) => b.isDefault === 'Y') || availableBound[0]
+  if (associated) {
+    await selectRoute(associated.routeId)
+  } else if (routeProductId.value) {
+    form.routeProductId = null
+    await loadRouteProcesses(routeProductId.value)
+  } else {
     routeProcesses.value = []
   }
-  return loadRoutes(row.itemId)
 }
 
 function loadSchema(productId: number) {
@@ -610,32 +655,43 @@ function loadSchema(productId: number) {
   })
 }
 
-function loadRoutes(itemId: number) {
-  return Promise.all([
-    listRouteProduct({ itemId, pageSize: 100 }),
-    listRoute({ pageSize: 1000 })
-  ]).then(([rpRes, rtRes]: any[]) => {
-    const map: Record<string, string> = {}
-    ;(rtRes.rows || []).forEach((rt: any) => { map[rt.routeId] = rt.routeName || rt.routeCode })
-    const bound = (rpRes.rows || []).map((rp: any) => ({ ...rp, _routeName: map[rp.routeId] }))
-    if (bound.length) {
-      routeOptions.value = bound
-      return
-    }
-    // 产品未绑定工艺路线：允许选择现有任意路线，保存时后端自动建立绑定
+/** 加载全部可用工艺路线（下拉选项与产品无关，切换产品不重建列表） */
+function loadAllRoutes() {
+  return listRoute({ pageSize: 1000 }).then((rtRes: any) => {
     routeOptions.value = (rtRes.rows || []).map((rt: any) => ({
-      recordId: -rt.routeId, routeId: rt.routeId, itemId, itemName: '',
-      _routeName: map[rt.routeId] || ('路线#' + rt.routeId), __unbound: true
+      routeId: rt.routeId,
+      routeCode: rt.routeCode,
+      _routeName: rt.routeName || rt.routeCode || ('路线#' + rt.routeId)
     }))
   })
 }
 
-function onRouteChange(recordId: number) {
-  const rp = routeOptions.value.find((r: any) => r.recordId === recordId)
-  if (!rp) return
-  routeProductId.value = rp.__unbound ? null : recordId
-  form.routeProductId = rp.__unbound ? null : recordId
-  loadRouteProcesses(rp.routeId)
+/** 加载当前产品已建立的「产品+路线」绑定 */
+function loadItemRouteBindings(itemId: number) {
+  itemRouteBindings.value = []
+  if (!itemId) return Promise.resolve()
+  return listRouteProduct({ itemId, pageSize: 100 }).then((rpRes: any) => {
+    itemRouteBindings.value = rpRes.rows || []
+  })
+}
+
+/** 当前产品已关联该路线则返回绑定记录ID，未关联返回 null（保存时后端自动建立关联） */
+function bindingIdOf(routeId: number | null): number | null {
+  if (!routeId) return null
+  const b = itemRouteBindings.value.find((x: any) => x.routeId === routeId)
+  return b ? b.recordId : null
+}
+
+/** 选中路线：同步绑定ID并按路线装载工序与 BOM */
+async function selectRoute(routeId: number) {
+  if (!routeId || !routeOptions.value.some((o: any) => o.routeId === routeId)) return
+  routeProductId.value = routeId
+  form.routeProductId = bindingIdOf(routeId)
+  await loadRouteProcesses(routeId)
+}
+
+function onRouteChange(routeId: number) {
+  selectRoute(routeId)
 }
 
 /** 按路线加载工序与 BOM（开单页与销售订单预填共用） */
@@ -688,7 +744,7 @@ function loadBomRows(routeId: number, itemId: number) {
 
 function searchOwners(kw: string) {
   ownerLoading.value = true
-  listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
+  listUserOptions({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
     .then((r: any) => { ownerOptions.value = r.rows || [] })
     .finally(() => { ownerLoading.value = false })
 }
@@ -775,7 +831,8 @@ function submit() {
       workorder: {
         ...form,
         requestDate: normalizeDateTime(form.requestDate),
-        routeProductId: routeProductId.value || form.routeProductId
+        // 未绑定路线时留空，由后端按所选工序的 routeId 自动建立绑定
+        routeProductId: form.routeProductId || null
       },
       bomList: bomRows.value,
       paramList: [],

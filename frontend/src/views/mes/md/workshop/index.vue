@@ -156,7 +156,7 @@ import { getCurrentInstance } from 'vue'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdWorkshop, WorkshopQueryParams } from '@/types/api/mes/md/workshop'
 import { listWorkshop, getWorkshop, delWorkshop, addWorkshop, updateWorkshop } from '@/api/mes/md/workshop'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
@@ -164,7 +164,7 @@ const { sys_yes_no } = useDict('sys_yes_no')
 // 负责人下拉数据源（预加载 SysUser 列表，表单存 userName，展示 nickName）
 const userOptions = ref<any[]>([])
 function loadUserOptions() {
-  listUser({ pageNum: 1, pageSize: 999 } as any).then((res: any) => {
+  listUserOptions({ pageNum: 1, pageSize: 999 } as any).then((res: any) => {
     userOptions.value = res.rows || []
   })
 }

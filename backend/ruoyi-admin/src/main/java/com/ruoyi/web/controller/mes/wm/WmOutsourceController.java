@@ -314,7 +314,7 @@ public class WmOutsourceController extends BaseController
         return AjaxResult.success();
     }
 
-    /** 删除草稿外协单（仅 DRAFT 状态，未扣库存，级联删发料行） */
+    /** 删除草稿外协单（仅 DRAFT 状态，未扣库存，主表软删除，发料行保留） */
     @PreAuthorize("@ss.hasPermi('mes:wm:outsource:remove')")
     @Log(title = "外协发货", businessType = BusinessType.DELETE)
     @DeleteMapping("/{orderId}")

@@ -64,7 +64,7 @@
           <el-row>
             <el-col :span="12">
               <el-form-item label="印刷要求" prop="printingReq">
-                <el-input v-model="form.printingReq" placeholder="如1色满版黑印刷" />
+                <el-input v-model="form.printingReq" type="textarea" :autosize="{ minRows: 2 }" placeholder="如1色满版黑印刷" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -76,17 +76,17 @@
           <el-row>
             <el-col :span="12">
               <el-form-item label="包装要求" prop="packageReq">
-                <el-input v-model="form.packageReq" type="textarea" :rows="2" placeholder="如500个/箱,贴唛头" />
+                <el-input v-model="form.packageReq" type="textarea" :autosize="{ minRows: 2 }" placeholder="如500个/箱,贴唛头" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="发货要求" prop="shippingReq">
-                <el-input v-model="form.shippingReq" type="textarea" :rows="2" placeholder="发货要求" />
+                <el-input v-model="form.shippingReq" type="textarea" :autosize="{ minRows: 2 }" placeholder="发货要求" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-form-item label="备注" prop="remark">
-            <el-input v-model="form.remark" type="textarea" :rows="2" />
+            <el-input v-model="form.remark" type="textarea" :autosize="{ minRows: 2 }" />
           </el-form-item>
         </el-form>
       </el-tab-pane>
@@ -226,9 +226,19 @@ async function loadRouteOptions(selectResolved = true) {
     if (seq !== routeReqSeq || form.productId !== itemId || !showFlag.value) return
     const routeMap: Record<number, string> = {}
     ;(routeRes.rows || []).forEach((rt: any) => { routeMap[rt.routeId] = rt.routeName || rt.routeCode })
-    routeOptions.value = (bindRes.rows || []).map((rp: any) => ({
+    const bound = (bindRes.rows || []).map((rp: any) => ({
       ...rp, _routeName: routeMap[rp.routeId] || ('路线#' + rp.routeId)
     }))
+    const boundRouteIds = new Set(bound.map((rp: any) => rp.routeId))
+    // 展示全部路线：未与产品绑定的以负 recordId 作为临时选项，保存订单时后端自动建立「产品+路线」绑定
+    const unbound = (routeRes.rows || [])
+      .filter((rt: any) => !boundRouteIds.has(rt.routeId))
+      .map((rt: any) => ({
+        recordId: -rt.routeId, routeId: rt.routeId, itemId,
+        routeCode: rt.routeCode, _routeName: routeMap[rt.routeId] || ('路线#' + rt.routeId),
+        itemName: form.productName, isDefault: 'N', __unbound: true
+      }))
+    routeOptions.value = [...bound, ...unbound]
     // 历史路线可能属于其它产品（如 ERP 接单换过产品），不在候选内视为孤儿路线：
     // 按当前产品重新解析默认路线，解析不到则清空，避免下拉直接显示 recordId
     const orphan = form.routeProductId != null

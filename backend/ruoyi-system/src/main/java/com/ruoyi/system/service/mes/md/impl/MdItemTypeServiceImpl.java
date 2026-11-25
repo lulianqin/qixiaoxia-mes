@@ -187,9 +187,8 @@ public class MdItemTypeServiceImpl implements IMdItemTypeService
     /** 存在子分类时不允许删除，避免产生孤儿节点 */
     private void checkChildExists(Long itemTypeId)
     {
-        MdItemType query = new MdItemType();
-        query.setParentTypeId(itemTypeId);
-        if (!mdItemTypeMapper.selectMdItemTypeList(query).isEmpty())
+        // 必须按 parent_type_id 精确查询子分类（selectMdItemTypeList 不支持按父级过滤）
+        if (!mdItemTypeMapper.selectMdItemTypeByParentId(itemTypeId).isEmpty())
         {
             MdItemType self = mdItemTypeMapper.selectMdItemTypeById(itemTypeId);
             String name = self == null ? String.valueOf(itemTypeId) : self.getItemTypeName();

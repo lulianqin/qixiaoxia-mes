@@ -268,4 +268,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         delete from qxx_sal_quote_line where quote_id = #{quoteId}
     </delete>
 
+    <!-- 软删除报价单：主表打标，明细行保留以便追溯（列表/详情已按 del_flag 过滤） -->
+    <update id="deleteSalQuoteByQuoteId" parameterType="Long">
+        update qxx_sal_quote set del_flag = '2' where quote_id = #{quoteId}
+    </update>
+
 </mapper>

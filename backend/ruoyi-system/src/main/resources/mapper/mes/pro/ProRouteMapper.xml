@@ -46,9 +46,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <foreach item="routeId" collection="routeIds" open="(" separator="," close=")">#{routeId}</foreach>
     </select>
 
+    <!-- 路线编码唯一性校验：匹配全部记录（含已软删），编码不允许复用；GET 的 del_flag 过滤保持原样 -->
     <select id="selectProRouteByRouteCode" parameterType="String" resultMap="ProRouteResult">
         <include refid="selectProRouteVo"/>
-        where route_code = #{routeCode} and del_flag = '0'
+        where route_code = #{routeCode}
     </select>
 
     <insert id="insertProRoute" parameterType="ProRoute" useGeneratedKeys="true" keyProperty="routeId">
@@ -94,14 +95,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where route_id = #{routeId}
     </update>
 
-    <delete id="deleteProRouteByRouteId" parameterType="Long">
-        delete from qxx_pro_route where route_id = #{routeId}
-    </delete>
+    <!-- 删除改为软删除：仅置 del_flag='2'；factory_id 由拦截器注入 -->
+    <update id="deleteProRouteByRouteId" parameterType="Long">
+        update qxx_pro_route set del_flag = '2' where route_id = #{routeId}
+    </update>
 
-    <delete id="deleteProRouteByRouteIds">
-        delete from qxx_pro_route where route_id in
+    <update id="deleteProRouteByRouteIds">
+        update qxx_pro_route set del_flag = '2' where route_id in
         <foreach item="routeId" collection="array" open="(" separator="," close=")">
             #{routeId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

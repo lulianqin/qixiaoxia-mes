@@ -219,14 +219,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         WHERE order_id = #{orderId}
     </update>
 
-    <delete id="deletePurOrderByOrderId" parameterType="Long">
-        delete from qxx_pur_order where order_id = #{orderId}
-    </delete>
+    <!-- 删除改为软删除：仅置 del_flag='2'，明细 qxx_pur_order_line 保留原样；factory_id 由拦截器注入 -->
+    <update id="deletePurOrderByOrderId" parameterType="Long">
+        update qxx_pur_order set del_flag = '2' where order_id = #{orderId}
+    </update>
 
-    <delete id="deletePurOrderByOrderIds" >
-        delete from qxx_pur_order where order_id in 
+    <update id="deletePurOrderByOrderIds" >
+        update qxx_pur_order set del_flag = '2' where order_id in
         <foreach item="orderId" collection="array" open="(" separator="," close=")">
             #{orderId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

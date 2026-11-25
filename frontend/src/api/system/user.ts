@@ -11,6 +11,15 @@ export function listUser(query: UserQueryParams): Promise<TableDataInfo<SysUser[
   })
 }
 
+// 查询用户下拉选项（任意登录用户可访问，用于负责人/指派人选择）
+export function listUserOptions(query: UserQueryParams): Promise<TableDataInfo<SysUser[]>> {
+  return request({
+    url: '/system/user/options',
+    method: 'get',
+    params: query
+  })
+}
+
 // 查询用户详细
 export function getUser(userId?: number): Promise<UserFormDataResult> {
   return request({

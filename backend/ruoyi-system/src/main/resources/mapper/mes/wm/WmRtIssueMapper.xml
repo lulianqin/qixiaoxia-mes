@@ -168,16 +168,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where rt_id = #{rtId}
     </update>
 
-    <delete id="deleteWmRtIssueByRtId" parameterType="Long">
-        delete from qxx_wm_rt_issue where rt_id = #{rtId}
-    </delete>
+    <update id="deleteWmRtIssueByRtId" parameterType="Long">
+        update qxx_wm_rt_issue set del_flag = '2' where rt_id = #{rtId}
+    </update>
 
-    <delete id="deleteWmRtIssueByRtIds">
-        delete from qxx_wm_rt_issue where rt_id in
+    <update id="deleteWmRtIssueByRtIds">
+        update qxx_wm_rt_issue set del_flag = '2' where rt_id in
         <foreach item="rtId" collection="array" open="(" separator="," close=")">
             #{rtId}
         </foreach>
-    </delete>
+    </update>
 
     <update id="updateRtIssueHeaderRefs">
         update qxx_wm_rt_issue

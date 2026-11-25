@@ -63,7 +63,7 @@ function load() {
   if (query.clientName) params.append('clientName', query.clientName)
   // 注意：本项目 request 拦截器对 GET params 走 tansParams(Object.keys 遍历)，
   // URLSearchParams 无枚举键会被清空，故把重复 key 查询串直接拼到 URL
-  request.get('/mes/sal/order/list?' + params.toString()).then((r: any) => {
+  request.get('/mes/sal/order/options?' + params.toString()).then((r: any) => {
     list.value = r.rows
     total.value = r.total
   }).finally(() => { loading.value = false })

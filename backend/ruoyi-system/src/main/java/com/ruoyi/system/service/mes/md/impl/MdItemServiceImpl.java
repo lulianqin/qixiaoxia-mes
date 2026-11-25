@@ -64,7 +64,8 @@ public class MdItemServiceImpl implements IMdItemService
     @Override
     public void expandItemTypeFilter(MdItem mdItem)
     {
-        if (mdItem == null || mdItem.getItemTypeId() == null || mdItem.getItemTypeId() == 0)
+        if (mdItem == null || Boolean.TRUE.equals(mdItem.getUncategorized())
+                || mdItem.getItemTypeId() == null || mdItem.getItemTypeId() == 0)
         {
             return;
         }

@@ -24,10 +24,10 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5"><el-button type="primary" plain icon="Link" size="small" @click="handleFromPurOrder" v-hasPermi="['mes:wm:itemrecpt:add']">从采购单生成</el-button></el-col>
-      <el-col :span="1.5"><el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:wm:itemrecpt:edit']">修改</el-button></el-col>
-      <el-col :span="1.5"><el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:wm:itemrecpt:remove']">删除</el-button></el-col>
-      <el-col :span="1.5"><el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:itemrecpt:export']">导出</el-button></el-col>
+      <el-col :span="1.5"><el-button type="primary" plain icon="Link" size="small" @click="handleFromPurOrder" v-hasPermi="['mes:wm:item_recpt:add']">从采购单生成</el-button></el-col>
+      <el-col :span="1.5"><el-button type="success" plain icon="Edit" size="small" :disabled="single" @click="handleUpdate()" v-hasPermi="['mes:wm:item_recpt:edit']">修改</el-button></el-col>
+      <el-col :span="1.5"><el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete()" v-hasPermi="['mes:wm:item_recpt:remove']">删除</el-button></el-col>
+      <el-col :span="1.5"><el-button type="warning" plain icon="Download" size="small" @click="handleExport" v-hasPermi="['mes:wm:item_recpt:export']">导出</el-button></el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
 
@@ -58,11 +58,11 @@
       </el-table-column>
       <el-table-column fixed="right" label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']"></el-button></el-tooltip>
-          <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:itemrecpt:remove']"></el-button></el-tooltip>
+          <el-tooltip content="修改" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:wm:item_recpt:edit']"></el-button></el-tooltip>
+          <el-tooltip content="删除" placement="top" v-if="isEditable(scope.row)"><el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['mes:wm:item_recpt:remove']"></el-button></el-tooltip>
           <el-tooltip content="确认收货" placement="top" v-if="scope.row.status === 'DRAFT'"><el-button link type="success" icon="Check" @click="handleConfirm(scope.row)"></el-button></el-tooltip>
           <el-tooltip content="打印批次标签" placement="top" v-if="scope.row.status !== 'DRAFT'"><el-button link type="primary" icon="Printer" @click="handlePrintLabels(scope.row)"></el-button></el-tooltip>
-          <el-button v-if="scope.row.status === 'CONFIRMED'" link type="warning" size="small" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:itemrecpt:edit']">过账</el-button>
+          <el-button v-if="scope.row.status === 'CONFIRMED'" link type="warning" size="small" @click="handlePost(scope.row)" v-hasPermi="['mes:wm:item_recpt:edit']">过账</el-button>
         </template>
       </el-table-column>
     </el-table>

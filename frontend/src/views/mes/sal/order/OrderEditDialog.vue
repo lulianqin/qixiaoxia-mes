@@ -13,7 +13,7 @@
           </el-form-item>
         </el-col>
         <el-col :span="8"><el-form-item label="客户PO号" prop="clientOrderCode"><el-input v-model="form.clientOrderCode" placeholder="客户PO号" /></el-form-item></el-col>
-        <el-col :span="8"><el-form-item label="业务员" prop="salesperson"><el-select v-model="form.salesperson" placeholder="请选择业务员" clearable filterable style="width:100%"><el-option v-for="u in userOptions" :key="u.userName" :label="u.nickName || u.userName" :value="u.nickName || u.userName" /></el-select></el-form-item></el-col>
+        <el-col :span="8"><el-form-item label="业务员" prop="salesperson"><el-select v-model="form.salesperson" placeholder="请选择或输入业务员" clearable filterable allow-create default-first-option style="width:100%"><el-option v-for="u in userOptions" :key="u.userName" :label="u.nickName || u.userName" :value="u.nickName || u.userName" /></el-select></el-form-item></el-col>
       </el-row>
       <el-row>
         <el-col :span="6"><el-form-item label="业务线" prop="businessLine"><el-select v-model="form.businessLine" placeholder="请选择" style="width:100%"><el-option label="内贸" value="DOMESTIC" /><el-option label="外贸" value="FOREIGN" /><el-option label="现货" value="SPOT" /></el-select></el-form-item></el-col>
@@ -24,11 +24,16 @@
       <el-row>
         <el-col :span="6"><el-form-item label="是否外发" prop="outsourceFlag"><el-switch v-model="form.outsourceFlag" active-value="Y" inactive-value="N" @change="onHeadDimensionChange" /></el-form-item></el-col>
         <el-col :span="6"><el-form-item label="是否包装" prop="packageFlag"><el-switch v-model="form.packageFlag" active-value="Y" inactive-value="N" @change="onHeadDimensionChange" /></el-form-item></el-col>
-        <el-col :span="12">
-          <el-form-item label="签约主体" prop="signCompany">
-            <el-select v-model="form.signCompany" placeholder="请选择签约主体" clearable filterable style="width:100%">
+        <el-col :span="6">
+          <el-form-item label="供方主体" prop="signCompany">
+            <el-select v-model="form.signCompany" placeholder="请选择供方主体" clearable filterable style="width:100%">
               <el-option v-for="d in companyOptions" :key="d.dictValue" :label="d.dictLabel" :value="d.dictValue" />
             </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="6">
+          <el-form-item label="需方主体" prop="demanderName">
+            <el-input v-model="form.demanderName" placeholder="需方主体名称" clearable />
           </el-form-item>
         </el-col>
       </el-row>
@@ -75,7 +80,7 @@ import { getOrderDetail, createOrderWithLines, updateOrderWithLines } from '@/ap
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { resolveRouteProductBatch } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { getDicts } from '@/api/system/dict/data'
 import ClientSelect from '@/components/clientSelect/single.vue'
 import LineEdit from './LineEdit.vue'
@@ -93,7 +98,7 @@ export default {
       open: false, optType: undefined, autoGenFlag: true,
       // 业务员选项列表(SysUser,存展示用姓名 nickName,与客户/成品销售的 salesperson 口径一致)
       userOptions: [],
-      // 签约主体字典(sys_company)
+      // 供方主体字典(sys_company)
       companyOptions: [],
       form: {}, lineList: [],
       lineEditOpen: false, editingLine: null,
@@ -102,7 +107,7 @@ export default {
       rules: {
         orderCode: [{ required: true, message: '销售订单号不能为空', trigger: 'blur' }],
         orderName: [{ required: true, message: '订单名称不能为空', trigger: 'blur' }],
-        signCompany: [{ required: true, message: '签约主体不能为空', trigger: 'change' }]
+        signCompany: [{ required: true, message: '供方主体不能为空', trigger: 'change' }]
       }
     }
   },
@@ -111,13 +116,13 @@ export default {
   },
   created() { this.loadUserOptions(); this.loadCompanyOptions() },
   methods: {
-    /** 签约主体选项（字典 sys_company） */
+    /** 供方主体选项（字典 sys_company） */
     loadCompanyOptions() {
       getDicts('sys_company').then(r => { this.companyOptions = r.data || [] })
     },
     /** 业务员下拉数据源：按展示名去重(重复 value 会导致 el-select 的 filterable 过滤失效) */
     loadUserOptions() {
-      listUser({ pageSize: 999 }).then(r => {
+      listUserOptions({ pageSize: 999 }).then(r => {
         const seen = new Set()
         this.userOptions = (r.rows || []).filter(u => {
           const name = u.nickName || u.userName
@@ -134,7 +139,7 @@ export default {
       getOrderDetail(id).then(r => { this.form = r.data; this.lineList = r.data.lines || []; this.open = true })
     },
     reset() {
-      this.form = { orderId: null, orderCode: null, orderName: null, signCompany: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, productionRemark: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
+      this.form = { orderId: null, orderCode: null, orderName: null, signCompany: null, demanderName: null, orderType: 'STANDARD', clientId: null, clientCode: null, clientName: null, clientOrderCode: null, productionRemark: null, salesperson: null, businessLine: null, sampleFlag: 'N', outsourceFlag: 'N', packageFlag: 'N', orderDate: null, requestDate: null, totalAmount: 0, paymentMethod: null, status: 'PENDING_ACCEPT', remark: null }
       this.lineList = []; this.autoGenFlag = true; this.resetForm('form')
     },
     cancel() { this.open = false; this.reset() },

@@ -438,7 +438,7 @@ import { listAllProcess } from '@/api/mes/pro/process'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { getDicts } from '@/api/system/dict/data'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import ItemSelect from '@/components/itemSelect/single.vue'
 
 export default {
@@ -520,7 +520,7 @@ export default {
     searchOwnerOptions() {
       if (this.ownerLoading) return
       this.ownerLoading = true
-      listUser({ pageNum: 1, pageSize: 200, status: '0' }).then(r => {
+      listUserOptions({ pageNum: 1, pageSize: 200, status: '0' }).then(r => {
         this.ownerOptions = r.rows || []
       }).catch(() => {}).finally(() => { this.ownerLoading = false })
     },

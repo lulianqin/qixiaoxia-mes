@@ -33,4 +33,7 @@ public interface ISalQuoteService
 
     /** ERP 退回报价需求，允许重新报价 */
     void returnQuote(ErpQuoteReturnRequest req);
+
+    /** 软删除报价单（明细保留，列表不再展示） */
+    int deleteSalQuote(Long quoteId);
 }

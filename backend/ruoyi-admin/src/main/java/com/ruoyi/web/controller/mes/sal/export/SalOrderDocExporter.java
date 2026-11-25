@@ -110,7 +110,7 @@ public class SalOrderDocExporter
     {
         Row row = sh.createRow(r);
         row.setHeightInPoints(24);
-        set(row, 0, "订单编号：" + str(o.getOrderCode()), st.infoValue);
+        set(row, 0, "订单编号：" + docOrderNo(o), st.infoValue);
         merge(sh, r, r, 0, 1);
         set(row, 2, "客户名称：", st.infoLabel);
         set(row, 3, str(o.getClientName()), st.infoValue);
@@ -508,7 +508,7 @@ public class SalOrderDocExporter
           .append("</style></head><body>");
         sb.append("<div class='c t1'>").append(esc(signCompanyName(o))).append("</div>");
         sb.append("<div class='c t2'>业务订单</div>");
-        sb.append("<table class='info'><tr><td>订单编号：").append(esc(str(o.getOrderCode())))
+        sb.append("<table class='info'><tr><td>订单编号：").append(esc(docOrderNo(o)))
           .append("</td><td style='text-align:center'>客户名称：").append(esc(str(o.getClientName())))
           .append("</td><td style='text-align:right'>下单日期：").append(date(o.getOrderDate()))
           .append("</td></tr><tr><td>订单性质：").append(esc(exportOrderTypeText(o)))
@@ -573,7 +573,7 @@ public class SalOrderDocExporter
     // ═══════════════════ 工具 ═══════════════════
 
     /**
-     * 单据抬头取签约主体名称（字典 sys_company），未选择时回退公司配置。
+     * 单据抬头取供方主体名称（字典 sys_company），未选择时回退公司配置。
      */
     private String signCompanyName(SalOrder o)
     {
@@ -593,6 +593,12 @@ public class SalOrderDocExporter
     {
         String name = docProperties == null ? null : docProperties.getCompanyName();
         return name == null || name.isBlank() ? "企小侠MES" : name;
+    }
+
+    /** 单据「订单编号」展示客户PO号，未填写时回退内部销售订单号，避免单据单号为空 */
+    private String docOrderNo(SalOrder o)
+    {
+        return isBlank(o.getClientOrderCode()) ? str(o.getOrderCode()) : o.getClientOrderCode();
     }
 
     /** 单据标题取订单名称，未填写时回退默认「业务订单」 */

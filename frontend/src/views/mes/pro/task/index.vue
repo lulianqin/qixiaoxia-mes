@@ -271,7 +271,7 @@ import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { listRouteProduct } from '@/api/mes/pro/routeproduct'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { checkPermi } from '@/utils/permission'
 import { TASK_STATUS_LABEL as statusMap, TASK_STATUS_COLOR as statusColor } from '../taskStatus'
 import WorkstationSelect from '@/components/workstationSelect/single.vue'
@@ -347,8 +347,8 @@ async function doSearchUsers(kw: string, opts: typeof workerOptions, loading: ty
   try {
     // 系统用户列表仅支持账号/手机号模糊（不支持姓名），两路并发查询后按 userId 去重合并
     const [byName, byPhone] = await Promise.all([
-      listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
-      listUser({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
+      listUserOptions({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any),
+      listUserOptions({ phonenumber: kw || undefined, status: '0', pageNum: 1, pageSize: 20 } as any)
     ])
     const rows: any[] = [...((byName as any)?.rows || []), ...((byPhone as any)?.rows || [])]
     const dedup = rows.filter((r, i) => rows.findIndex(x => x.userId === r.userId) === i)

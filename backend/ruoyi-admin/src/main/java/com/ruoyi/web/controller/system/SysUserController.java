@@ -65,6 +65,23 @@ public class SysUserController extends BaseController
         return getDataTable(list);
     }
 
+    /**
+     * 用户下拉选项：任意登录用户可访问，供负责人/指派人等业务选择。
+     */
+    @GetMapping("/options")
+    public TableDataInfo options(SysUser user)
+    {
+        startPage();
+        List<SysUser> list = userService.selectUserList(user);
+        // 下拉选项不返回密码、登录 IP/时间等敏感字段
+        list.forEach(u -> {
+            u.setPassword(null);
+            u.setLoginIp(null);
+            u.setLoginDate(null);
+        });
+        return getDataTable(list);
+    }
+
     @Log(title = "用户管理", businessType = BusinessType.EXPORT)
     @PreAuthorize("@ss.hasPermi('system:user:export')")
     @PostMapping("/export")

@@ -59,7 +59,9 @@
           </el-table-column>
           <el-table-column label="物料名称" align="center" prop="itemName" min-width="120" :show-overflow-tooltip="true" />
           <el-table-column label="规格型号" align="center" prop="specification" width="150" :show-overflow-tooltip="true" />
-          <el-table-column label="分类" align="center" prop="itemTypeName" width="100" :show-overflow-tooltip="true" />
+          <el-table-column label="分类" align="center" prop="itemTypeName" width="100" :show-overflow-tooltip="true">
+            <template #default="scope">{{ scope.row.itemTypeName || '未分类' }}</template>
+          </el-table-column>
           <el-table-column label="主单位" align="center" prop="unitName" width="80" :show-overflow-tooltip="true" />
           <el-table-column label="启用" align="center" width="70">
         <template #default="scope">
@@ -291,12 +293,19 @@ function filterNode(value: string, data: any) {
   return data.label?.indexOf(value) !== -1
 }
 
+/** 左侧树「未分类」虚拟节点ID（非真实分类，仅用于筛选 item_type_id 为空/0 的物料） */
+const UNCATEGORIZED_TREE_ID = -1
+
 function loadTree() {
   treeData.value = []
   itemTypeTree.value = []
   unitOptions.value = []
   return Promise.all([
-    treeselect().then(r => { treeData.value = r.data || []; itemTypeTree.value = r.data || [] }),
+    treeselect().then(r => {
+      const types = r.data || []
+      treeData.value = [{ id: UNCATEGORIZED_TREE_ID, label: '未分类', disabled: false, children: [] } as TreeSelect, ...types]
+      itemTypeTree.value = types
+    }),
     listAllUnitmeasure().then(r => { unitOptions.value = r.data || [] })
   ])
 }
@@ -330,7 +339,13 @@ function loadEffAttrSchema(typeId: number) {
 
 function handleNodeClick(data: any) {
   if (data.disabled) return // 禁用的分类不触发查询
-  queryParams.value.itemTypeId = data.id
+  if (data.id === UNCATEGORIZED_TREE_ID) {
+    queryParams.value.itemTypeId = undefined
+    queryParams.value.uncategorized = true
+  } else {
+    queryParams.value.itemTypeId = data.id
+    queryParams.value.uncategorized = undefined
+  }
   handleQuery()
 }
 
@@ -374,7 +389,12 @@ function reset() {
 }
 
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
-function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
+function resetQuery() {
+  proxy.resetForm('queryRef')
+  queryParams.value.itemTypeId = undefined
+  queryParams.value.uncategorized = undefined
+  handleQuery()
+}
 function handleSelectionChange(s: MdItem[]) { ids.value = s.map(i => i.itemId!); single.value = s.length !== 1; multiple.value = !s.length }
 
 function handleAdd() {

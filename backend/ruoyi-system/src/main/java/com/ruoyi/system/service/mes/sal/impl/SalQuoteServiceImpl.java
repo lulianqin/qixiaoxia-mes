@@ -263,6 +263,18 @@ public class SalQuoteServiceImpl implements ISalQuoteService
         }
     }
 
+    @Override
+    public int deleteSalQuote(Long quoteId)
+    {
+        SalQuote exist = salQuoteMapper.selectSalQuoteByQuoteId(quoteId);
+        if (exist == null)
+        {
+            throw new ServiceException("报价单不存在");
+        }
+        // 主表软删除，明细行保留；列表/详情查询均已过滤 del_flag
+        return salQuoteMapper.deleteSalQuoteByQuoteId(quoteId);
+    }
+
     /** 报价单号：优先自动编码规则，未配置时退化到时间戳编码 */
     private String generateQuoteCode()
     {

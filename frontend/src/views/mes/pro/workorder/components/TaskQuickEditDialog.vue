@@ -87,7 +87,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { getTask, updateTask } from '@/api/mes/pro/task'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { listAllVendor } from '@/api/mes/md/vendor'
 
 const props = defineProps<{ modelValue: boolean }>()
@@ -139,7 +139,7 @@ function searchLeaders(kw: string) {
 async function searchUsers(kw: string, target: any, loading: any) {
   loading.value = true
   try {
-    const res: any = await listUser({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
+    const res: any = await listUserOptions({ userName: kw || undefined, status: '0', pageNum: 1, pageSize: 20 })
     target.value = res.rows || []
   } finally { loading.value = false }
 }

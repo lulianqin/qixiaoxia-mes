@@ -30,8 +30,10 @@ export interface SalOrder extends BaseEntity {
   factoryId?: number;
   orderCode?: string;
   orderName?: string;
-  /** 签约主体（字典 sys_company，对应 ERP 采购单供方） */
+  /** 供方主体（字典 sys_company，对应 ERP 采购单供方） */
   signCompany?: string;
+  /** 需方主体（ERP 采购单需方名称，外部来源原样保存） */
+  demanderName?: string;
   orderType?: string;
   /** 源订单类型（SRM 订单 Type：0未知 1新单 2翻单 3异常单 4打样） */
   sourceOrderType?: string;

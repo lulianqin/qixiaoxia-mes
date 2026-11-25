@@ -341,16 +341,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where workorder_id = #{workorderId}
     </update>
 
-    <delete id="deleteProWorkorderByWorkorderId" parameterType="Long">
-        delete from qxx_pro_workorder where workorder_id = #{workorderId}
-    </delete>
+    <!-- 删除改为软删除：仅置 del_flag='2'；库存预留释放等副作用仍在 Service 中执行；factory_id 由拦截器注入 -->
+    <update id="deleteProWorkorderByWorkorderId" parameterType="Long">
+        update qxx_pro_workorder set del_flag = '2' where workorder_id = #{workorderId}
+    </update>
 
-    <delete id="deleteProWorkorderByWorkorderIds">
-        delete from qxx_pro_workorder where workorder_id in
+    <update id="deleteProWorkorderByWorkorderIds">
+        update qxx_pro_workorder set del_flag = '2' where workorder_id in
         <foreach item="workorderId" collection="array" open="(" separator="," close=")">
             #{workorderId}
         </foreach>
-    </delete>
+    </update>
 
     <update id="addQuantityProduced">
         update qxx_pro_workorder
@@ -371,6 +372,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where workorder_id = #{workorderId}
           and status = 'PRODUCING'
     </update>
+
+    <!-- 工单编码唯一性校验：匹配全部记录（含已软删），编码不允许复用；factory_id 由拦截器注入 -->
+    <select id="checkWorkorderCodeUnique" parameterType="String" resultMap="ProWorkorderResult">
+        <include refid="selectProWorkorderVo"/>
+        where workorder_code = #{workorderCode}
+    </select>
 
     <!-- 按销售订单行反查工单产出产品（排除 CANCEL）。factory_id 由拦截器注入 -->
     <select id="selectProductIdsBySalesOrderLineId" parameterType="Long" resultType="java.lang.Long">

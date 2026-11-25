@@ -766,10 +766,9 @@ public class OutsourceServiceImpl implements IOutsourceService
         if (order == null) throw new ServiceException("外协单不存在");
         if (!STATUS_DRAFT.equals(order.getStatus()))
             throw new ServiceException("仅草稿状态外协单可删除，当前状态：" + order.getStatus());
-        lineMapper.deleteIssueLinesByOrderId(orderId);
-        processLineMapper.deleteByOrderId(orderId);
+        // 保留明细：发料行/工序行原样留存，仅主表软删除
         orderMapper.deleteOutsourceOrderByOrderId(orderId);
-        log.info("外协草稿单已删除: orderId={}, orderCode={}", orderId, order.getOrderCode());
+        log.info("外协草稿单已软删除: orderId={}, orderCode={}", orderId, order.getOrderCode());
     }
 
     @Override

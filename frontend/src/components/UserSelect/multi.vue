@@ -91,7 +91,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { listDept } from '@/api/system/dept'
 
 const props = defineProps<{
@@ -124,7 +124,7 @@ const queryParams = reactive({
 
 function getList() {
   loading.value = true
-  listUser(queryParams).then((response: any) => {
+  listUserOptions(queryParams).then((response: any) => {
     userList.value = response.rows
     total.value = response.total
     loading.value = false

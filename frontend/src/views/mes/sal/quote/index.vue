@@ -32,10 +32,11 @@
       <el-table-column label="回写状态" align="center" prop="syncStatus" width="100">
         <template #default="s"><el-tag v-if="s.row.syncStatus" :type="syncTag(s.row.syncStatus)">{{ syncText(s.row.syncStatus) }}</el-tag><span v-else>-</span></template>
       </el-table-column>
-      <el-table-column fixed="right" label="操作" align="center" width="140" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="180" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)">查看</el-button>
           <el-button v-if="canQuote(scope.row)" link type="success" @click="handleEdit(scope.row)" v-hasPermi="['mes:sal:quote:edit']">报价</el-button>
+          <el-button link type="danger" v-hasPermi="['mes:sal:quote:remove']" @click="handleDelete(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -47,7 +48,7 @@
 
 <script>
 import { getDicts } from '@/api/system/dict/data'
-import { listQuote } from '@/api/mes/sal/quote'
+import { listQuote, delQuote } from '@/api/mes/sal/quote'
 import QuoteEditDialog from './QuoteEditDialog.vue'
 
 export default {
@@ -80,7 +81,13 @@ export default {
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() { this.resetForm('queryRef'); this.handleQuery() },
     handleView(row) { this.$refs.editDialogRef.open(row.quoteId, true) },
-    handleEdit(row) { this.$refs.editDialogRef.open(row.quoteId, false) }
+    handleEdit(row) { this.$refs.editDialogRef.open(row.quoteId, false) },
+    handleDelete(row) {
+      this.$modal.confirm('是否确认删除报价单 "' + row.quoteCode + '" ？删除后列表中不再显示，数据仍保留可追溯。')
+        .then(() => delQuote(row.quoteId))
+        .then(() => { this.getList(); this.$modal.msgSuccess('删除成功') })
+        .catch(() => {})
+    }
   }
 }
 </script>

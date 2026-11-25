@@ -52,6 +52,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMdVendorList" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" resultMap="MdVendorResult">
         <include refid="selectMdVendorVo"/>
         <where>
+            and del_flag = '0'
             <if test="vendorCode != null  and vendorCode != ''"> and vendor_code = #{vendorCode}</if>
             <if test="vendorName != null  and vendorName != ''"> and vendor_name like concat('%', #{vendorName}, '%')</if>
             <if test="vendorNick != null  and vendorNick != ''"> and vendor_nick like concat('%', #{vendorNick}, '%')</if>
@@ -64,7 +65,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMdVendorAllEnabled" resultMap="MdVendorResult">
         <include refid="selectMdVendorVo"/>
-        where enable_flag = '1'
+        where enable_flag = '1' and del_flag = '0'
     </select>
 
     <select id="checkVendorCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" resultMap="MdVendorResult">
@@ -74,7 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMdVendorByVendorId" parameterType="Long" resultMap="MdVendorResult">
         <include refid="selectMdVendorVo"/>
-        where vendor_id = #{vendorId}
+        where vendor_id = #{vendorId} and del_flag = '0'
     </select>
 
     <insert id="insertMdVendor" parameterType="com.ruoyi.system.domain.mes.md.MdVendor" useGeneratedKeys="true" keyProperty="vendorId">
@@ -179,14 +180,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where vendor_id = #{vendorId}
     </update>
 
-    <delete id="deleteMdVendorByVendorId" parameterType="Long">
-        delete from qxx_md_vendor where vendor_id = #{vendorId}
-    </delete>
+    <update id="deleteMdVendorByVendorId" parameterType="Long">
+        update qxx_md_vendor set del_flag = '2' where vendor_id = #{vendorId}
+    </update>
 
-    <delete id="deleteMdVendorByVendorIds" parameterType="String">
-        delete from qxx_md_vendor where vendor_id in
+    <update id="deleteMdVendorByVendorIds" parameterType="String">
+        update qxx_md_vendor set del_flag = '2' where vendor_id in
         <foreach item="vendorId" collection="array" open="(" separator="," close=")">
             #{vendorId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

@@ -182,16 +182,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where recpt_id = #{recptId}
     </update>
 
-    <delete id="deleteWmProductRecptByRecptId" parameterType="Long">
-        delete from qxx_wm_product_recpt where recpt_id = #{recptId}
-    </delete>
+    <update id="deleteWmProductRecptByRecptId" parameterType="Long">
+        update qxx_wm_product_recpt set del_flag = '2' where recpt_id = #{recptId}
+    </update>
 
-    <delete id="deleteWmProductRecptByRecptIds" parameterType="String">
-        delete from qxx_wm_product_recpt where recpt_id in
+    <update id="deleteWmProductRecptByRecptIds" parameterType="String">
+        update qxx_wm_product_recpt set del_flag = '2' where recpt_id in
         <foreach item="recptId" collection="array" open="(" separator="," close=")">
             #{recptId}
         </foreach>
-    </delete>
+    </update>
 
     <!--
       汇总某工单已生成的入库单总量。

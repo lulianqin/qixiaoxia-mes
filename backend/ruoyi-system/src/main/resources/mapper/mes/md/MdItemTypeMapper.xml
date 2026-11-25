@@ -30,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMdItemTypeList" parameterType="com.ruoyi.system.domain.mes.md.MdItemType" resultMap="MdItemTypeResult">
         <include refid="selectMdItemTypeVo"/>
         <where>
+            and del_flag = '0'
             <if test="itemTypeCode != null and itemTypeCode != ''"> and item_type_code like concat('%', #{itemTypeCode}, '%')</if>
             <if test="itemTypeName != null and itemTypeName != ''"> and item_type_name like concat('%', #{itemTypeName}, '%')</if>
             <if test="itemOrProduct != null and itemOrProduct != ''"> and item_or_product = #{itemOrProduct}</if>
@@ -40,12 +41,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMdItemTypeById" parameterType="Long" resultMap="MdItemTypeResult">
         <include refid="selectMdItemTypeVo"/>
-        where item_type_id = #{itemTypeId}
+        where item_type_id = #{itemTypeId} and del_flag = '0'
     </select>
 
     <select id="selectMdItemTypeByParentId" parameterType="Long" resultMap="MdItemTypeResult">
         <include refid="selectMdItemTypeVo"/>
-        where parent_type_id = #{parentTypeId}
+        where parent_type_id = #{parentTypeId} and del_flag = '0'
         order by order_num, item_type_id
     </select>
 
@@ -109,14 +110,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where item_type_id = #{itemTypeId}
     </update>
 
-    <delete id="deleteMdItemTypeById" parameterType="Long">
-        delete from qxx_md_item_type where item_type_id = #{itemTypeId}
-    </delete>
+    <update id="deleteMdItemTypeById" parameterType="Long">
+        update qxx_md_item_type set del_flag = '2' where item_type_id = #{itemTypeId}
+    </update>
 
-    <delete id="deleteMdItemTypeByIds" parameterType="String">
-        delete from qxx_md_item_type where item_type_id in
+    <update id="deleteMdItemTypeByIds" parameterType="String">
+        update qxx_md_item_type set del_flag = '2' where item_type_id in
         <foreach item="itemTypeId" collection="array" open="(" separator="," close=")">
             #{itemTypeId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

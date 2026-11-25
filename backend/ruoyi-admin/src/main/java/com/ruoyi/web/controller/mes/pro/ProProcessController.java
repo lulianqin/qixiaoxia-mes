@@ -59,6 +59,15 @@ public class ProProcessController extends BaseController
     }
 
     /**
+     * 生产工序下拉选项（任意登录用户可访问，供工作站等业务页面选择工序）
+     */
+    @GetMapping("/options")
+    public AjaxResult options()
+    {
+        return success(proProcessService.selectProProcessAll());
+    }
+
+    /**
      * 导出生产工序列表
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:process:export')")

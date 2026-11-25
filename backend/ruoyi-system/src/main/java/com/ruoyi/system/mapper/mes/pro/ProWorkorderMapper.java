@@ -18,6 +18,10 @@ public interface ProWorkorderMapper {
 
     int countMobilePendingTasks(@Param("status") String status);
     ProWorkorder selectProWorkorderByWorkorderCode(String code);
+
+    /** 工单编码唯一性校验：匹配全部记录（含已软删），与 GET 查询的 del_flag 过滤互不干扰 */
+    ProWorkorder checkWorkorderCodeUnique(String workorderCode);
+
     int insertProWorkorder(ProWorkorder w);
     int updateProWorkorder(ProWorkorder w);
     /** 清空工单负责人（动态 update 无法置 null，单独精准更新） */

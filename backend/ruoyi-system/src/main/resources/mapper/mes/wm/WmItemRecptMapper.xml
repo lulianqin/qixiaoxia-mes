@@ -182,16 +182,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where recpt_id = #{recptId}
     </update>
 
-    <delete id="deleteWmItemRecptByRecptId" parameterType="Long">
-        delete from qxx_wm_item_recpt where recpt_id = #{recptId}
-    </delete>
+    <update id="deleteWmItemRecptByRecptId" parameterType="Long">
+        update qxx_wm_item_recpt set del_flag = '2' where recpt_id = #{recptId}
+    </update>
 
-    <delete id="deleteWmItemRecptByRecptIds" parameterType="String">
-        delete from qxx_wm_item_recpt where recpt_id in
+    <update id="deleteWmItemRecptByRecptIds" parameterType="String">
+        update qxx_wm_item_recpt set del_flag = '2' where recpt_id in
         <foreach item="recptId" collection="array" open="(" separator="," close=")">
             #{recptId}
         </foreach>
-    </delete>
+    </update>
 
     <!-- 仅回写 IQC 挂点两列（factory 生成检验单后回填，避免并发覆盖整头） -->
     <update id="updateWmItemRecptHeaderRefs">

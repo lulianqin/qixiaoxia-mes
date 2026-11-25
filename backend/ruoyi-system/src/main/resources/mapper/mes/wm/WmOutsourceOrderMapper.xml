@@ -239,9 +239,10 @@
         where order_id = #{orderId}
     </update>
 
-    <delete id="deleteOutsourceOrderByOrderId" parameterType="Long">
-        delete from qxx_wm_outsource_order where order_id = #{orderId}
-    </delete>
+    <!-- 删除改为软删除：仅置 del_flag='2'，发料行/工序行保留原样；factory_id 由拦截器注入 -->
+    <update id="deleteOutsourceOrderByOrderId" parameterType="Long">
+        update qxx_wm_outsource_order set del_flag = '2' where order_id = #{orderId}
+    </update>
 
     <!-- 仅回写 IQC 挂点两列（工厂生成检验单后回填，避免并发覆盖整头） -->
     <update id="updateOutsourceOrderHeaderRefs">

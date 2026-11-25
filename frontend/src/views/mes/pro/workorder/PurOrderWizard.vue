@@ -146,7 +146,7 @@ import { getWorkorder } from '@/api/mes/pro/workorder'
 import { listBomByWorkorderId } from '@/api/mes/pro/workorderbom'
 import { listItemVendor } from '@/api/mes/md/itemvendor'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
-import { listUser } from '@/api/system/user'
+import { listUserOptions } from '@/api/system/user'
 import { listAllOrder } from '@/api/mes/sal/order'
 import ItemSelect from '@/components/itemSelect/single.vue'
 import VendorSelect from '@/components/vendorSelect/single.vue'
@@ -195,7 +195,7 @@ function resetHeader() {
 }
 
 function loadUserOptions() {
-  listUser({ pageSize: 999 }).then((r: any) => { userOptions.value = r.rows || [] }).catch(() => {})
+  listUserOptions({ pageSize: 999 }).then((r: any) => { userOptions.value = r.rows || [] }).catch(() => {})
 }
 
 function loadSalOrderOptions() {

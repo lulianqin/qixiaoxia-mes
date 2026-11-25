@@ -259,9 +259,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
     }
 
     /**
-     * 批量删除领料单：草稿/待审核/已作废可删，防止误删已预占/已发料单据导致库存账实不符。
-     * 已作废单额外校验：若存在 ISSUE_OUT 出库流水（历史脏数据或并发漏网）则拒绝物理删除，
-     * 避免删除审计凭证。同时级联删除领料行。
+     * 批量删除领料单（软删除）：草稿/待审核/已作废可删，防止误删已预占/已发料单据导致库存账实不符。
+     * 已作废单额外校验：若存在 ISSUE_OUT 出库流水（历史脏数据或并发漏网）则拒绝删除，
+     * 避免删除审计凭证。领料行保留不删。
      */
     @Override
     @Transactional
@@ -278,8 +278,6 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
             if (canceled) {
                 assertNoIssueOutTransaction(id);
             }
-            // 级联删除领料行
-            wmIssueLineMapper.deleteWmIssueLineByIssueId(id);
         }
         return wmIssueHeaderMapper.deleteWmIssueHeaderByIssueIds(issueIds);
     }

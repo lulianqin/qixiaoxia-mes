@@ -4,8 +4,18 @@ import type { SalOrderQueryParams, SalOrder, SalOrderCreateRequest, SalOrderToWo
 export function listOrder(q: SalOrderQueryParams): Promise<TableDataInfo<SalOrder[]>> {
   return request({ url: '/mes/sal/order/list', method: 'get', params: q })
 }
-export function listAllOrder(): Promise<AjaxResult<SalOrder[]>> {
-  return request({ url: '/mes/sal/order/listAll', method: 'get' })
+// 可转生产/采购关联的销售订单下拉选项（免授权，任意登录用户可访问）
+export async function listAllOrder(): Promise<AjaxResult<SalOrder[]>> {
+  const res: any = await request({
+    url: '/mes/sal/order/options',
+    method: 'get',
+    params: { statusList: ['CONFIRMED', 'PRODUCING'] }
+  })
+  return { code: res.code, msg: res.msg, data: res.rows || [] } as AjaxResult<SalOrder[]>
+}
+// 销售订单下拉选项（任意登录用户可访问，供销售出库等页面选择）
+export function listOrderOptions(q: SalOrderQueryParams): Promise<TableDataInfo<SalOrder[]>> {
+  return request({ url: '/mes/sal/order/options', method: 'get', params: q })
 }
 export function getOrder(id: number): Promise<AjaxResult<SalOrder>> {
   return request({ url: '/mes/sal/order/' + id, method: 'get' })

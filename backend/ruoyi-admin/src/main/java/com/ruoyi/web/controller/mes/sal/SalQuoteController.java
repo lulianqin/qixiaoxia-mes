@@ -3,6 +3,7 @@ package com.ruoyi.web.controller.mes.sal;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,5 +71,13 @@ public class SalQuoteController extends BaseController
         Long taskId = salQuoteService.submitQuote(req);
         if (taskId != null) syncTaskService.dispatch(taskId);
         return AjaxResult.success(taskId);
+    }
+
+    @PreAuthorize("@ss.hasPermi('mes:sal:quote:remove')")
+    @Log(title = "报价单删除", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{quoteId}")
+    public AjaxResult remove(@PathVariable Long quoteId)
+    {
+        return toAjax(salQuoteService.deleteSalQuote(quoteId));
     }
 }

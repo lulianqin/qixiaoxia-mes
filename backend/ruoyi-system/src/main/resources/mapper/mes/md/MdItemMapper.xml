@@ -68,6 +68,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 </foreach>
             </if>
             <if test="itemTypeId != null and itemTypeId != 0"> and i.item_type_id = #{itemTypeId}</if>
+            <if test="uncategorized != null and uncategorized"> and (i.item_type_id is null or i.item_type_id = 0)</if>
             <if test="specification != null and specification != ''"> and i.specification like concat('%', #{specification}, '%')</if>
             <if test="enableFlag != null and enableFlag != ''"> and i.enable_flag = #{enableFlag}</if>
             <if test="parentIdFilter == 'spu'"> and i.parent_id = 0</if>
@@ -97,7 +98,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="checkItemCodeUnique" parameterType="com.ruoyi.system.domain.mes.md.MdItem" resultMap="MdItemResult">
         <include refid="selectMdItemVo"/>
-        where i.item_code = #{itemCode} and i.del_flag = '0' limit 1
+        where i.item_code = #{itemCode} limit 1
     </select>
 
     <insert id="insertMdItem" parameterType="com.ruoyi.system.domain.mes.md.MdItem" useGeneratedKeys="true" keyProperty="itemId">
@@ -207,14 +208,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where item_id = #{itemId}
     </update>
 
-    <delete id="deleteMdItemById" parameterType="Long">
-        delete from qxx_md_item where item_id = #{itemId}
-    </delete>
+    <update id="deleteMdItemById" parameterType="Long">
+        update qxx_md_item set del_flag = '2' where item_id = #{itemId}
+    </update>
 
-    <delete id="deleteMdItemByIds" parameterType="String">
-        delete from qxx_md_item where item_id in
+    <update id="deleteMdItemByIds" parameterType="String">
+        update qxx_md_item set del_flag = '2' where item_id in
         <foreach item="itemId" collection="array" open="(" separator="," close=")">
             #{itemId}
         </foreach>
-    </delete>
+    </update>
 </mapper>

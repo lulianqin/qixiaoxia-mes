@@ -48,7 +48,9 @@ public class MdUnitMeasureController extends BaseController
         return AjaxResult.success(list);
     }
 
-    @PreAuthorize("@ss.hasPermi('mes:md:unitmeasure:query')")
+    /**
+     * 所有启用单位（下拉选项）：任意登录用户可访问，供物料等业务页面选择单位。
+     */
     @GetMapping("/selectall")
     public AjaxResult selectAll()
     {

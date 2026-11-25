@@ -27,6 +27,7 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdClient;
 import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdItemType;
 import com.ruoyi.system.domain.mes.pro.ProRoute;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProduct;
@@ -48,6 +49,7 @@ import com.ruoyi.system.domain.mes.sal.vo.SalOrderProgressRow;
 import com.ruoyi.system.domain.mes.sal.vo.SalOrderWorkorderCountRow;
 import com.ruoyi.system.mapper.mes.md.MdClientMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
+import com.ruoyi.system.mapper.mes.md.MdItemTypeMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
@@ -86,6 +88,9 @@ public class SalOrderServiceImpl implements ISalOrderService
 
     @Autowired
     private MdItemMapper mdItemMapper;
+
+    @Autowired
+    private MdItemTypeMapper mdItemTypeMapper;
 
     @Autowired
     private MdClientMapper mdClientMapper;
@@ -128,6 +133,9 @@ public class SalOrderServiceImpl implements ISalOrderService
     private static final String LOCK_PREFIX = "sal:order:line:toWorkorder:";
     private static final String YES = "Y";
     private static final String NO = "N";
+    /** 销售订单接单自动建档物料的默认分类：纸袋成品 */
+    private static final String DEFAULT_ITEM_TYPE_CODE = "FINISHED-BAG";
+    private static final String DEFAULT_ITEM_TYPE_NAME = "纸袋成品";
     /** qxx_pro_route_process.is_outsource 外发节点取值为 1/0（与订单 Y/N 标志不同源） */
     private static final String OUTSOURCE_NODE = "1";
 
@@ -175,10 +183,10 @@ public class SalOrderServiceImpl implements ISalOrderService
         normalizeOrderDimensions(order);
         if (order.getSampleFlag() == null) order.setSampleFlag("N");
         if (order.getSource() == null) order.setSource(SalConstants.SOURCE_DIRECT);
-        // 人工建单必须指定签约主体（导出单据抬头取值）；CRM 等外部来源允许后续接单时补选
+        // 人工建单必须指定供方主体（导出单据抬头取值）；CRM 等外部来源允许后续接单时补选
         if (SalConstants.SOURCE_DIRECT == order.getSource() && StringUtils.isEmpty(order.getSignCompany()))
         {
-            throw new ServiceException("请选择签约主体");
+            throw new ServiceException("请选择供方主体");
         }
         order.setCreateBy(SecurityUtils.getUsername());
         order.setCreateTime(DateUtils.getNowDate());
@@ -394,8 +402,8 @@ public class SalOrderServiceImpl implements ISalOrderService
 
     /**
      * 接单时确认 MES 客户与产品：
-     *  - 首次接单建立「外部编码 → MES ID」映射，后续接单默认带出且允许调整
-     *  - ERP/SRM 来源订单必须全部行产品已关联，否则拒绝接单（后续流程依赖产品）
+     *  - 客户/产品按外部名称自动匹配 MES 主数据，不存在则按名称自动建档
+     *  - 首次建立「外部编码 → MES ID」映射，后续接单默认带出且允许调整
      */
     private void applyAcceptMappings(Long orderId, SalOrder order, SalOrderAcceptRequest req)
     {
@@ -406,6 +414,8 @@ public class SalOrderServiceImpl implements ISalOrderService
         {
             clientId = lookupMapping(system, "CLIENT", order.getClientCode(), order.getClientName());
         }
+        // 外部客户在 MES 不存在时按名称自动建档，接单不再依赖人工先维护客户主数据
+        if (clientId == null) clientId = resolveOrCreateClient(order, system);
         if (clientId != null)
         {
             applyClientMapping(orderId, order, system, clientId);
@@ -413,7 +423,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         List<String> missing = applyLineMappings(orderId, system, collectLineProducts(req));
         if (!missing.isEmpty())
         {
-            throw new ServiceException("以下产品未关联 MES 物料，请先选择后再接单："
+            throw new ServiceException("以下产品无法匹配或创建 MES 物料，请检查产品名称："
                     + String.join("、", missing));
         }
     }
@@ -435,7 +445,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         }
     }
 
-    /** 明细产品落库 + 记录「外部产品编码/名称 → MES 物料」映射，返回仍未关联的 ERP/SRM 行 */
+    /** 明细产品落库 + 记录「外部产品编码/名称 → MES 物料」映射，返回仍无法解析的 ERP/SRM 行 */
     private List<String> applyLineMappings(Long orderId, String system, Map<Long, Long> lineProducts)
     {
         List<SalOrderLine> lines = salOrderLineMapper.selectSalOrderLineByOrderId(orderId);
@@ -446,23 +456,21 @@ public class SalOrderServiceImpl implements ISalOrderService
             boolean needMapping = line.getProductId() == null;
             Long productId = lineProducts.get(line.getLineId());
             if (productId == null) productId = line.getProductId();
-            if (productId == null && isExternalSystem(system))
+            MdItem item = productId == null
+                    ? resolveOrCreateItem(line, system) : mdItemMapper.selectMdItemById(productId);
+            if (item == null)
             {
-                productId = lookupMapping(system, "ITEM", line.getProductCode(), line.getProductName());
-            }
-            if (productId == null)
-            {
-                if (isExternalSystem(system)) missing.add(line.getProductName());
+                if (productId != null) throw new ServiceException("MES 物料不存在:" + productId);
+                missing.add(StringUtils.isNotEmpty(line.getProductName())
+                        ? line.getProductName() : "第" + line.getLineNo() + "行产品");
                 continue;
             }
-            MdItem item = mdItemMapper.selectMdItemById(productId);
-            if (item == null) throw new ServiceException("MES 物料不存在:" + productId);
             String extCode = StringUtils.isNotEmpty(line.getProductCode())
                     ? line.getProductCode() : line.getProductName();
 
             SalOrderLine patch = new SalOrderLine();
             patch.setLineId(line.getLineId());
-            patch.setProductId(productId);
+            patch.setProductId(item.getItemId());
             patch.setProductCode(item.getItemCode());
             // 源产品名称不改写（外部单保留 ERP/SRM 名称），MES 物料名称单独落列
             patch.setMesProductName(item.getItemName());
@@ -472,16 +480,194 @@ public class SalOrderServiceImpl implements ISalOrderService
 
             if (needMapping && StringUtils.isNotEmpty(system) && StringUtils.isNotEmpty(extCode))
             {
-                upsertMapping(system, "ITEM", line.getProductCode(), extCode, productId);
+                upsertMapping(system, "ITEM", line.getProductCode(), extCode, item.getItemId());
             }
         }
         return missing;
     }
 
+    /** 客户：映射表 → 名称精确匹配 → 按外部名称自动建档 */
+    private Long resolveOrCreateClient(SalOrder order, String system)
+    {
+        String name = order.getClientName();
+        if (StringUtils.isEmpty(name)) return null;
+        String trimmed = name.trim();
+        if (StringUtils.isNotEmpty(system))
+        {
+            Long mapped = lookupMapping(system, "CLIENT", order.getClientCode(), trimmed);
+            if (mapped != null) return mapped;
+        }
+        MdClient matched = findClientByName(trimmed);
+        if (matched != null) return matched.getClientId();
+
+        MdClient client = new MdClient();
+        client.setClientCode(uniqueClientCode(order.getClientCode()));
+        client.setClientName(trimmed);
+        client.setClientType(order.getBusinessLine());
+        client.setEnableFlag("1");
+        client.setRemark("销售订单接单自动建档");
+        client.setCreateBy(SecurityUtils.getUsername());
+        client.setCreateTime(DateUtils.getNowDate());
+        insertClientWithFallback(client);
+        return client.getClientId();
+    }
+
+    /** 客户编码唯一键为全局约束：并发或跨工厂撞码时换自动编码重试一次 */
+    private void insertClientWithFallback(MdClient client)
+    {
+        try
+        {
+            mdClientMapper.insertMdClient(client);
+        }
+        catch (org.springframework.dao.DuplicateKeyException e)
+        {
+            client.setClientCode("C" + DateUtils.dateTimeNow("yyyyMMddHHmmssSSS") + (System.nanoTime() & 0x3ff));
+            mdClientMapper.insertMdClient(client);
+        }
+    }
+
+    private MdClient findClientByName(String name)
+    {
+        MdClient query = new MdClient();
+        query.setClientName(name);
+        List<MdClient> list = mdClientMapper.selectMdClientList(query);
+        if (list == null) return null;
+        for (MdClient client : list)
+        {
+            if (name.equals(client.getClientName())) return client;
+        }
+        return null;
+    }
+
+    /** 客户编码：优先沿用 ERP 编码，为空或已占用时自动生成 */
+    private String uniqueClientCode(String preferred)
+    {
+        String code = StringUtils.isNotEmpty(preferred) ? preferred.trim() : null;
+        if (StringUtils.isNotEmpty(code) && code.length() <= 64)
+        {
+            MdClient query = new MdClient();
+            query.setClientCode(code);
+            if (mdClientMapper.checkClientCodeUnique(query) == null) return code;
+        }
+        return "C" + DateUtils.dateTimeNow("yyyyMMddHHmmssSSS");
+    }
+
+    /** 产品：映射表 → 名称精确匹配 → 按外部名称自动建档 */
+    private MdItem resolveOrCreateItem(SalOrderLine line, String system)
+    {
+        String name = line.getProductName();
+        if (StringUtils.isEmpty(name)) return null;
+        String trimmed = name.trim();
+        if (isExternalSystem(system))
+        {
+            Long mapped = lookupMapping(system, "ITEM", line.getProductCode(), trimmed);
+            if (mapped != null)
+            {
+                MdItem item = mdItemMapper.selectMdItemById(mapped);
+                if (item != null) return item;
+            }
+        }
+        MdItem matched = findItemByName(trimmed);
+        if (matched != null) return matched;
+        return createItemFromLine(line, trimmed);
+    }
+
+    private MdItem findItemByName(String name)
+    {
+        MdItem query = new MdItem();
+        query.setItemName(name);
+        List<MdItem> list = mdItemMapper.selectMdItemList(query);
+        if (list == null) return null;
+        for (MdItem item : list)
+        {
+            if (name.equals(item.getItemName())) return item;
+        }
+        return null;
+    }
+
+    /** 按销售明细自动创建 MES 物料：名称/规格/单位取外部单据，编码优先沿用 ERP 编码 */
+    private MdItem createItemFromLine(SalOrderLine line, String trimmedName)
+    {
+        String unitName = StringUtils.isNotEmpty(line.getUnitName())
+                ? line.getUnitName() : line.getUnitOfMeasure();
+        if (StringUtils.isEmpty(unitName)) unitName = "个";
+
+        MdItem item = new MdItem();
+        item.setItemCode(uniqueItemCode(line.getProductCode()));
+        item.setItemName(trimmedName);
+        item.setSpecification(StringUtils.isNotEmpty(line.getProductSpc())
+                ? line.getProductSpc() : line.getProductSize());
+        item.setImageUrl(line.getProductPhoto());
+        item.setProductSize(line.getProductSize());
+        item.setPrintingReq(line.getPrintingReq());
+        item.setUnitOfMeasure(StringUtils.isNotEmpty(line.getUnitOfMeasure())
+                ? line.getUnitOfMeasure() : unitName);
+        item.setUnitName(unitName);
+        item.setEnableFlag("1");
+        item.setRemark("销售订单接单自动建档");
+        // 自动建档默认归入「纸袋成品」分类，避免物料无分类导致主数据页面按分类查不到
+        MdItemType defaultType = resolveDefaultItemType();
+        if (defaultType != null)
+        {
+            item.setItemTypeId(defaultType.getItemTypeId());
+            item.setItemTypeCode(defaultType.getItemTypeCode());
+            item.setItemTypeName(defaultType.getItemTypeName());
+        }
+        item.setCreateBy(SecurityUtils.getUsername());
+        item.setCreateTime(DateUtils.getNowDate());
+        insertItemWithFallback(item);
+        return item;
+    }
+
+    /** 自动建档默认分类：按编码匹配「纸袋成品」，未命中时按名称兜底（不写死自增ID） */
+    private MdItemType resolveDefaultItemType()
+    {
+        MdItemType query = new MdItemType();
+        query.setItemTypeCode(DEFAULT_ITEM_TYPE_CODE);
+        List<MdItemType> list = mdItemTypeMapper.selectMdItemTypeList(query);
+        if (list == null || list.isEmpty()) return null;
+        for (MdItemType t : list)
+        {
+            if (DEFAULT_ITEM_TYPE_CODE.equals(t.getItemTypeCode())) return t;
+        }
+        for (MdItemType t : list)
+        {
+            if (DEFAULT_ITEM_TYPE_NAME.equals(t.getItemTypeName())) return t;
+        }
+        return list.get(0);
+    }
+
+    /** 物料编码唯一键为全局约束：并发或跨工厂撞码时换自动编码重试一次 */
+    private void insertItemWithFallback(MdItem item)
+    {
+        try
+        {
+            mdItemMapper.insertMdItem(item);
+        }
+        catch (org.springframework.dao.DuplicateKeyException e)
+        {
+            item.setItemCode("FIN" + DateUtils.dateTimeNow("yyyyMMddHHmmssSSS") + (System.nanoTime() & 0x3ff));
+            mdItemMapper.insertMdItem(item);
+        }
+    }
+
+    /** 物料编码：优先沿用 ERP 编码，为空或已占用时自动生成 */
+    private String uniqueItemCode(String preferred)
+    {
+        String code = StringUtils.isNotEmpty(preferred) ? preferred.trim() : null;
+        if (StringUtils.isNotEmpty(code) && code.length() <= 64)
+        {
+            MdItem query = new MdItem();
+            query.setItemCode(code);
+            if (mdItemMapper.checkItemCodeUnique(query) == null) return code;
+        }
+        return "FIN" + DateUtils.dateTimeNow("yyyyMMddHHmmssSSS");
+    }
+
     private Map<Long, Long> collectLineProducts(SalOrderAcceptRequest req)
     {
         Map<Long, Long> lineProducts = new HashMap<>();
-        if (req.getLines() == null) return lineProducts;
+        if (req == null || req.getLines() == null) return lineProducts;
         for (SalOrderAcceptRequest.LineDate l : req.getLines())
         {
             if (l.getLineId() != null && l.getProductId() != null)
@@ -597,7 +783,7 @@ public class SalOrderServiceImpl implements ISalOrderService
                 ErpCallbackPaths.PURCHASE_ACCEPT, payload, ErpCallbackPaths.SYSTEM_ERP);
     }
 
-    /** 接单时确认业务员：优先使用接单选择的 MES 账号；ERP 已带下单人时允许沿用 */
+    /** 接单时确认业务员：外部系统只保留名称，不强制关联 MES 员工账号 */
     private void applyAcceptSalesperson(SalOrder order, SalOrderAcceptRequest req)
     {
         String salesperson = req == null ? null : req.getSalesperson();
@@ -605,18 +791,18 @@ public class SalOrderServiceImpl implements ISalOrderService
         {
             SalOrder upd = new SalOrder();
             upd.setOrderId(order.getOrderId());
-            upd.setSalesperson(salesperson);
+            upd.setSalesperson(salesperson.trim());
             salOrderMapper.updateSalOrder(upd);
-            order.setSalesperson(salesperson);
+            order.setSalesperson(salesperson.trim());
             return;
         }
         if (StringUtils.isEmpty(order.getSalesperson()))
         {
-            throw new ServiceException("请选择业务员（ERP采购单未提供下单人）");
+            throw new ServiceException("请填写业务员（ERP采购单未提供业务员）");
         }
     }
 
-    /** 接单时确认签约主体：ERP 未匹配到供方时由人工补选 */
+    /** 接单时确认供方主体：ERP 未匹配到供方时由人工补选 */
     private void applyAcceptSignCompany(SalOrder order, SalOrderAcceptRequest req)
     {
         String signCompany = req == null ? null : req.getSignCompany();
@@ -685,7 +871,10 @@ public class SalOrderServiceImpl implements ISalOrderService
         }
         order.setOrderName(req.getOrderName());
         order.setClientCode(req.getClientCode());
+        // 客户名称 = ERP 销售订单客户名称，接单时按名称匹配/创建 MES 客户
         order.setClientName(req.getClientName());
+        // 需方主体 = ERP 采购单需方名称，原样保存（与客户名称区分）
+        order.setDemanderName(req.getDemanderName());
         // 客户PO号 = ERP 侧订单编号，与 ERP 采购单号是两个字段：
         // 采购单未关联销售订单时 ERP 不传该值，这里必须留空，不能拿采购单号兜底填充，
         // 否则 MES 里「客户PO号」和「ERP单号」会显示成同一个值，误导业务。
@@ -696,7 +885,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         order.setTotalAmount(req.getTotalAmount());
         order.setPaymentMethod(req.getPaymentMethod());
         order.setRemark(req.getRemark());
-        // 签约主体 = 销售订单对应主体，ERP 采购单按其供方名称匹配字典 sys_company；
+        // 供方主体 = 销售订单对应主体，ERP 采购单按其供方名称匹配字典 sys_company；
         // 匹配不到时留空，接单环节强制人工选择。
         if (StringUtils.isNotEmpty(req.getSupplierName()))
         {
@@ -850,7 +1039,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         }
         assertNoDerivedWorkorder(order.getOrderId(), "修改");
         normalizeOrderDimensions(order);
-        if (StringUtils.isEmpty(order.getSignCompany())) throw new ServiceException("请选择签约主体");
+        if (StringUtils.isEmpty(order.getSignCompany())) throw new ServiceException("请选择供方主体");
         order.setStatus(existing.getStatus()); // 状态不允许经编辑接口篡改
         // 审核历史列为留存字段,不允许经编辑接口覆写,强制以库中值为准
         order.setApproveBy(existing.getApproveBy());
@@ -965,7 +1154,7 @@ public class SalOrderServiceImpl implements ISalOrderService
     {
         List<String> missing = new ArrayList<>();
         if (StringUtils.isEmpty(order.getOrderName())) missing.add("表头-订单名称");
-        if (StringUtils.isEmpty(order.getSignCompany())) missing.add("表头-签约主体");
+        if (StringUtils.isEmpty(order.getSignCompany())) missing.add("表头-供方主体");
         if (order.getClientId() == null) missing.add("表头-客户");
         if (order.getOrderDate() == null) missing.add("表头-订单日期");
         if (order.getRequestDate() == null) missing.add("表头-需求交期");
@@ -1002,7 +1191,7 @@ public class SalOrderServiceImpl implements ISalOrderService
                 throw new ServiceException("订单 " + order.getOrderCode() + " 非待接单/已确认状态,不可删除");
             }
             assertNoDerivedWorkorder(orderId, "删除");
-            salOrderLineMapper.deleteSalOrderLineByOrderId(orderId);
+            // 主表软删除，明细行保留以便追溯（列表/详情入口已按 del_flag 过滤）
         }
         return salOrderMapper.deleteSalOrderByOrderIds(orderIds);
     }
@@ -1164,6 +1353,7 @@ public class SalOrderServiceImpl implements ISalOrderService
      */
     private void resolveLinesRoute(SalOrder order, List<SalOrderLine> lines)
     {
+        ensureLineRouteBindings(lines);
         Map<Long, ProRouteProduct> manualBindings = loadManualBindings(lines);
         Map<Long, RouteResolveResult> autoResults = resolveAutoLines(order, lines);
         Set<Long> outsourceRoutes = YES.equals(order.getOutsourceFlag())
@@ -1180,6 +1370,63 @@ public class SalOrderServiceImpl implements ISalOrderService
                 line.setRouteName(route.getRouteName());
             }
         }
+    }
+
+    /**
+     * 明细行展示全部工艺路线后，所选路线可能尚未与该产品绑定：
+     * 前端以负 recordId 作为临时选项，保存前统一转换为真实绑定（已有则复用，无则新建），
+     * 避免临时负数落库导致转工单时「路线不属于该产品」。
+     */
+    private void ensureLineRouteBindings(List<SalOrderLine> lines)
+    {
+        for (SalOrderLine line : lines)
+        {
+            Long temp = line.getRouteProductId();
+            if (temp == null || temp >= 0) continue;
+            if (line.getProductId() == null)
+            {
+                line.setRouteProductId(null);
+                continue;
+            }
+            Long routeId = -temp;
+            ProRouteProduct query = new ProRouteProduct();
+            query.setRouteId(routeId);
+            query.setItemId(line.getProductId());
+            List<ProRouteProduct> exists = proRouteProductMapper.selectProRouteProductList(query);
+            if (exists != null && !exists.isEmpty())
+            {
+                line.setRouteProductId(exists.get(0).getRecordId());
+                continue;
+            }
+            ProRouteProduct binding = new ProRouteProduct();
+            binding.setRouteId(routeId);
+            binding.setItemId(line.getProductId());
+            binding.setItemCode(line.getProductCode());
+            binding.setItemName(StringUtils.isNotEmpty(line.getMesProductName())
+                    ? line.getMesProductName() : line.getProductName());
+            binding.setSpecification(line.getProductSpc());
+            binding.setUnitOfMeasure(line.getUnitOfMeasure());
+            binding.setUnitName(line.getUnitName());
+            fillBindingFromItem(binding);
+            binding.setIsDefault(NO);
+            proRouteProductMapper.insertProRouteProduct(binding);
+            line.setRouteProductId(binding.getRecordId());
+        }
+    }
+
+    /** 明细行缺少编码/名称/单位时用物料主数据兜底（单位列非空且无默认值） */
+    private void fillBindingFromItem(ProRouteProduct binding)
+    {
+        if (StringUtils.isNotEmpty(binding.getUnitOfMeasure()) && StringUtils.isNotEmpty(binding.getItemCode()))
+        {
+            return;
+        }
+        MdItem item = mdItemMapper.selectMdItemById(binding.getItemId());
+        if (item == null) return;
+        if (StringUtils.isEmpty(binding.getItemCode())) binding.setItemCode(item.getItemCode());
+        if (StringUtils.isEmpty(binding.getItemName())) binding.setItemName(item.getItemName());
+        if (StringUtils.isEmpty(binding.getUnitOfMeasure())) binding.setUnitOfMeasure(item.getUnitOfMeasure());
+        if (StringUtils.isEmpty(binding.getUnitName())) binding.setUnitName(item.getUnitName());
     }
 
     private Map<Long, ProRouteProduct> loadManualBindings(List<SalOrderLine> lines)

@@ -9,6 +9,8 @@ export interface ItemQueryParams extends PageDomain {
   enableFlag?: string;
   /** 产品类型筛选：spu=标准产品(parent_id=0) | variant=变体(parent_id>0) */
   parentIdFilter?: string;
+  /** 仅查询未分类物料（item_type_id 为空或 0） */
+  uncategorized?: boolean;
 }
 
 /** 物料产品信息 */

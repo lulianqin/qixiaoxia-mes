@@ -78,6 +78,9 @@ public class MdItem extends BaseEntity
     /** 物料类型ID列表(含子分类，仅查询参数用，非DB字段) */
     private List<Long> itemTypeIds;
 
+    /** 仅查询未分类物料（item_type_id 为空或 0，仅查询参数用，非DB字段） */
+    private Boolean uncategorized;
+
     /** 产品尺寸 */
     @Excel(name = "产品尺寸")
     private String productSize;
@@ -176,6 +179,8 @@ public class MdItem extends BaseEntity
 
     public List<Long> getItemTypeIds() { return itemTypeIds; }
     public void setItemTypeIds(List<Long> itemTypeIds) { this.itemTypeIds = itemTypeIds; }
+    public Boolean getUncategorized() { return uncategorized; }
+    public void setUncategorized(Boolean uncategorized) { this.uncategorized = uncategorized; }
 
     public String getProductSize() { return productSize; }
     public void setProductSize(String productSize) { this.productSize = productSize; }

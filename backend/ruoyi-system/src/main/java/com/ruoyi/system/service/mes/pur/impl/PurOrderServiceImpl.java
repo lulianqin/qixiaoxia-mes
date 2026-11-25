@@ -183,7 +183,7 @@ public class PurOrderServiceImpl implements IPurOrderService
     }
 
     /**
-     * 批量删除采购订单头（级联删除行）
+     * 批量删除采购订单头（软删除，明细行保留）
      *
      * @param orderIds 需要删除的采购订单头主键
      * @return 结果
@@ -192,14 +192,11 @@ public class PurOrderServiceImpl implements IPurOrderService
     @Transactional
     public int deletePurOrderByOrderIds(Long[] orderIds)
     {
-        for (Long orderId : orderIds) {
-            purOrderLineService.deletePurOrderLineByOrderId(orderId);
-        }
         return purOrderMapper.deletePurOrderByOrderIds(orderIds);
     }
 
     /**
-     * 删除采购订单头信息（级联删除行）
+     * 删除采购订单头信息（软删除，明细行保留）
      *
      * @param orderId 采购订单头主键
      * @return 结果
@@ -208,7 +205,6 @@ public class PurOrderServiceImpl implements IPurOrderService
     @Transactional
     public int deletePurOrderByOrderId(Long orderId)
     {
-        purOrderLineService.deletePurOrderLineByOrderId(orderId);
         return purOrderMapper.deletePurOrderByOrderId(orderId);
     }
 
