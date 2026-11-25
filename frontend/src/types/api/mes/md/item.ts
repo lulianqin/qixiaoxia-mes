@@ -9,6 +9,8 @@ export interface ItemQueryParams extends PageDomain {
   enableFlag?: string;
   /** 产品类型筛选：spu=标准产品(parent_id=0) | variant=变体(parent_id>0) */
   parentIdFilter?: string;
+  /** 按父产品精确查询子规格（树形懒加载用） */
+  parentId?: number;
   /** 仅查询未分类物料（item_type_id 为空或 0） */
   uncategorized?: boolean;
 }
@@ -51,4 +53,8 @@ export interface MdItem extends BaseEntity {
   defaultTaxRate?: number;
   /** 扩展属性(扁平JSON {attrCode:value})，分类驱动的动态属性 */
   extAttrs?: Record<string, any>;
+  /** 子规格数量（SPU 行返回） */
+  variantCount?: number;
+  /** 是否还有子节点（前端树形懒加载标记） */
+  hasChildren?: boolean;
 }

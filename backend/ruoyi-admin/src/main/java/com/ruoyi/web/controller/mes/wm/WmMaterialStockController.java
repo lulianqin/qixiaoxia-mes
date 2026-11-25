@@ -9,7 +9,9 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
+import com.ruoyi.system.service.mes.md.IMdItemService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +33,9 @@ public class WmMaterialStockController extends BaseController
 
     @Autowired
     private IWmStockImportService wmStockImportService;
+
+    @Autowired
+    private IMdItemService mdItemService;
 
     @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:list')")
     @GetMapping("/list")
@@ -86,6 +91,17 @@ public class WmMaterialStockController extends BaseController
     public AjaxResult getInfo(@PathVariable("materialStockId") Long materialStockId)
     {
         return AjaxResult.success(wmMaterialStockService.selectWmMaterialStockByMaterialStockId(materialStockId));
+    }
+
+    /**
+     * 新增库存前解析物料：按名称+分类+规格型号+装箱规格+产品尺寸+扩展属性匹配，
+     * 命中直接复用，未命中自动建档（先建物料，再保存库存）。
+     */
+    @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:add')")
+    @PostMapping("/resolveItem")
+    public AjaxResult resolveItem(@RequestBody MdItem spec)
+    {
+        return AjaxResult.success(mdItemService.findOrCreateForStock(spec));
     }
 
     @PreAuthorize("@ss.hasPermi('mes:wm:material_stock:add')")

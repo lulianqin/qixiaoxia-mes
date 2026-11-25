@@ -13,6 +13,14 @@ export function getWmMaterialStock(materialStockId: number): Promise<AjaxResult<
   return request({ url: '/mes/wm/material_stock/' + materialStockId, method: 'get' })
 }
 
+/**
+ * 新增库存前解析物料：按名称+分类+规格型号+装箱规格+产品尺寸+扩展属性匹配，
+ * 命中复用，未命中自动建档（先建物料，再保存库存）。
+ */
+export function resolveStockItem(spec: any): Promise<AjaxResult<any>> {
+  return request({ url: '/mes/wm/material_stock/resolveItem', method: 'post', data: spec })
+}
+
 export function addWmMaterialStock(d: WmMaterialStock): Promise<AjaxResult> {
   return request({ url: '/mes/wm/material_stock', method: 'post', data: d })
 }

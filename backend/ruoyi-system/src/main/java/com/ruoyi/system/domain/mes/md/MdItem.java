@@ -130,6 +130,9 @@ public class MdItem extends BaseEntity
     /** 规格指纹（SPU + 规格组合 SHA-256，用于同规格查重） */
     private String specFingerprint;
 
+    /** 子规格（变体）数量，仅查询返回，非 DB 字段 */
+    private Integer variantCount;
+
     public Long getItemId() { return itemId; }
     public void setItemId(Long itemId) { this.itemId = itemId; }
 
@@ -223,6 +226,9 @@ public class MdItem extends BaseEntity
 
     public String getSpecFingerprint() { return specFingerprint; }
     public void setSpecFingerprint(String specFingerprint) { this.specFingerprint = specFingerprint; }
+
+    public Integer getVariantCount() { return variantCount; }
+    public void setVariantCount(Integer variantCount) { this.variantCount = variantCount; }
 
     @Override
     public String toString() {

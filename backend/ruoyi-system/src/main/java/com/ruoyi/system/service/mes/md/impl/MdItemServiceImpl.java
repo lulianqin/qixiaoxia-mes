@@ -1,16 +1,22 @@
 package com.ruoyi.system.service.mes.md.impl;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.text.Normalizer;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdItemType;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemTypeMapper;
 import com.ruoyi.system.service.mes.md.IMdItemService;
@@ -141,14 +147,173 @@ public class MdItemServiceImpl implements IMdItemService
             throw new ServiceException("请选择产品大类(SPU)");
         MdItem parent = mdItemMapper.selectMdItemById(spec.getParentId());
         if (parent == null) throw new ServiceException("产品大类不存在");
+
+        // 统一规则匹配兄弟变体；印刷/包装作为变体额外判据（双方都有值时比较）
         MdItem query = new MdItem();
-        query.setSpecFingerprint(buildSpecFingerprint(spec));
-        MdItem existed = mdItemMapper.selectBySpecFingerprint(query);
-        if (existed != null) return existed;
+        query.setParentId(spec.getParentId());
+        for (MdItem candidate : mdItemMapper.selectMdItemList(query))
+        {
+            if (isSameItem(candidate, spec)
+                && normalize(candidate.getProductSize()).equals(normalize(spec.getProductSize()))
+                && valuesCompatible(candidate.getPrintingReq(), spec.getPrintingReq())
+                && valuesCompatible(candidate.getPackageSpec(), spec.getPackageSpec()))
+            {
+                return candidate;
+            }
+        }
         fillVariantDefaults(spec, parent);
-        spec.setSpecFingerprint(query.getSpecFingerprint());
+        spec.setSpecFingerprint(buildSpecFingerprint(spec));
         insertMdItem(spec);
         return spec;
+    }
+
+    @Override
+    @Transactional
+    public MdItem findOrCreateForStock(MdItem spec)
+    {
+        if (spec == null || StringUtils.isEmpty(spec.getItemName()))
+            throw new ServiceException("物料名称不能为空");
+        if (spec.getItemTypeId() == null || spec.getItemTypeId() <= 0)
+            throw new ServiceException("请选择物料分类");
+        MdItemType type = itemTypeMapper.selectMdItemTypeById(spec.getItemTypeId());
+        if (type == null) throw new ServiceException("物料分类不存在");
+
+        spec.setItemName(spec.getItemName().trim());
+        spec.setItemTypeCode(type.getItemTypeCode());
+        spec.setItemTypeName(type.getItemTypeName());
+
+        // 手工新增：扩展属性严格比对（属性值或属性项变化即视为新物料）
+        MdItem existed = matchItem(spec, true);
+        if (existed != null) return existed;
+
+        if (StringUtils.isEmpty(spec.getUnitOfMeasure())) spec.setUnitOfMeasure("PCS");
+        if (StringUtils.isEmpty(spec.getUnitName())) spec.setUnitName("个");
+        spec.setItemCode(generateStockItemCode(type));
+        spec.setEnableFlag("1");
+        spec.setCreateBy(SecurityUtils.getUsername());
+        spec.setRemark("库存新增自动建档");
+        insertMdItem(spec);
+        return spec;
+    }
+
+    @Override
+    public boolean isSameItem(MdItem a, MdItem b) { return isSameItem(a, b, false); }
+
+    @Override
+    public boolean isSameItem(MdItem a, MdItem b, boolean strictAttrs)
+    {
+        if (a == null || b == null) return false;
+        if (a.getItemId() != null && a.getItemId().equals(b.getItemId())) return true;
+        // 分类/父产品：双方都有值时才要求一致，避免外部单据没带分类导致匹配失败
+        if (hasType(a) && hasType(b) && !a.getItemTypeId().equals(b.getItemTypeId())) return false;
+        if (hasParent(a) && hasParent(b) && !a.getParentId().equals(b.getParentId())) return false;
+        // 名称/规格：双方都有值时才比较，空值视为"未提供该维度"
+        if (StringUtils.isNotEmpty(a.getItemName()) && StringUtils.isNotEmpty(b.getItemName())
+            && !normalize(a.getItemName()).equals(normalize(b.getItemName()))) return false;
+        // 规格型号、产品尺寸：必须完全一致（规范化后精确比较，空值与空值视为一致）
+        if (!normalize(a.getSpecification()).equals(normalize(b.getSpecification()))) return false;
+        if (!normalize(a.getProductSize()).equals(normalize(b.getProductSize()))) return false;
+        // 扩展属性：严格模式要求属性项/值完全一致；宽松模式只比较双方都有的 key
+        return strictAttrs
+            ? attrsKey(a.getExtAttrs()).equals(attrsKey(b.getExtAttrs()))
+            : attrsCompatible(a.getExtAttrs(), b.getExtAttrs());
+    }
+
+    @Override
+    public MdItem matchItem(MdItem spec) { return matchItem(spec, false); }
+
+    @Override
+    public MdItem matchItem(MdItem spec, boolean strictAttrs)
+    {
+        if (spec == null) return null;
+        // 1. 编码精确匹配
+        String code = StringUtils.isNotEmpty(spec.getItemCode()) ? spec.getItemCode().trim() : null;
+        if (code != null)
+        {
+            MdItem codeQuery = new MdItem();
+            codeQuery.setItemCode(code);
+            for (MdItem candidate : mdItemMapper.selectMdItemList(codeQuery))
+            {
+                if (code.equals(candidate.getItemCode())) return candidate;
+            }
+        }
+        // 2. 名称/规格候选，再按统一规则逐一判定
+        MdItem query = new MdItem();
+        if (StringUtils.isNotEmpty(spec.getItemName())) query.setItemName(spec.getItemName().trim());
+        else if (StringUtils.isNotEmpty(spec.getSpecification())) query.setSpecification(spec.getSpecification().trim());
+        else return null;
+        for (MdItem candidate : mdItemMapper.selectMdItemList(query))
+        {
+            if (isSameItem(candidate, spec, strictAttrs)) return candidate;
+        }
+        return null;
+    }
+
+    /** 文本规范化：去空白、全角转半角、小写、数字间的 x/× 统一为 * */
+    private String normalize(String value)
+    {
+        if (value == null) return "";
+        String text = Normalizer.normalize(value.trim(), Normalizer.Form.NFKC)
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("(?<=\\d)\\s*[x×✕✖]\\s*(?=\\d)", "*");
+        return text.replaceAll("\\s+", "");
+    }
+
+    private boolean hasType(MdItem item) { return item.getItemTypeId() != null && item.getItemTypeId() > 0; }
+
+    private boolean hasParent(MdItem item) { return item.getParentId() != null && item.getParentId() > 0; }
+
+    /** 扩展属性兼容：只比较双方都有的 key，值不同则不匹配，缺一方不视为冲突 */
+    private boolean attrsCompatible(Map<String, Object> a, Map<String, Object> b)
+    {
+        if (a == null || b == null) return true;
+        for (Map.Entry<String, Object> e : a.entrySet())
+        {
+            if (!b.containsKey(e.getKey())) continue;
+            String va = attrValue(e.getValue());
+            String vb = attrValue(b.get(e.getKey()));
+            if (!va.isEmpty() && !vb.isEmpty() && !va.equals(vb)) return false;
+        }
+        return true;
+    }
+
+    /** 扩展属性规范化：按 key 排序、忽略空值，数组按逗号连接，用于严格比对 */
+    private String attrsKey(Map<String, Object> attrs)
+    {
+        if (attrs == null || attrs.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Object> e : new TreeMap<>(attrs).entrySet())
+        {
+            String text = attrValue(e.getValue());
+            if (text.isEmpty()) continue;
+            sb.append(e.getKey()).append('=').append(text).append(';');
+        }
+        return sb.toString();
+    }
+
+    private String attrValue(Object v)
+    {
+        if (v == null) return "";
+        String text = v instanceof Collection<?> c
+            ? c.stream().map(String::valueOf).collect(Collectors.joining(","))
+            : String.valueOf(v);
+        return text.trim();
+    }
+
+    /** 可选字段比较：任一方为空视为未提供，不构成差异 */
+    private boolean valuesCompatible(String a, String b)
+    {
+        String na = nullToEmpty(a).trim();
+        String nb = nullToEmpty(b).trim();
+        return na.isEmpty() || nb.isEmpty() || na.equals(nb);
+    }
+
+    private String generateStockItemCode(MdItemType type)
+    {
+        String prefix = StringUtils.isEmpty(type.getItemTypeCode()) ? "ITEM"
+            : type.getItemTypeCode().toUpperCase().replaceAll("[^A-Z0-9-]", "");
+        if (prefix.length() > 20) prefix = prefix.substring(0, 20);
+        return prefix + "-" + DateUtils.dateTimeNow("yyyyMMddHHmmssSSS");
     }
 
     /** 规格指纹：SPU + 尺寸/印刷/包装/规格 + 扩展属性（按 key 排序）的 SHA-256 */

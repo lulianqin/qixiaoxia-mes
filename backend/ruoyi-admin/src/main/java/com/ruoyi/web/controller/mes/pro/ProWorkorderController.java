@@ -43,8 +43,11 @@ import com.ruoyi.system.domain.mes.pur.PurOrder;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.md.MdItemTypeAttr;
+import com.ruoyi.system.domain.mes.md.MdProductBom;
 import com.ruoyi.system.service.mes.md.IMdItemService;
 import com.ruoyi.system.service.mes.md.IMdItemTypeAttrService;
+import com.ruoyi.system.service.mes.md.IMdProductBomService;
+import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderCreateRequest;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDetailVO;
 import com.ruoyi.system.domain.mes.pro.ProWorkorderDeviationVO;
@@ -97,6 +100,12 @@ public class ProWorkorderController extends BaseController
 
     @Autowired
     private IMdItemTypeAttrService mdItemTypeAttrService;
+
+    @Autowired
+    private IMdProductBomService mdProductBomService;
+
+    @Autowired
+    private AutoCodeGenerator autoCodeGenerator;
 
     @Autowired
     private IPurOrderService purOrderService;
@@ -402,9 +411,36 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
-     * 新增生产工单（独立开单页）：主工单 + BOM + 参数 + 工序调整 + 采购单/加工单草稿，一次事务提交
+     * 开单页内置：生成工单编码（固定 WORKORDER_NO 规则，不暴露编码规则管理权限）
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:add')")
+    @PostMapping("/nextCode")
+    public AjaxResult nextCode()
+    {
+        try
+        {
+            return AjaxResult.success("编码生成成功", autoCodeGenerator.genSerialCode("WORKORDER_NO", null));
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error("编码生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 开单页内置：按产品查询产品级 BOM（页面预填物料明细用，无需 BOM 管理权限）
+     */
+    @GetMapping("/bomList")
+    public TableDataInfo bomList(MdProductBom mdProductBom)
+    {
+        startPage();
+        return getDataTable(mdProductBomService.selectMdProductBomList(mdProductBom));
+    }
+
+    /**
+     * 新增生产工单（独立开单页）：主工单 + BOM + 参数 + 工序调整 + 采购单/加工单草稿，一次事务提交。
+     * 销售订单「生成工单」入口持 mes:sal:order:workorder，列表手工新增持 mes:pro:workorder:add。
+     */
+    @PreAuthorize("@ss.hasAnyPermi('mes:pro:workorder:add,mes:sal:order:workorder')")
     @Log(title = "生产工单(开单页)", businessType = BusinessType.INSERT)
     @PostMapping("/createFull")
     public AjaxResult createFull(
@@ -417,9 +453,10 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
-     * 修改生产工单（独立开单页）：重建工序快照与草稿单据
+     * 修改生产工单（独立开单页）：重建工序快照与草稿单据。
+     * 销售订单开单链路持 mes:sal:order:workorder 的用户可继续修正自己生成的工单。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:edit')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:pro:workorder:edit,mes:sal:order:workorder')")
     @Log(title = "生产工单(开单页)", businessType = BusinessType.UPDATE)
     @PutMapping("/updateFull/{workorderId}")
     public AjaxResult updateFull(@PathVariable Long workorderId,
@@ -432,9 +469,10 @@ public class ProWorkorderController extends BaseController
     }
 
     /**
-     * 开单页回显：主工单 + BOM + 参数 + 工序 + 已生成采购单/加工单
+     * 开单页回显：主工单 + BOM + 参数 + 工序 + 已生成采购单/加工单。
+     * 编辑/新增入口（edit、add、生成工单）均需能回显，避免仅持入口权限时 403。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("@ss.hasAnyPermi('mes:pro:workorder:query,mes:pro:workorder:edit,mes:sal:order:workorder')")
     @GetMapping("/fullDetail/{workorderId}")
     public AjaxResult fullDetail(@PathVariable Long workorderId)
     {

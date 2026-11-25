@@ -107,6 +107,10 @@
               </el-form-item>
             </el-col>
           </el-row>
+          <template v-if="productionAttrs.length">
+            <el-divider content-position="left">生产属性</el-divider>
+            <ExtAttrForm :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCTION" :columns="3" sortable />
+          </template>
           <el-row :gutter="12">
             <el-col :span="24">
               <el-form-item label="印刷要求">
@@ -138,25 +142,21 @@
           </el-row>
           <el-row :gutter="12">
             <el-col :span="24">
+              <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :autosize="{ minRows: 2 }" /></el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="24">
               <el-form-item label="产品图片">
                 <image-upload v-model="form.productImage" :limit="1" :disabled="readonly" class="img-100" />
                 <span class="tip">导出采购单/加工单时作为单据底部图片</span>
               </el-form-item>
             </el-col>
           </el-row>
-          <el-row :gutter="12">
-            <el-col :span="24">
-              <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :autosize="{ minRows: 2 }" /></el-form-item>
-            </el-col>
-          </el-row>
 
           <template v-if="productAttrs.length">
             <el-divider content-position="left">产品属性</el-divider>
             <ExtAttrForm ref="extAttrRef" :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCT" :columns="3" sortable />
-          </template>
-          <template v-if="productionAttrs.length">
-            <el-divider content-position="left">生产属性</el-divider>
-            <ExtAttrForm :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCTION" :columns="3" sortable />
           </template>
         </el-form>
 
@@ -209,16 +209,15 @@ import { ref, reactive, computed, watch, onMounted, getCurrentInstance } from 'v
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  createWorkorderFull, updateWorkorderFull, getWorkorderFullDetail, getWorkorderCopyTemplate
+  createWorkorderFull, updateWorkorderFull, getWorkorderFullDetail, getWorkorderCopyTemplate,
+  genWorkorderCode, listWorkorderBom
 } from '@/api/mes/pro/workorderFull'
 import { listOrder, getOrderDetail } from '@/api/mes/sal/order'
 import { listRouteProduct, getRouteProduct, resolveRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRoute } from '@/api/mes/pro/proroute'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
 import { listRouteProductBomByRouteId } from '@/api/mes/pro/routeproductbom'
-import { listBom } from '@/api/mes/md/bom'
 import { listAllProcess } from '@/api/mes/pro/process'
-import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import { listUserOptions } from '@/api/system/user'
 import { getItem } from '@/api/mes/md/item'
 import { getEffAttrSchema } from '@/api/mes/md/attr'
@@ -346,7 +345,7 @@ onMounted(() => {
   else initFromSalesOrder()
   if (mode.value === 'add') {
     // 新增工单默认自动生成编码，关闭开关后可手动输入
-    genSerialCode('WORKORDER_NO').then((r: any) => { form.workorderCode = r.data })
+    genWorkorderCode().then((r: any) => { form.workorderCode = r.data })
   } else if (mode.value === 'copy' && !form.workorderCode) {
     form.workorderCode = ''
   }
@@ -511,7 +510,7 @@ function loadCopyTemplate(sourceId: number) {
     }, true)
     purchaseDocs.value = (d.purchaseDocs || []).map((x: any) => ({ ...x.order, lines: x.lines || [] }))
     processDocs.value = (d.processDocs || []).map((x: any) => ({ ...x, lines: x.processLines || [] }))
-    genSerialCode('WORKORDER_NO').then((res: any) => {
+    genWorkorderCode().then((res: any) => {
       form.workorderCode = res.data
       autoGen.value = true
     })
@@ -519,7 +518,7 @@ function loadCopyTemplate(sourceId: number) {
 }
 
 function onAutoGen(flag: boolean) {
-  if (flag) genSerialCode('WORKORDER_NO').then((r: any) => { form.workorderCode = r.data })
+  if (flag) genWorkorderCode().then((r: any) => { form.workorderCode = r.data })
   else form.workorderCode = ''
 }
 
@@ -717,7 +716,7 @@ function loadBomRows(routeId: number, itemId: number) {
   const pids = new Set(routeProcesses.value.map((p: any) => p.processId))
   Promise.all([
     listRouteProductBomByRouteId(routeId),
-    listBom({ itemId, pageSize: 999 })
+    listWorkorderBom({ itemId, pageSize: 999 })
   ]).then(([rb, pb]: any[]) => {
     const rows = (rb.data || [])
       .filter((b: any) => b.productId === itemId && pids.has(b.processId))

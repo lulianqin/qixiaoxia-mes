@@ -30,6 +30,7 @@ import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.md.MdItemTypeMapper;
 import com.ruoyi.system.mapper.mes.md.MdVendorMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
+import com.ruoyi.system.service.mes.md.IMdItemService;
 import com.ruoyi.system.service.mes.wm.IWmStockImportService;
 
 /**
@@ -76,6 +77,9 @@ public class WmStockImportServiceImpl implements IWmStockImportService
 
     @Autowired
     private WmMaterialStockServiceImpl stockService;
+
+    @Autowired
+    private IMdItemService mdItemService;
 
     @Override
     @Transactional
@@ -170,7 +174,7 @@ public class WmStockImportServiceImpl implements IWmStockImportService
         return rv;
     }
 
-    /** 物料匹配：分类内按 名称 + 门幅/尺寸；匹配不到按分类自动建档 */
+    /** 物料匹配：分类内按统一规则（名称 + 门幅/尺寸 + 材质属性）；匹配不到按分类自动建档 */
     private MdItem findOrCreateItem(StockImportResult result, ImportContext ctx, RowValues rv)
     {
         MdItem query = new MdItem();
@@ -178,7 +182,7 @@ public class WmStockImportServiceImpl implements IWmStockImportService
         query.setItemTypeId(ctx.type.getItemTypeId());
         List<MdItem> list = mdItemMapper.selectMdItemList(query);
 
-        MdItem matched = matchItem(list, rv);
+        MdItem matched = matchItem(list, ctx, rv);
         if (matched != null)
         {
             if (fillMissingUnits(matched, rv)) mdItemMapper.updateMdItem(matched);
@@ -191,16 +195,18 @@ public class WmStockImportServiceImpl implements IWmStockImportService
         return item;
     }
 
-    private MdItem matchItem(List<MdItem> list, RowValues rv)
+    /** 与库存新增/接单共用同一套物料同一性规则，避免各入口重复建档口径不一致 */
+    private MdItem matchItem(List<MdItem> list, ImportContext ctx, RowValues rv)
     {
         if (list == null) return null;
-        String key = StringUtils.isNotEmpty(rv.width) ? rv.width : rv.size;
+        MdItem spec = new MdItem();
+        spec.setItemName(rv.name);
+        spec.setItemTypeId(ctx.type.getItemTypeId());
+        spec.setSpecification(StringUtils.isNotEmpty(rv.width) ? rv.width : rv.size);
+        spec.setExtAttrs(buildItemAttrs(rv));
         for (MdItem item : list)
         {
-            if (!rv.name.equals(item.getItemName())) continue;
-            if (StringUtils.isEmpty(key)) return item;
-            String spec = item.getSpecification();
-            if (spec != null && spec.contains(key)) return item;
+            if (mdItemService.isSameItem(item, spec)) return item;
         }
         return null;
     }

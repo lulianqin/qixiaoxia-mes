@@ -32,6 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="extAttrs"        column="ext_attrs"
                 typeHandler="com.ruoyi.common.core.handler.JsonMapTypeHandler" />
         <result property="specFingerprint" column="spec_fingerprint" />
+        <result property="variantCount"    column="variant_count" />
         <result property="batchFlag"       column="batch_flag"       />
         <result property="defaultPurchasePrice" column="default_purchase_price" />
         <result property="defaultTaxRate"  column="default_tax_rate"  />
@@ -51,7 +52,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                i.enable_flag, i.safe_stock_flag, i.min_stock, i.max_stock, i.alert_stock,
                i.high_value, i.ext_attrs, i.spec_fingerprint, i.batch_flag,
                i.default_purchase_price, i.default_tax_rate,
-               i.remark, i.create_by, i.create_time, i.update_by, i.update_time
+               i.remark, i.create_by, i.create_time, i.update_by, i.update_time,
+               (select count(1) from qxx_md_item v where v.parent_id = i.item_id and v.del_flag = '0') as variant_count
         from qxx_md_item i
         left join qxx_md_item_type t on i.item_type_id = t.item_type_id
     </sql>
@@ -73,6 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="enableFlag != null and enableFlag != ''"> and i.enable_flag = #{enableFlag}</if>
             <if test="parentIdFilter == 'spu'"> and i.parent_id = 0</if>
             <if test="parentIdFilter == 'variant'"> and i.parent_id > 0</if>
+            <if test="parentId != null and parentId != 0"> and i.parent_id = #{parentId}</if>
         </where>
     </select>
 

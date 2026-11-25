@@ -1,40 +1,10 @@
 <template>
-  <el-dialog :model-value="modelValue" :title="isEdit ? '编辑库存' : '新增库存'" width="820px" append-to-body
-             @update:model-value="v => emit('update:modelValue', v)" @open="init">
+  <el-dialog :model-value="modelValue" :title="isEdit ? '编辑库存' : '新增库存'" width="1040px" append-to-body
+             @update:model-value="(v: boolean) => emit('update:modelValue', v)" @open="init">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" size="small">
-      <el-row :gutter="12">
-        <el-col :span="12">
-          <el-form-item label="物料" prop="itemId">
-            <el-select v-model="form.itemId" filterable remote clearable placeholder="按编码/名称搜索"
-                       :remote-method="searchItems" :loading="itemLoading" style="width:100%"
-                       :disabled="isEdit" @change="onItemChange">
-              <el-option v-for="it in itemOptions" :key="it.itemId"
-                         :label="`${it.itemCode} ${it.itemName}`" :value="it.itemId" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="物料分类">
-            <el-input :model-value="form.itemTypeName || '-'" disabled placeholder="选择物料后自动带出" />
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row :gutter="12">
-        <el-col :span="12">
-          <el-form-item label="规格型号">
-            <el-input :model-value="form.specification || '-'" disabled />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="装箱规格">
-            <el-input :model-value="form.packageSpec || '-'" disabled placeholder="维护在物料档案" />
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-descriptions v-if="attrRows.length" :column="2" border size="small" class="mb8"
-                       :title="`扩展属性（${form.itemTypeName || '物料分类'}）`">
-        <el-descriptions-item v-for="a in attrRows" :key="a.code" :label="a.label">{{ a.value }}</el-descriptions-item>
-      </el-descriptions>
+      <StockItemFields ref="itemRef" :form="form" :is-edit="isEdit" />
+
+      <el-divider content-position="left">库存信息</el-divider>
       <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="仓库" prop="warehouseId">
@@ -91,25 +61,6 @@
             <el-date-picker v-model="form.stocktakeDate" type="date" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
           </el-form-item>
         </el-col>
-        <el-col :span="8">
-          <el-form-item label="换算率">
-            <el-input :model-value="form.conversionRate ?? '-'" disabled placeholder="维护在物料档案" />
-          </el-form-item>
-        </el-col>
-      </el-row>
-
-      <el-divider content-position="left">库存数量</el-divider>
-      <el-row :gutter="12">
-        <el-col :span="12">
-          <el-form-item :label="`数量（${form.unitName || '主单位'}）`" prop="quantityOnhand">
-            <el-input-number v-model="form.quantityOnhand" :min="0" :precision="4" controls-position="right" style="width:100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item :label="`辅助数量（${form.unit2Name || '辅助单位'}）`">
-            <el-input-number v-model="form.quantityOnhand2" :min="0" :precision="4" controls-position="right" style="width:100%" />
-          </el-form-item>
-        </el-col>
       </el-row>
 
       <el-row :gutter="12" style="margin-top:8px">
@@ -128,14 +79,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { addWmMaterialStock, updateWmMaterialStock } from '@/api/mes/wm/material_stock'
+import { addWmMaterialStock, updateWmMaterialStock, resolveStockItem } from '@/api/mes/wm/material_stock'
 import { listAllWmStorageLocation } from '@/api/mes/wm/storage_location'
 import { listAllWmStorageArea } from '@/api/mes/wm/storage_area'
 import { listAllVendor } from '@/api/mes/md/vendor'
 import { listAllClient } from '@/api/mes/md/client'
-import { listItem } from '@/api/mes/md/item'
-import { listAttrDef } from '@/api/mes/md/attr'
+import { getItem } from '@/api/mes/md/item'
 import type { WmMaterialStock } from '@/types/api/mes/wm/material_stock'
+import StockItemFields from './StockItemFields.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -147,49 +98,44 @@ const emit = defineEmits(['update:modelValue', 'success'])
 const isEdit = computed(() => !!props.row?.materialStockId)
 
 const formRef = ref()
+const itemRef = ref()
 const saving = ref(false)
-const itemLoading = ref(false)
-const itemOptions = ref<any[]>([])
 const locationOptions = ref<any[]>([])
 const areaOptions = ref<any[]>([])
 const vendorOptions = ref<any[]>([])
 const clientOptions = ref<any[]>([])
-const attrMap = ref<Record<string, { attrName: string; attrUnit?: string }>>({})
 const form = reactive<any>({})
 
-/** 选中物料的扩展属性：翻译成「中文名(单位): 值」展示 */
-const attrRows = computed(() => {
-  const attrs = form.extAttrs || {}
-  return Object.keys(attrs)
-    .filter(k => attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== '')
-    .map(k => {
-      const def = attrMap.value[k]
-      const name = def?.attrName || k
-      const unit = def?.attrUnit ? `(${def.attrUnit})` : ''
-      return { code: k, label: `${name}${unit}`, value: Array.isArray(attrs[k]) ? attrs[k].join('、') : String(attrs[k]) }
+const rules = computed(() => isEdit.value
+  ? {
+      warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
+      quantityOnhand: [{ required: true, message: '请输入库存数量', trigger: 'blur' }]
+    }
+  : {
+      itemName: [{ required: true, message: '请输入物料名称', trigger: 'blur' }],
+      itemTypeId: [{ required: true, message: '请选择物料分类', trigger: 'change' }],
+      unitOfMeasure: [{ required: true, message: '请选择主单位', trigger: 'change' }],
+      warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
+      quantityOnhand: [{ required: true, message: '请输入库存数量', trigger: 'blur' }]
     })
-})
-
-const rules = {
-  itemId: [{ required: true, message: '请选择物料', trigger: 'change' }],
-  warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
-  quantityOnhand: [{ required: true, message: '请输入库存数量', trigger: 'blur' }]
-}
 
 function init() {
   const r: any = props.row || {}
   Object.keys(form).forEach(k => delete form[k])
   Object.assign(form, {
     materialStockId: r.materialStockId,
-    itemId: r.itemId,
+    itemId: r.itemId ?? null,
     itemCode: r.itemCode,
-    itemName: r.itemName,
-    specification: r.specification,
+    itemName: r.itemName || '',
+    itemTypeId: r.itemTypeId ?? null,
+    itemTypeCode: r.itemTypeCode,
     itemTypeName: r.itemTypeName,
-    packageSpec: r.packageSpec,
+    specification: r.specification || '',
+    packageSpec: r.packageSpec || '',
+    productSize: '',
     extAttrs: r.itemExtAttrs || {},
-    unitOfMeasure: r.unitOfMeasure,
-    unitName: r.unitName,
+    unitOfMeasure: r.unitOfMeasure || 'PCS',
+    unitName: r.unitName || '个',
     unit2: r.unit2,
     unit2Name: r.unit2Name,
     conversionRate: r.conversionRate,
@@ -215,24 +161,22 @@ function init() {
     stocktakeDate: r.stocktakeDate,
     remark: r.remark
   })
-  if (r.itemId) {
-    itemOptions.value = [{ itemId: r.itemId, itemCode: r.itemCode, itemName: r.itemName }]
-  } else {
-    searchItems('')
-  }
   loadLocationOptions()
   loadVendorOptions()
   loadClientOptions()
-  loadAttrMap()
-}
-
-function loadAttrMap() {
-  if (Object.keys(attrMap.value).length) return
-  listAttrDef({ enableFlag: '1' } as any).then((res: any) => {
-    const map: Record<string, { attrName: string; attrUnit?: string }> = {}
-    for (const a of (res.rows || [])) map[a.attrCode] = { attrName: a.attrName, attrUnit: a.attrUnit }
-    attrMap.value = map
-  }).catch(() => {})
+  // 编辑态：补全物料档案里的产品尺寸/扩展属性/辅单位
+  if (isEdit.value && r.itemId) {
+    getItem(r.itemId).then((res: any) => {
+      const it = res?.data
+      if (!it) return
+      form.itemTypeId = it.itemTypeId ?? form.itemTypeId
+      form.productSize = it.productSize || form.productSize
+      form.extAttrs = it.extAttrs || form.extAttrs
+      form.unit2 = it.unit2
+      form.unit2Name = it.unit2Name
+      form.conversionRate = it.conversionRate
+    }).catch(() => {})
+  }
 }
 
 function loadLocationOptions() {
@@ -251,66 +195,79 @@ function loadAreaOptions(locationId?: number) {
   }).catch(() => {})
 }
 
-function searchItems(keyword: string) {
-  itemLoading.value = true
-  const kw = keyword || undefined
-  // 编码/名称两路并发，支持按 PAPER-XBZ-A 这类编码搜索
-  Promise.all([
-    listItem({ pageNum: 1, pageSize: 30, itemCode: kw } as any),
-    listItem({ pageNum: 1, pageSize: 30, itemName: kw } as any)
-  ]).then(([byCode, byName]) => {
-    const rows = [...(byCode.rows || []), ...(byName.rows || [])]
-    itemOptions.value = rows.filter((r: any, i: number) => rows.findIndex((x: any) => x.itemId === r.itemId) === i)
-  }).finally(() => { itemLoading.value = false })
-}
-
-/** 单位、换算率、装箱规格全部来自物料档案，库存不做行业假设 */
-function onItemChange(itemId: number) {
-  const it = itemOptions.value.find(x => x.itemId === itemId)
-  if (!it) return
-  form.itemCode = it.itemCode
-  form.itemName = it.itemName
-  form.specification = it.specification
-  form.itemTypeName = it.itemTypeName
-  form.packageSpec = it.packageSpec
-  form.extAttrs = it.extAttrs || {}
-  form.unitOfMeasure = it.unitOfMeasure
-  form.unitName = it.unitName
-  form.unit2 = it.unit2
-  form.unit2Name = it.unit2Name
-  form.conversionRate = it.conversionRate
-}
-
 function onWarehouseChange(id: number) {
-  const w = props.warehouseOptions.find(x => x.warehouseId === id)
+  const w = props.warehouseOptions.find((x: any) => x.warehouseId === id)
   if (w) { form.warehouseCode = w.warehouseCode; form.warehouseName = w.warehouseName }
 }
 function onLocationChange(id: number) {
-  const l = locationOptions.value.find(x => x.locationId === id)
+  const l = locationOptions.value.find((x: any) => x.locationId === id)
   if (l) { form.locationCode = l.locationCode; form.locationName = l.locationName }
   form.areaId = null
   loadAreaOptions(id)
 }
 function onVendorChange(id: number) {
-  const v = vendorOptions.value.find(x => x.vendorId === id)
+  const v = vendorOptions.value.find((x: any) => x.vendorId === id)
   if (v) { form.vendorCode = v.vendorCode; form.vendorName = v.vendorName }
 }
 function onClientChange(id: number) {
-  const c = clientOptions.value.find(x => x.clientId === id)
+  const c = clientOptions.value.find((x: any) => x.clientId === id)
   if (c) { form.clientName = c.clientName }
 }
 
 async function submit() {
   await formRef.value?.validate()
+  try {
+    await itemRef.value?.validate()
+  } catch (e: any) {
+    ElMessage.warning(e?.message || '请完善扩展属性')
+    return
+  }
   saving.value = true
   try {
     const payload: any = { ...form }
+    payload.itemExtAttrs = form.extAttrs || {}
+    delete payload.extAttrs
     payload.quantityAvailable = payload.quantityOnhand
     payload.quantityAvailable2 = payload.quantityOnhand2
-    const area = areaOptions.value.find(x => x.areaId === payload.areaId)
+    const area = areaOptions.value.find((x: any) => x.areaId === payload.areaId)
     if (area) { payload.areaCode = area.areaCode; payload.areaName = area.areaName }
-    if (isEdit.value) await updateWmMaterialStock(payload)
-    else await addWmMaterialStock(payload)
+
+    if (isEdit.value) {
+      await updateWmMaterialStock(payload)
+    } else {
+      // 先按最终填写值解析物料：同规格命中复用，否则自动建档
+      const res: any = await resolveStockItem({
+        itemName: form.itemName,
+        itemTypeId: form.itemTypeId,
+        specification: form.specification,
+        packageSpec: form.packageSpec,
+        productSize: form.productSize,
+        unitOfMeasure: form.unitOfMeasure,
+        unitName: form.unitName,
+        unit2: form.unit2,
+        unit2Name: form.unit2Name,
+        conversionRate: form.conversionRate,
+        extAttrs: form.extAttrs || {}
+      })
+      const item = res?.data || res
+      Object.assign(payload, {
+        itemId: item.itemId,
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        itemTypeId: item.itemTypeId,
+        itemTypeCode: item.itemTypeCode,
+        itemTypeName: item.itemTypeName,
+        specification: item.specification,
+        packageSpec: item.packageSpec,
+        unitOfMeasure: item.unitOfMeasure,
+        unitName: item.unitName,
+        unit2: item.unit2,
+        unit2Name: item.unit2Name,
+        conversionRate: item.conversionRate,
+        itemExtAttrs: item.extAttrs || form.extAttrs || {}
+      })
+      await addWmMaterialStock(payload)
+    }
     ElMessage.success('保存成功')
     emit('update:modelValue', false)
     emit('success')

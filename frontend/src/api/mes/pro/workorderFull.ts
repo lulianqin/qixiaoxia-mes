@@ -1,5 +1,15 @@
 import request from '@/utils/request'
 
+// 开单页内置：生成工单编码（WORKORDER_NO）
+export function genWorkorderCode(): Promise<any> {
+  return request({ url: '/mes/pro/workorder/nextCode', method: 'post' })
+}
+
+// 开单页内置：按产品查询产品级 BOM（预填工单物料明细）
+export function listWorkorderBom(query: any): Promise<any> {
+  return request({ url: '/mes/pro/workorder/bomList', method: 'get', params: query })
+}
+
 // 新增生产工单（独立开单页）：主工单 + BOM + 参数 + 工序 + 采购单/加工单草稿
 export function createWorkorderFull(data: any) {
   return request({ url: '/mes/pro/workorder/createFull', method: 'post', data })

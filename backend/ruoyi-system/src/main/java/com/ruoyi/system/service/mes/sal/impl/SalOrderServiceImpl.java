@@ -56,6 +56,7 @@ import com.ruoyi.system.mapper.mes.pro.ProRouteProductMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
 import com.ruoyi.system.mapper.mes.sys.SysExternalMappingMapper;
+import com.ruoyi.system.service.mes.md.IMdItemService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderService;
 import com.ruoyi.system.service.mes.pro.ProRouteResolveService;
 import com.ruoyi.system.service.mes.sal.ISalOrderService;
@@ -88,6 +89,9 @@ public class SalOrderServiceImpl implements ISalOrderService
 
     @Autowired
     private MdItemMapper mdItemMapper;
+
+    @Autowired
+    private IMdItemService mdItemService;
 
     @Autowired
     private MdItemTypeMapper mdItemTypeMapper;
@@ -567,22 +571,15 @@ public class SalOrderServiceImpl implements ISalOrderService
                 if (item != null) return item;
             }
         }
-        MdItem matched = findItemByName(trimmed);
+        // 统一物料匹配规则：名称 + 规格型号（含历史写法兼容），与库存新增/导入共用
+        MdItem spec = new MdItem();
+        spec.setItemName(trimmed);
+        spec.setSpecification(StringUtils.isNotEmpty(line.getProductSpc())
+                ? line.getProductSpc() : line.getProductSize());
+        spec.setProductSize(line.getProductSize());
+        MdItem matched = mdItemService.matchItem(spec);
         if (matched != null) return matched;
         return createItemFromLine(line, trimmed);
-    }
-
-    private MdItem findItemByName(String name)
-    {
-        MdItem query = new MdItem();
-        query.setItemName(name);
-        List<MdItem> list = mdItemMapper.selectMdItemList(query);
-        if (list == null) return null;
-        for (MdItem item : list)
-        {
-            if (name.equals(item.getItemName())) return item;
-        }
-        return null;
     }
 
     /** 按销售明细自动创建 MES 物料：名称/规格/单位取外部单据，编码优先沿用 ERP 编码 */
@@ -961,7 +958,7 @@ public class SalOrderServiceImpl implements ISalOrderService
         return null;
     }
 
-    /** 物料匹配：映射表(编码/名称) → mesItemCode/productCode → 物料名称精确匹配，未匹配返回 null */
+    /** 物料匹配：映射表(编码/名称) → 统一规则（编码/名称/规格），未匹配返回 null */
     private MdItem resolveItem(ErpOrderLineRequest dto)
     {
         if (StringUtils.isNotEmpty(dto.getProductCode()))
@@ -982,28 +979,13 @@ public class SalOrderServiceImpl implements ISalOrderService
                 if (mappedItem != null) return mappedItem;
             }
         }
-        String code = StringUtils.isNotEmpty(dto.getMesItemCode()) ? dto.getMesItemCode() : dto.getProductCode();
-        if (StringUtils.isNotEmpty(code))
-        {
-            MdItem query = new MdItem();
-            query.setItemCode(code);
-            List<MdItem> list = mdItemMapper.selectMdItemList(query);
-            if (list != null && !list.isEmpty()) return list.get(0);
-        }
-        if (StringUtils.isNotEmpty(dto.getProductName()))
-        {
-            MdItem query = new MdItem();
-            query.setItemName(dto.getProductName().trim());
-            List<MdItem> list = mdItemMapper.selectMdItemList(query);
-            if (list != null)
-            {
-                for (MdItem item : list)
-                {
-                    if (dto.getProductName().trim().equals(item.getItemName())) return item;
-                }
-            }
-        }
-        return null;
+        MdItem spec = new MdItem();
+        spec.setItemCode(StringUtils.isNotEmpty(dto.getMesItemCode()) ? dto.getMesItemCode() : dto.getProductCode());
+        spec.setItemName(StringUtils.isNotEmpty(dto.getProductName()) ? dto.getProductName().trim() : null);
+        spec.setSpecification(StringUtils.isNotEmpty(dto.getProductSpec())
+                ? dto.getProductSpec() : dto.getProductSize());
+        spec.setProductSize(dto.getProductSize());
+        return mdItemService.matchItem(spec);
     }
 
     private void assertErpUpdatable(SalOrder order, String action)

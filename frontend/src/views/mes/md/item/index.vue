@@ -42,7 +42,9 @@
           <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
         </el-row>
 
-        <el-table v-loading="loading" :data="itemList" @selection-change="handleSelectionChange">
+        <el-table v-loading="loading" :data="itemList" @selection-change="handleSelectionChange"
+                  :key="treeMode ? 'tree' : 'flat'" row-key="itemId"
+                  :tree-props="{ children: 'children' }" :lazy="treeMode" :load="loadVariants">
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column label="主图" align="center" width="70">
             <template #default="scope">
@@ -51,13 +53,19 @@
               <span v-else class="item-thumb-empty">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="物料编码" align="center" prop="itemCode" width="130">
+          <el-table-column label="物料编码" align="center" prop="itemCode" width="150" class-name="code-cell">
             <template #default="scope">
-              <span>{{ scope.row.itemCode }}</span>
+              <span class="item-code-text">{{ scope.row.itemCode }}</span>
               <el-tag v-if="scope.row.parentId > 0" type="warning" size="small" class="variant-tag" effect="plain">变体</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="物料名称" align="center" prop="itemName" min-width="120" :show-overflow-tooltip="true" />
+          <el-table-column label="规格数" align="center" width="80">
+            <template #default="scope">
+              <el-tag v-if="scope.row.parentId === 0" size="small" type="info">{{ scope.row.variantCount || 0 }}</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="规格型号" align="center" prop="specification" width="150" :show-overflow-tooltip="true" />
           <el-table-column label="分类" align="center" prop="itemTypeName" width="100" :show-overflow-tooltip="true">
             <template #default="scope">{{ scope.row.itemTypeName || '未分类' }}</template>
@@ -271,7 +279,7 @@ const data = reactive({
     enableFlag: '1', batchFlag: '1', safeStockFlag: '0',
     highValue: '0', conversionRate: 1.0, parentId: 0
   } as MdItem,
-  queryParams: { pageNum: 1, pageSize: 10, parentIdFilter: undefined } as ItemQueryParams,
+  queryParams: { pageNum: 1, pageSize: 10, parentIdFilter: 'spu' } as ItemQueryParams,
   rules: {
     itemCode: [{ required: true, message: '物料编码不能为空', trigger: 'blur' }],
     itemName: [{ required: true, message: '物料名称不能为空', trigger: 'blur' }],
@@ -358,9 +366,29 @@ function onUnit2Change(code: string) {
   if (found) form.value.unit2Name = found.unitName
 }
 
+/** 搜索关键词存在时跨 SPU/SKU 平铺查询，避免只过滤到父级导致搜不到变体 */
+function hasKeyword() {
+  return !!(queryParams.value.itemCode || queryParams.value.itemName || queryParams.value.specification)
+}
+/** 仅「SPU」浏览模式且无关键词时启用树形懒加载 */
+const treeMode = computed(() => queryParams.value.parentIdFilter === 'spu' && !hasKeyword())
+
 function getList() {
   loading.value = true
-  listItem(queryParams.value).then(r => { itemList.value = r.rows; total.value = r.total; loading.value = false })
+  const params: any = { ...queryParams.value }
+  if (hasKeyword() && params.parentIdFilter === 'spu') delete params.parentIdFilter
+  listItem(params).then(r => {
+    itemList.value = (r.rows || []).map((x: any) => ({ ...x, hasChildren: Number(x.variantCount) > 0 }))
+    total.value = r.total
+    loading.value = false
+  })
+}
+
+/** 树形懒加载：展开 SPU 时查其子规格 */
+function loadVariants(row: any, _treeNode: any, resolve: (rows: any[]) => void) {
+  listItem({ parentId: row.itemId, pageNum: 1, pageSize: 500 } as any)
+    .then(r => resolve((r.rows || []).map((x: any) => ({ ...x, hasChildren: false }))))
+    .catch(() => resolve([]))
 }
 
 function cancel() { open.value = false; reset() }
@@ -476,5 +504,14 @@ getList()
 <style scoped>
 .item-thumb { width: 40px; height: 40px; border-radius: 4px; }
 .item-thumb-empty { color: #c0c4cc; }
+/* 物料编码完整展示：不省略，超长自动换行 */
+:deep(.code-cell .cell) {
+  white-space: normal !important;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: clip;
+}
+.item-code-text { word-break: break-all; }
+.variant-tag { margin-left: 4px; }
 :deep(.el-form-item__label) { padding-right: 16px !important; }
 </style>
