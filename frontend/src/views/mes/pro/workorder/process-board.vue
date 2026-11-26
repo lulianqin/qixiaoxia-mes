@@ -10,9 +10,9 @@
       <template #extra>
         <div class="header-actions">
           <el-button link type="primary" size="small" @click="goWorkorder" v-if="wo.workorderId">所属工单：{{ wo.workorderCode }}</el-button>
-          <el-button v-if="canStart" type="primary" size="small" @click="quickStatus('START')" v-hasPermi="['mes:pro:task:edit']">开工</el-button>
-          <el-button v-if="canStop" type="warning" size="small" @click="quickStatus('PAUSE')" v-hasPermi="['mes:pro:task:edit']">停止</el-button>
-          <el-button v-if="canComplete" type="success" size="small" @click="quickStatus('COMPLETE')" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+          <el-button v-if="canStart" type="primary" size="small" @click="quickStatus('START')" v-hasPermi="['mes:pro:task:start']">开工</el-button>
+          <el-button v-if="canStop" type="warning" size="small" @click="quickStatus('PAUSE')" v-hasPermi="['mes:pro:task:start']">停止</el-button>
+          <el-button v-if="canComplete" type="success" size="small" @click="quickStatus('COMPLETE')" v-hasPermi="['mes:pro:task:complete']">完成</el-button>
           <el-button v-if="canReport" type="success" size="small" @click="goFeedback" v-hasPermi="['mes:pro:feedback:add']">报工</el-button>
           <el-button type="primary" size="small" @click="qrOpen = true" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
         </div>

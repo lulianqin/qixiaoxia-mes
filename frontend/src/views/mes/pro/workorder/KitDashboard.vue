@@ -19,7 +19,7 @@
 
     <!-- 操作按钮区 -->
     <el-space wrap style="margin-bottom: 16px">
-      <el-button type="primary" @click="handleGenerateAll" :loading="genLoading">
+      <el-button type="primary" @click="handleGenerateAll" :loading="genLoading" v-hasPermi="['mes:pro:workorder:edit']">
         一键全部生成
       </el-button>
       <el-button
@@ -27,18 +27,19 @@
         :loading="genLoading"
         :disabled="issueDisabled"
         :title="issueDisabled ? issueDisabledReason : ''"
+        v-hasPermi="['mes:pro:workorder:edit']"
       >
         仅生成领料单
       </el-button>
-      <el-button @click="handleGeneratePurOrder" :loading="genLoading">
+      <el-button @click="handleGeneratePurOrder" :loading="genLoading" v-hasPermi="['mes:pro:workorder:edit']">
         仅生成采购单
       </el-button>
       <el-tooltip content="需已报工审核后自动或手动触发" :disabled="isCompleted">
-        <el-button @click="handleGenerateReceipt" :loading="genLoading" :disabled="!isCompleted || dashboard?.receiptRecommend?.alreadyHasReceipt">
+        <el-button @click="handleGenerateReceipt" :loading="genLoading" :disabled="!isCompleted || dashboard?.receiptRecommend?.alreadyHasReceipt" v-hasPermi="['mes:pro:workorder:edit']">
           仅生成入库单
         </el-button>
       </el-tooltip>
-      <el-button @click="handleGenerateReturn" :loading="genLoading" :disabled="!isCompleted">
+      <el-button @click="handleGenerateReturn" :loading="genLoading" :disabled="!isCompleted" v-hasPermi="['mes:pro:workorder:edit']">
         仅生成退料单
       </el-button>
       <el-tag v-if="genMsg" type="info">{{ genMsg }}</el-tag>

@@ -77,10 +77,10 @@
 
     <el-divider content-position="left">采购明细</el-divider>
     <div class="line-actions">
-      <el-button plain icon="Plus" size="small" @click="itemSelectRef?.open()">添加物料</el-button>
-      <el-button plain icon="Box" size="small" :disabled="!workorder.productId" @click="addProductLine">加入产品本身</el-button>
-      <el-button plain icon="Document" size="small" @click="addBomLines(false)">加入产品BOM</el-button>
-      <el-button plain icon="Document" size="small" @click="addBomLines(true)">加入工序BOM</el-button>
+      <el-button plain icon="Plus" size="small" @click="itemSelectRef?.open()" v-hasPermi="['mes:pro:workorder:edit']">添加物料</el-button>
+      <el-button plain icon="Box" size="small" :disabled="!workorder.productId" @click="addProductLine" v-hasPermi="['mes:pro:workorder:edit']">加入产品本身</el-button>
+      <el-button plain icon="Document" size="small" @click="addBomLines(false)" v-hasPermi="['mes:pro:workorder:edit']">加入产品BOM</el-button>
+      <el-button plain icon="Document" size="small" @click="addBomLines(true)" v-hasPermi="['mes:pro:workorder:edit']">加入工序BOM</el-button>
       <span class="line-tip">可采购任意物料；缺口行已默认勾选</span>
     </div>
     <el-table :data="lines" size="small" border ref="tableRef" @selection-change="handleSelection">
@@ -132,7 +132,7 @@
 
     <template #footer>
       <el-button @click="visible = false">取 消</el-button>
-      <el-button type="primary" :disabled="checked.length===0" :loading="submitting" @click="submit">
+      <el-button type="primary" :disabled="checked.length===0" :loading="submitting" @click="submit" v-hasPermi="['mes:pro:workorder:edit']">
         确认生成（{{ checked.length }} 项）
       </el-button>
     </template>

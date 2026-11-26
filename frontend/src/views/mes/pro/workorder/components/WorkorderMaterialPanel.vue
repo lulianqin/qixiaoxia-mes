@@ -7,7 +7,7 @@
           <el-tag size="small" :type="shortageCount > 0 ? 'danger' : 'success'">
             {{ shortageCount > 0 ? '缺料 ' + shortageCount + ' 项' : '已齐套' }}
           </el-tag>
-          <el-button v-if="editable" link type="primary" icon="Plus" size="small" class="ml8" @click="openAdd">添加物料</el-button>
+          <el-button v-if="editable" link type="primary" icon="Plus" size="small" class="ml8" @click="openAdd" v-hasPermi="['mes:pro:workorder:add']">添加物料</el-button>
           <el-button link type="primary" size="small" class="ml8" @click="load">刷新</el-button>
         </div>
       </div>
@@ -71,8 +71,8 @@
       </el-table-column>
       <el-table-column v-if="editable" label="操作" width="130" align="center" fixed="right">
         <template #default="s">
-          <el-button link type="primary" size="small" :disabled="!s.row._dirty" @click="saveRow(s.row)">保存</el-button>
-          <el-button link type="danger" size="small" @click="deleteRow(s.row)">删除</el-button>
+          <el-button link type="primary" size="small" :disabled="!s.row._dirty" @click="saveRow(s.row)" v-hasPermi="['mes:pro:workorder:edit']">保存</el-button>
+          <el-button link type="danger" size="small" @click="deleteRow(s.row)" v-hasPermi="['mes:pro:workorder:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

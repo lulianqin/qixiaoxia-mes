@@ -54,20 +54,20 @@
     <el-table-column label="操作" align="center" width="220" fixed="right" class-name="op-col">
       <template #default="s">
         <el-button v-if="canDispatch(s.row)" link type="success" size="small"
-          @click.stop="emit('action', s.row, 'DISPATCH')" v-hasPermi="['mes:pro:task:edit']">下发</el-button>
+          @click.stop="emit('action', s.row, 'DISPATCH')" v-hasPermi="['mes:pro:task:dispatch']">下发</el-button>
         <el-button v-if="canStartTask(s.row)" link type="primary" size="small"
-          @click.stop="emit('action', s.row, 'START')" v-hasPermi="['mes:pro:task:edit']">开工</el-button>
+          @click.stop="emit('action', s.row, 'START')" v-hasPermi="['mes:pro:task:start']">开工</el-button>
         <el-button v-if="s.row.status === 'PRODUCING'" link type="warning" size="small"
-          @click.stop="emit('action', s.row, 'PAUSE')" v-hasPermi="['mes:pro:task:edit']">停止</el-button>
+          @click.stop="emit('action', s.row, 'PAUSE')" v-hasPermi="['mes:pro:task:start']">停止</el-button>
         <el-button v-if="canReport(s.row)" link type="success" size="small"
           @click.stop="emit('report', s.row)" v-hasPermi="['mes:pro:feedback:add']">报工</el-button>
         <el-button v-if="!isFinal(s.row)" link type="success" size="small"
-          @click.stop="emit('action', s.row, 'COMPLETE')" v-hasPermi="['mes:pro:task:edit']">完成</el-button>
+          @click.stop="emit('action', s.row, 'COMPLETE')" v-hasPermi="['mes:pro:task:complete']">完成</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('edit', s.row)" v-hasPermi="['mes:pro:task:edit']">编辑</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('qrcode', s.row)" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('process-board', s.row)">工序看板</el-button>
         <el-button v-if="!isFinal(s.row)" link type="danger" size="small"
-          @click.stop="emit('action', s.row, 'CANCEL')" v-hasPermi="['mes:pro:task:edit']">取消</el-button>
+          @click.stop="emit('action', s.row, 'CANCEL')" v-hasPermi="['mes:pro:task:cancel']">取消</el-button>
         <el-button v-if="!isFinal(s.row)" link type="primary" size="small"
           @click.stop="emit('action', s.row, 'EXCEPTION')" v-hasPermi="['mes:pro:exception:add']">报异常</el-button>
       </template>

@@ -207,7 +207,7 @@ public class ProWorkorderController extends BaseController
     /**
      * 查询所有生产工单列表
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:list')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/listAll")
     public AjaxResult listAll()
     {
@@ -364,7 +364,7 @@ public class ProWorkorderController extends BaseController
     /**
      * 获取生产工单详细信息
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping(value = "/{workorderId}")
     public AjaxResult getInfo(@PathVariable("workorderId") Long workorderId)
     {
@@ -374,7 +374,7 @@ public class ProWorkorderController extends BaseController
     /**
      * 获取生产工单详情（含BOM和工序参数，合并返回）
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping(value = "/detail/{workorderId}")
     public AjaxResult getDetail(@PathVariable("workorderId") Long workorderId)
     {
@@ -560,7 +560,7 @@ public class ProWorkorderController extends BaseController
     /**
      * 物料齐套检查（实时计算，不持久化）
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/checkMaterial/{workorderId}")
     public AjaxResult checkMaterial(@PathVariable Long workorderId)
     {
@@ -581,7 +581,7 @@ public class ProWorkorderController extends BaseController
     /**
      * 加载工单齐套看板 — 汇总物料分析及领料/采购/退料/入库四类单据状态
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/kitDashboard/{workorderId}")
     public AjaxResult kitDashboard(@PathVariable Long workorderId)
     {
@@ -638,7 +638,7 @@ public class ProWorkorderController extends BaseController
     /**
      * 采购单快捷创建向导 — 返回推荐数据（供应商、数量），不写库
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/purOrderWizard/{workorderId}")
     public AjaxResult purOrderWizard(@PathVariable Long workorderId)
     {

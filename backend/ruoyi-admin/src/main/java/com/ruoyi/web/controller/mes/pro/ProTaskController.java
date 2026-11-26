@@ -17,6 +17,8 @@ import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.framework.web.service.PermissionService;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.service.mes.pro.IProTaskService;
@@ -39,6 +41,9 @@ public class ProTaskController extends BaseController
     private IProTaskService proTaskService;
 
     @Autowired
+    private PermissionService permissionService;
+
+    @Autowired
     private com.ruoyi.system.service.mes.pro.IProWorkorderService proWorkorderService;
 
     @Autowired(required = false)
@@ -50,7 +55,7 @@ public class ProTaskController extends BaseController
     /**
      * 移动端开工：仅工单负责人/当前工序负责人（或管理员）可操作。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:task:list')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:start')")
     @Log(title = "移动端开工", businessType = BusinessType.UPDATE)
     @PutMapping("/mobileStart/{taskId}")
     public AjaxResult mobileStart(@PathVariable Long taskId)
@@ -181,7 +186,7 @@ public class ProTaskController extends BaseController
     /**
      * 下发排产任务：NORMAL/PREPARE → PRODUCING
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:dispatch')")
     @Log(title = "生产任务下发", businessType = BusinessType.UPDATE)
     @PutMapping("/dispatch/{taskId}")
     public AjaxResult dispatch(@PathVariable Long taskId)
@@ -193,7 +198,7 @@ public class ProTaskController extends BaseController
     /**
      * 完成任务：PRODUCING → COMPLETED（末工序完成时自动检查工单完工）
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:complete')")
     @Log(title = "生产任务完成", businessType = BusinessType.UPDATE)
     @PutMapping("/complete/{taskId}")
     public AjaxResult complete(@PathVariable Long taskId)
@@ -205,7 +210,7 @@ public class ProTaskController extends BaseController
     /**
      * 取消任务：非终态 → CANCEL
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
+    @PreAuthorize("@ss.hasPermi('mes:pro:task:cancel')")
     @Log(title = "生产任务取消", businessType = BusinessType.UPDATE)
     @PutMapping("/cancel/{taskId}")
     public AjaxResult cancel(@PathVariable Long taskId)
@@ -218,11 +223,28 @@ public class ProTaskController extends BaseController
      * 工序快捷状态：START-开始, PAUSE-停止, COMPLETE-完成。
      * 弱流程记录：不校验机台/负责人/质检，直接记录状态与时间。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:task:edit')")
     @Log(title = "工序快捷状态", businessType = BusinessType.UPDATE)
     @PutMapping("/quickStatus/{taskId}")
     public AjaxResult quickStatus(@PathVariable Long taskId, @RequestParam("action") String action)
     {
+        // START/PAUSE 与 COMPLETE 分属独立权限，需按 action 动态校验
+        String permission;
+        if ("COMPLETE".equals(action))
+        {
+            permission = "mes:pro:task:complete";
+        }
+        else if ("START".equals(action) || "PAUSE".equals(action))
+        {
+            permission = "mes:pro:task:start";
+        }
+        else
+        {
+            throw new ServiceException("不支持的工序操作：" + action);
+        }
+        if (!permissionService.hasPermi(permission))
+        {
+            throw new ServiceException("没有权限，请联系管理员授权", 403);
+        }
         proTaskService.quickChangeStatus(taskId, action);
         return success();
     }

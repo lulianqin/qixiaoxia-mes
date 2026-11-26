@@ -103,7 +103,7 @@ public class SysAutoCodeRuleController extends BaseController
     /**
      * 生成流水编码 (POST — 非幂等操作)
      */
-    @PreAuthorize("@ss.hasPermi('mes:sys:autocoderule:query')")
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/genSerialCode/{ruleCode}")
     public AjaxResult genSerialCode(@PathVariable("ruleCode") String ruleCode,
                                      @RequestParam(required = false) String inputCharacter)

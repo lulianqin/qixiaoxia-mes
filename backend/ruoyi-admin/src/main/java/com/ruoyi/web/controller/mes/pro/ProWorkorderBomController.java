@@ -62,7 +62,7 @@ public class ProWorkorderBomController extends BaseController
     /**
      * 根据工单ID查询BOM组成列表
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/listByWorkorderId/{workorderId}")
     public AjaxResult listByWorkorderId(@PathVariable("workorderId") Long workorderId)
     {

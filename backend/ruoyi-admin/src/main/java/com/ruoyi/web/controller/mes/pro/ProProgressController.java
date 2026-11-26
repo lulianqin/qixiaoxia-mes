@@ -34,7 +34,7 @@ public class ProProgressController extends BaseController
     /**
      * 工单进度详情（含工序进度、流转卡进度）。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{workorderId}")
     public AjaxResult getProgress(@PathVariable Long workorderId)
     {
@@ -62,7 +62,7 @@ public class ProProgressController extends BaseController
      * 工单进度详情内嵌的甘特图（只读）。
      * 复用工单查询权限，且不触发自动排产，避免只读弹窗产生写副作用或要求排产权限。
      */
-    @PreAuthorize("@ss.hasPermi('mes:pro:workorder:query')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{workorderId}/gantt")
     public AjaxResult getGantt(@PathVariable Long workorderId)
     {
