@@ -244,6 +244,40 @@
         update qxx_wm_outsource_order set del_flag = '2' where order_id = #{orderId}
     </update>
 
+    <!-- 物理删除：工单开单页重建草稿单时使用，释放 uk_wo_process(workorder_id, process_id) 唯一键 -->
+    <delete id="deleteOutsourceOrderHardByOrderId" parameterType="Long">
+        delete from qxx_wm_outsource_order where order_id = #{orderId}
+    </delete>
+
+    <!-- 先清工序ID：草稿单首道工序变更时避免唯一键中间态冲突 -->
+    <update id="clearDraftProcessId" parameterType="Long">
+        update qxx_wm_outsource_order set process_id = null
+        where order_id = #{orderId} and status = 'DRAFT'
+    </update>
+
+    <!-- 工单开单页就地更新草稿单头：保留单号/状态/发料行，显式覆盖可空字段 -->
+    <update id="updateDraftHeaderForWorkorder" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder">
+        update qxx_wm_outsource_order
+        set supplier_type = #{supplierType},
+            vendor_id = #{vendorId},
+            vendor_code = #{vendorCode},
+            vendor_name = #{vendorName},
+            doc_title = #{docTitle},
+            order_date = #{orderDate},
+            expected_date = #{expectedDate},
+            purchaser = #{purchaser},
+            source_order_code = #{sourceOrderCode},
+            delivery_address = #{deliveryAddress},
+            remark = #{remark},
+            route_id = #{routeId},
+            process_id = #{processId},
+            process_code = #{processCode},
+            process_name = #{processName},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where order_id = #{orderId} and status = 'DRAFT'
+    </update>
+
     <!-- 仅回写 IQC 挂点两列（工厂生成检验单后回填，避免并发覆盖整头） -->
     <update id="updateOutsourceOrderHeaderRefs">
         update qxx_wm_outsource_order set iqc_id = #{iqcId}, iqc_code = #{iqcCode} where order_id = #{orderId}

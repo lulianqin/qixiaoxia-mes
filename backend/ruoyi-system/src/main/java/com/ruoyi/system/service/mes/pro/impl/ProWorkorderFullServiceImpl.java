@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ import com.ruoyi.system.mapper.mes.pro.ProWorkorderProcessMapper;
 import com.ruoyi.system.mapper.mes.pur.PurOrderMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderLineMapper;
 import com.ruoyi.system.mapper.mes.sal.SalOrderMapper;
+import com.ruoyi.system.mapper.mes.wm.WmOutsourceLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessLineMapper;
 import com.ruoyi.system.service.mes.common.MesQuantityService;
@@ -72,6 +75,7 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
     @Autowired private IOutsourceService outsourceService;
     @Autowired private WmOutsourceOrderMapper outsourceOrderMapper;
     @Autowired private WmOutsourceProcessLineMapper processLineMapper;
+    @Autowired private WmOutsourceLineMapper outsourceLineMapper;
     @Autowired private SalOrderLineMapper salOrderLineMapper;
     @Autowired private SalOrderMapper salOrderMapper;
 
@@ -154,7 +158,6 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         wo = workorderService.selectProWorkorderByWorkorderId(workorderId);
         woProcessMapper.deleteByWorkorderId(workorderId, SecurityUtils.getFactoryId());
         saveRouteSnapshot(workorderId, body.getRouteProcesses());
-        removeDraftDocs(workorderId);
         savePurchaseDocs(wo, body.getPurchaseDocs());
         saveProcessDocs(wo, body.getProcessDocs());
         return wo;
@@ -578,38 +581,111 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
 
     private void savePurchaseDocs(ProWorkorder wo, List<WorkorderPurDocVO> docs)
     {
-        if (docs == null || docs.isEmpty())
+        Set<Long> submitted = new HashSet<>();
+        if (docs != null)
+        {
+            for (WorkorderPurDocVO doc : docs)
+            {
+                validatePurDoc(doc);
+                if (doc.getOrderId() != null)
+                {
+                    PurOrderVO exist = purOrderMapper.selectPurOrderByOrderId(doc.getOrderId());
+                    if (exist != null && wo.getWorkorderId().equals(exist.getWorkorderId()))
+                    {
+                        // 已审批/已下单等非草稿采购单保持原样，不参与重建，避免重复下单
+                        if (!STATUS_DRAFT.equals(exist.getStatus()))
+                        {
+                            submitted.add(exist.getOrderId());
+                            continue;
+                        }
+                        updateDraftPurOrder(wo, doc, exist.getOrderId());
+                        submitted.add(exist.getOrderId());
+                        continue;
+                    }
+                }
+                PurOrder created = createPurDoc(wo, doc);
+                // 新建的单据也要纳入“本次已提交”，否则会被后面的未提交草稿清理误删
+                if (created != null && created.getOrderId() != null)
+                {
+                    submitted.add(created.getOrderId());
+                }
+            }
+        }
+        // 用户在开单页移除的单据：删除其草稿采购单
+        removeUnsubmittedDraftPurchase(wo.getWorkorderId(), submitted);
+    }
+
+    private void validatePurDoc(WorkorderPurDocVO doc)
+    {
+        if (doc.getVendorId() == null)
+        {
+            throw new ServiceException("采购单[" + safe(doc.getDocTitle()) + "]请选择供应商");
+        }
+        if (doc.getLines() == null || doc.getLines().isEmpty())
+        {
+            throw new ServiceException("采购单[" + safe(doc.getDocTitle()) + "]至少需要一行明细");
+        }
+    }
+
+    private PurOrder createPurDoc(ProWorkorder wo, WorkorderPurDocVO doc)
+    {
+        PurOrder po = buildPurOrder(wo, doc);
+        purOrderService.insertPurOrder(po);
+        replacePurLines(po, doc.getLines());
+        return po;
+    }
+
+    /** 草稿采购单就地更新：保留单号与单头主键，仅刷新单头与明细 */
+    private void updateDraftPurOrder(ProWorkorder wo, WorkorderPurDocVO doc, Long orderId)
+    {
+        PurOrder po = buildPurOrder(wo, doc);
+        po.setOrderId(orderId);
+        // 状态不走该路径变更
+        po.setStatus(null);
+        purOrderService.updatePurOrder(po);
+        purOrderLineService.deletePurOrderLineByOrderId(orderId);
+        replacePurLines(po, doc.getLines());
+    }
+
+    /** 明细全量重建（草稿单无下游单据引用行ID），并回写单头总数量/总金额 */
+    private void replacePurLines(PurOrder po, List<WorkorderPurLineVO> lines)
+    {
+        BigDecimal totalQty = BigDecimal.ZERO;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (WorkorderPurLineVO l : lines)
+        {
+            if (l.getItemId() == null)
+            {
+                throw new ServiceException("采购单明细物料不能为空");
+            }
+            PurOrderLine line = buildPurLine(po.getOrderId(), l);
+            purOrderLineService.insertPurOrderLine(line);
+            totalQty = totalQty.add(nvl(line.getQuantityOrdered()));
+            totalAmount = totalAmount.add(nvl(line.getAmount()));
+        }
+        po.setTotalQuantity(totalQty);
+        po.setTotalAmount(totalAmount);
+        purOrderService.updatePurOrder(po);
+    }
+
+    private void removeUnsubmittedDraftPurchase(Long workorderId, Set<Long> submitted)
+    {
+        PurOrder q = new PurOrder();
+        q.setWorkorderId(workorderId);
+        q.setStatus(STATUS_DRAFT);
+        List<PurOrderVO> pos = purOrderMapper.selectPurOrderList(q);
+        if (pos == null)
         {
             return;
         }
-        for (WorkorderPurDocVO doc : docs)
+        for (PurOrderVO po : pos)
         {
-            if (doc.getVendorId() == null)
+            if (submitted.contains(po.getOrderId()))
             {
-                throw new ServiceException("采购单[" + safe(doc.getDocTitle()) + "]请选择供应商");
+                continue;
             }
-            if (doc.getLines() == null || doc.getLines().isEmpty())
-            {
-                throw new ServiceException("采购单[" + safe(doc.getDocTitle()) + "]至少需要一行明细");
-            }
-            PurOrder po = buildPurOrder(wo, doc);
-            purOrderService.insertPurOrder(po);
-            BigDecimal totalQty = BigDecimal.ZERO;
-            BigDecimal totalAmount = BigDecimal.ZERO;
-            for (WorkorderPurLineVO l : doc.getLines())
-            {
-                if (l.getItemId() == null)
-                {
-                    throw new ServiceException("采购单明细物料不能为空");
-                }
-                PurOrderLine line = buildPurLine(po.getOrderId(), l);
-                purOrderLineService.insertPurOrderLine(line);
-                totalQty = totalQty.add(nvl(line.getQuantityOrdered()));
-                totalAmount = totalAmount.add(nvl(line.getAmount()));
-            }
-            po.setTotalQuantity(totalQty);
-            po.setTotalAmount(totalAmount);
-            purOrderService.updatePurOrder(po);
+            purOrderLineService.deletePurOrderLineByOrderId(po.getOrderId());
+            purOrderMapper.deletePurOrderByOrderId(po.getOrderId());
         }
     }
 
@@ -663,35 +739,6 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         return line;
     }
 
-    private void removeDraftDocs(Long workorderId)
-    {
-        PurOrder q = new PurOrder();
-        q.setWorkorderId(workorderId);
-        q.setStatus(STATUS_DRAFT);
-        List<PurOrderVO> pos = purOrderMapper.selectPurOrderList(q);
-        if (pos != null)
-        {
-            for (PurOrderVO po : pos)
-            {
-                purOrderLineService.deletePurOrderLineByOrderId(po.getOrderId());
-                purOrderMapper.deletePurOrderByOrderId(po.getOrderId());
-            }
-        }
-        List<WmOutsourceOrder> outs = outsourceOrderMapper.selectByWorkorderId(workorderId);
-        if (outs != null)
-        {
-            for (WmOutsourceOrder o : outs)
-            {
-                if (!STATUS_DRAFT.equals(o.getStatus()))
-                {
-                    continue;
-                }
-                processLineMapper.deleteByOrderId(o.getOrderId());
-                outsourceOrderMapper.deleteOutsourceOrderByOrderId(o.getOrderId());
-            }
-        }
-    }
-
     private List<WorkorderFullDetailVO.PurchaseDoc> loadPurchaseDocs(Long workorderId)
     {
         List<WorkorderFullDetailVO.PurchaseDoc> result = new ArrayList<>();
@@ -718,40 +765,138 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
 
     private void saveProcessDocs(ProWorkorder wo, List<WorkorderProcDocVO> docs)
     {
-        if (docs == null || docs.isEmpty())
+        // 先清空草稿单头工序ID：首道工序变更时避免 uk_wo_process 中间态冲突
+        List<WmOutsourceOrder> existing = outsourceOrderMapper.selectByWorkorderId(wo.getWorkorderId());
+        if (existing != null)
+        {
+            for (WmOutsourceOrder o : existing)
+            {
+                if (STATUS_DRAFT.equals(o.getStatus()))
+                {
+                    outsourceOrderMapper.clearDraftProcessId(o.getOrderId());
+                }
+            }
+        }
+        Set<Long> submitted = new HashSet<>();
+        if (docs != null)
+        {
+            for (WorkorderProcDocVO doc : docs)
+            {
+                validateProcDoc(doc);
+                if (doc.getOrderId() != null)
+                {
+                    WmOutsourceOrder exist = outsourceOrderMapper.selectOutsourceOrderByOrderId(doc.getOrderId());
+                    if (exist != null && wo.getWorkorderId().equals(exist.getWorkorderId()))
+                    {
+                        // 已发料/已签收等非草稿加工单保持原样，不参与重建
+                        if (!STATUS_DRAFT.equals(exist.getStatus()))
+                        {
+                            submitted.add(exist.getOrderId());
+                            continue;
+                        }
+                        updateDraftProcDoc(wo, doc, exist.getOrderId());
+                        submitted.add(exist.getOrderId());
+                        continue;
+                    }
+                }
+                WmOutsourceOrder created = createProcDoc(wo, doc);
+                // 新建的单据也要纳入“本次已提交”，否则会被后面的未提交草稿清理误删
+                if (created != null && created.getOrderId() != null)
+                {
+                    submitted.add(created.getOrderId());
+                }
+            }
+        }
+        // 用户在开单页移除的单据：删除其草稿加工单（保留发料行以外的工序行一并清理）
+        removeUnsubmittedDraftProcess(wo.getWorkorderId(), submitted);
+    }
+
+    private void validateProcDoc(WorkorderProcDocVO doc)
+    {
+        if (doc.getLines() == null || doc.getLines().isEmpty())
+        {
+            throw new ServiceException("加工单[" + safe(doc.getDocTitle()) + "]至少需要一道工序");
+        }
+        boolean inside = "INSIDE".equalsIgnoreCase(doc.getSupplierType());
+        if (!inside && doc.getVendorId() == null)
+        {
+            throw new ServiceException("加工单[" + safe(doc.getDocTitle()) + "]请选择加工商");
+        }
+    }
+
+    private WmOutsourceOrder createProcDoc(ProWorkorder wo, WorkorderProcDocVO doc)
+    {
+        boolean inside = "INSIDE".equalsIgnoreCase(doc.getSupplierType());
+        OutsourceRequest req = new OutsourceRequest();
+        req.setDraft(true);
+        req.setSupplierType(inside ? "INSIDE" : "OUTSIDE");
+        req.setVendorId(doc.getVendorId());
+        req.setVendorCode(doc.getVendorCode());
+        req.setVendorName(doc.getVendorName());
+        req.setWorkorderId(wo.getWorkorderId());
+        req.setWorkorderCode(wo.getWorkorderCode());
+        req.setRouteId(resolveRouteId(wo));
+        req.setDocTitle(doc.getDocTitle());
+        req.setOrderDate(parseDate(doc.getOrderDate(), new Date()));
+        req.setExpectedDate(parseDate(doc.getExpectedDate(), null));
+        req.setPurchaser(doc.getPurchaser());
+        req.setSourceOrderCode(StringUtils.isEmpty(doc.getSourceOrderCode())
+                ? wo.getClientOrderCode() : doc.getSourceOrderCode());
+        req.setDeliveryAddress(doc.getDeliveryAddress());
+        req.setRemark(doc.getRemark());
+        req.setProcessLines(buildProcLines(doc.getLines()));
+        return outsourceService.createOutsource(req);
+    }
+
+    /**
+     * 草稿加工单就地更新：保留单号与发料行，仅刷新单头与工序行。
+     * 工序行全量重建（发料行只关联 order_id，不引用工序行ID）。
+     */
+    private void updateDraftProcDoc(ProWorkorder wo, WorkorderProcDocVO doc, Long orderId)
+    {
+        boolean inside = "INSIDE".equalsIgnoreCase(doc.getSupplierType());
+        List<WmOutsourceProcessLine> lines = buildProcLines(doc.getLines());
+        WmOutsourceProcessLine first = lines.get(0);
+        WmOutsourceOrder patch = new WmOutsourceOrder();
+        patch.setOrderId(orderId);
+        patch.setSupplierType(inside ? "INSIDE" : "OUTSIDE");
+        patch.setVendorId(inside ? null : doc.getVendorId());
+        patch.setVendorCode(inside ? null : doc.getVendorCode());
+        patch.setVendorName(inside ? null : doc.getVendorName());
+        patch.setDocTitle(doc.getDocTitle());
+        patch.setOrderDate(parseDate(doc.getOrderDate(), new Date()));
+        patch.setExpectedDate(parseDate(doc.getExpectedDate(), null));
+        patch.setPurchaser(StringUtils.isEmpty(doc.getPurchaser()) ? SecurityUtils.getUsername() : doc.getPurchaser());
+        patch.setSourceOrderCode(StringUtils.isEmpty(doc.getSourceOrderCode())
+                ? wo.getClientOrderCode() : doc.getSourceOrderCode());
+        patch.setDeliveryAddress(doc.getDeliveryAddress());
+        patch.setRemark(doc.getRemark());
+        patch.setRouteId(resolveRouteId(wo));
+        patch.setProcessId(first.getProcessId());
+        patch.setProcessCode(first.getProcessCode());
+        patch.setProcessName(first.getProcessName());
+        patch.setUpdateBy(SecurityUtils.getUsername());
+        patch.setUpdateTime(new Date());
+        outsourceOrderMapper.updateDraftHeaderForWorkorder(patch);
+        outsourceService.saveProcessLines(orderId, lines);
+    }
+
+    private void removeUnsubmittedDraftProcess(Long workorderId, Set<Long> submitted)
+    {
+        List<WmOutsourceOrder> outs = outsourceOrderMapper.selectByWorkorderId(workorderId);
+        if (outs == null)
         {
             return;
         }
-        for (WorkorderProcDocVO doc : docs)
+        for (WmOutsourceOrder o : outs)
         {
-            if (doc.getLines() == null || doc.getLines().isEmpty())
+            if (!STATUS_DRAFT.equals(o.getStatus()) || submitted.contains(o.getOrderId()))
             {
-                throw new ServiceException("加工单[" + safe(doc.getDocTitle()) + "]至少需要一道工序");
+                continue;
             }
-            boolean inside = "INSIDE".equalsIgnoreCase(doc.getSupplierType());
-            if (!inside && doc.getVendorId() == null)
-            {
-                throw new ServiceException("加工单[" + safe(doc.getDocTitle()) + "]请选择加工商");
-            }
-            OutsourceRequest req = new OutsourceRequest();
-            req.setDraft(true);
-            req.setSupplierType(inside ? "INSIDE" : "OUTSIDE");
-            req.setVendorId(doc.getVendorId());
-            req.setVendorCode(doc.getVendorCode());
-            req.setVendorName(doc.getVendorName());
-            req.setWorkorderId(wo.getWorkorderId());
-            req.setWorkorderCode(wo.getWorkorderCode());
-            req.setRouteId(resolveRouteId(wo));
-            req.setDocTitle(doc.getDocTitle());
-            req.setOrderDate(parseDate(doc.getOrderDate(), new Date()));
-            req.setExpectedDate(parseDate(doc.getExpectedDate(), null));
-            req.setPurchaser(doc.getPurchaser());
-            req.setSourceOrderCode(StringUtils.isEmpty(doc.getSourceOrderCode())
-                    ? wo.getClientOrderCode() : doc.getSourceOrderCode());
-            req.setDeliveryAddress(doc.getDeliveryAddress());
-            req.setRemark(doc.getRemark());
-            req.setProcessLines(buildProcLines(doc.getLines()));
-            outsourceService.createOutsource(req);
+            processLineMapper.deleteByOrderId(o.getOrderId());
+            outsourceLineMapper.deleteIssueLinesByOrderId(o.getOrderId());
+            outsourceOrderMapper.deleteOutsourceOrderHardByOrderId(o.getOrderId());
         }
     }
 

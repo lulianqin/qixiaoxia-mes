@@ -10,6 +10,8 @@ import java.util.List;
  */
 public class WorkorderProcDocVO
 {
+    /** 已存在的加工单ID（草稿就地更新用；为空表示新增） */
+    private Long orderId;
     private String docTitle;
     /** INSIDE-厂内 / OUTSIDE-外协 */
     private String supplierType;
@@ -24,6 +26,8 @@ public class WorkorderProcDocVO
     private String remark;
     private List<WorkorderProcLineVO> lines;
 
+    public Long getOrderId() { return orderId; }
+    public void setOrderId(Long v) { this.orderId = v; }
     public String getDocTitle() { return docTitle; }
     public void setDocTitle(String v) { this.docTitle = v; }
     public String getSupplierType() { return supplierType; }

@@ -15,13 +15,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="attrCode"     column="attr_code"    />
         <result property="attrName"     column="attr_name"    />
         <result property="attrType"     column="attr_type"    />
+        <result property="widgetType"   column="widget_type"  />
         <result property="attrUnit"     column="attr_unit"    />
         <result property="optionsJson"  column="options_json" />
     </resultMap>
 
     <select id="selectByProcessId" resultMap="OutsourceProcessAttrResult">
         select a.id, a.factory_id, a.process_id, a.attr_id, a.required, a.sort_order, a.enable_flag,
-               d.attr_code, d.attr_name, d.attr_type, d.attr_unit, d.options_json
+               d.attr_code, d.attr_name, d.attr_type, d.widget_type, d.attr_unit, d.options_json
           from qxx_wm_outsource_process_attr a
           join qxx_md_attr_def d on d.attr_id = a.attr_id
          where a.factory_id = #{factoryId}

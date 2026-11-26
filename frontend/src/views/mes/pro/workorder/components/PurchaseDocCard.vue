@@ -14,7 +14,7 @@
       </div>
     </template>
 
-    <el-form :model="form" label-width="90px" :disabled="readonly">
+    <el-form :model="form" label-width="90px" :disabled="readonly" @submit.prevent>
       <el-row :gutter="12">
         <el-col :span="8">
           <el-form-item label="单据标题">
@@ -64,45 +64,54 @@
 
     <el-table :data="form.lines" size="small" border class="mt8">
       <el-table-column label="产品名称" min-width="150">
-        <template #default="{ row }"><el-input v-model="row.productName" /></template>
+        <template #default="{ row }">
+          <el-input v-model="row.productName" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" :disabled="readonly" />
+        </template>
       </el-table-column>
       <el-table-column label="物料" min-width="180">
         <template #default="{ row }">
           <el-input v-model="row.itemName" readonly placeholder="选择物料">
-            <template #append><el-button icon="Search" @click="pickItem(row)" /></template>
+            <template #append><el-button icon="Search" :disabled="readonly" @click="pickItem(row)" /></template>
           </el-input>
         </template>
       </el-table-column>
       <el-table-column label="关联工序" width="150">
         <template #default="{ row }">
-          <el-select v-model="row.processId" clearable placeholder="不关联" style="width:100%" @change="onProcessChange(row)">
+          <el-select v-model="row.processId" clearable placeholder="不关联" style="width:100%" :disabled="readonly" @change="onProcessChange(row)">
             <el-option v-for="p in processOptions" :key="p.processId" :label="p.processName" :value="p.processId" />
           </el-select>
         </template>
       </el-table-column>
       <el-table-column label="规格" width="140">
-        <template #default="{ row }"><el-input v-model="row.specification" /></template>
+        <template #default="{ row }">
+          <el-input v-model="row.specification" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" :disabled="readonly" />
+        </template>
       </el-table-column>
       <el-table-column label="品牌" width="110">
         <template #default="{ row }">
-          <el-input :model-value="brandOf(row)" @update:model-value="(v: string) => setBrand(row, v)" />
+          <el-input :model-value="brandOf(row)" @update:model-value="(v: string) => setBrand(row, v)" :disabled="readonly" />
         </template>
       </el-table-column>
       <el-table-column label="数量" width="120">
-        <template #default="{ row }"><el-input-number v-model="row.quantity" :min="0" :precision="4" controls-position="right" style="width:100%" /></template>
+        <template #default="{ row }"><el-input-number v-model="row.quantity" :min="0" :precision="4" controls-position="right" style="width:100%" :disabled="readonly" /></template>
       </el-table-column>
       <el-table-column label="单位" width="80">
-        <template #default="{ row }"><el-input v-model="row.unitName" /></template>
+        <template #default="{ row }"><el-input v-model="row.unitName" :disabled="readonly" /></template>
       </el-table-column>
       <el-table-column label="单价" width="110">
-        <template #default="{ row }"><el-input-number v-model="row.unitPrice" :min="0" :precision="4" controls-position="right" style="width:100%" /></template>
+        <template #default="{ row }"><el-input-number v-model="row.unitPrice" :min="0" :precision="4" controls-position="right" style="width:100%" :disabled="readonly" /></template>
       </el-table-column>
       <el-table-column label="金额" width="100" align="right">
         <template #default="{ row }">{{ money(row.quantity, row.unitPrice) }}</template>
       </el-table-column>
       <el-table-column label="送货日期" width="140">
         <template #default="{ row }">
-          <el-date-picker v-model="row.expectedDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          <el-date-picker v-model="row.expectedDate" type="date" value-format="YYYY-MM-DD" style="width:100%" :disabled="readonly" />
+        </template>
+      </el-table-column>
+      <el-table-column label="备注" min-width="120">
+        <template #default="{ row }">
+          <el-input v-model="row.remark" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" :disabled="readonly" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="60" align="center" v-if="!readonly">

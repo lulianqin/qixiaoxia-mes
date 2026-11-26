@@ -105,6 +105,9 @@ public class OutsourceServiceImpl implements IOutsourceService
     private static final String SOURCE_TYPE_SLITTING = "SLITTING";
     private static final String SOURCE_TYPE_GENERIC = "GENERIC";
 
+    /** 单据配置页固定列在 ext_attrs 中的保留键（与前端 ProcessDocCard 保持一致） */
+    private static final String[] FIXED_DOC_ATTR_KEYS = { "MATERIAL_CRAFT", "FINISHED_SIZE" };
+
     /** 代厂商操作权限（内部员工代厂商执行签收/录结果/完成/发货） */
     private static final String AGENT_PERM = "mes:wm:outsource:agentOps";
 
@@ -279,7 +282,15 @@ public class OutsourceServiceImpl implements IOutsourceService
                 SecurityUtils.getFactoryId(), line.getProcessId());
         if (schema == null || schema.isEmpty())
         {
-            line.setExtAttrs(null);
+            // 无工序模板时不落地扩展属性；但保留单据配置页固定列（材料+工艺/成品尺寸）
+            // 等保留键，避免保存工单时被清空
+            JSONObject attrs = parseExtAttrs(line.getExtAttrs());
+            JSONObject kept = new JSONObject();
+            for (String key : FIXED_DOC_ATTR_KEYS)
+            {
+                if (attrs.containsKey(key)) kept.put(key, attrs.get(key));
+            }
+            line.setExtAttrs(kept.isEmpty() ? null : kept.toJSONString());
             return;
         }
         JSONObject attrs = parseExtAttrs(line.getExtAttrs());

@@ -218,7 +218,10 @@ public class WmOutsourceController extends BaseController
                         a.getAttrName() != null ? a.getAttrName() : a.getAttrCode());
             }
         }
+        // 多工序加工单在「产品名称」后追加「工序」列（每行显示本行工序名），单工序单据不显示
+        boolean showProcessCol = lines != null && lines.size() > 1;
         m.headers.add("产品名称");
+        if (showProcessCol) m.headers.add("工序");
         m.headers.add("材料+工艺");
         m.headers.add("成品尺寸mm");
         m.headers.add("数量");
@@ -229,14 +232,17 @@ public class WmOutsourceController extends BaseController
         m.headers.add("备注");
         String pname = productName(o.getWorkorderId());
         String psize = productSize(o.getWorkorderId());
+        String printingReq = productPrintingReq(o.getWorkorderId());
         for (WmOutsourceProcessLine l : lines)
         {
             java.util.Map<String, Object> attrs =
                     com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.parseAttrs(l.getExtAttrs());
             java.util.List<String> row = new java.util.ArrayList<>();
             row.add(l.getProductName() != null && !l.getProductName().isBlank() ? l.getProductName() : pname);
-            row.add(l.getProcessName());
-            row.add(psize);
+            if (showProcessCol) row.add(l.getProcessName() == null ? "" : l.getProcessName());
+            // 材料+工艺 / 成品尺寸：优先取单据配置页填写值，未填回退工单印刷要求与产品尺寸
+            row.add(docField(attrs, "MATERIAL_CRAFT", printingReq));
+            row.add(docField(attrs, "FINISHED_SIZE", psize));
             row.add(com.ruoyi.web.controller.mes.export.WorkOrderDocExporter.fmt(l.getPlanQty()));
             for (String code : attrCols.keySet())
             {
@@ -253,9 +259,19 @@ public class WmOutsourceController extends BaseController
         return m;
     }
 
-    private String productName(Long workorderId)
+    /** 单据固定列取值：优先取明细扩展属性里的配置值，为空回退默认值 */
+    private String docField(java.util.Map<String, Object> attrs, String key, String fallback)
     {
-        if (workorderId == null) return "";
+        Object v = attrs == null ? null : attrs.get(key);
+        if (v != null && !String.valueOf(v).isBlank())
+        {
+            return String.valueOf(v);
+        }
+        return fallback == null ? "" : fallback;
+    }
+
+    private String productName(Long workorderId)
+    {        if (workorderId == null) return "";
         com.ruoyi.system.domain.mes.pro.ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
         return wo != null && wo.getProductName() != null ? wo.getProductName() : "";
     }
@@ -265,6 +281,13 @@ public class WmOutsourceController extends BaseController
         if (workorderId == null) return "";
         com.ruoyi.system.domain.mes.pro.ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
         return wo != null && wo.getProductSize() != null ? wo.getProductSize() : "";
+    }
+
+    private String productPrintingReq(Long workorderId)
+    {
+        if (workorderId == null) return "";
+        com.ruoyi.system.domain.mes.pro.ProWorkorder wo = proWorkorderService.selectProWorkorderByWorkorderId(workorderId);
+        return wo != null && wo.getPrintingReq() != null ? wo.getPrintingReq() : "";
     }
 
     private String productImage(Long workorderId)

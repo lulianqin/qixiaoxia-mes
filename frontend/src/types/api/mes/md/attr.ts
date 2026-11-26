@@ -8,8 +8,8 @@ export type AttrType = 'TEXT' | 'NUMBER' | 'SELECT' | 'BOOL' | 'DATE'
 /** 控件类型 */
 export type WidgetType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'MULTI_SELECT' | 'BOOL' | 'IMAGE' | 'FILE'
 
-/** 属性域：产品属性 / 生产（流转单）属性 */
-export type AttrScope = 'PRODUCT' | 'PRODUCTION'
+/** 属性域：产品属性 / 生产（流转单）属性 / 单据属性 */
+export type AttrScope = 'PRODUCT' | 'PRODUCTION' | 'DOC'
 
 /** 属性字典（全局定义） */
 export interface MdAttrDef {

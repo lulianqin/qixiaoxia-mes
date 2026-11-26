@@ -9,11 +9,11 @@
     <el-alert v-if="!purchaseDocs.length && !processDocs.length" type="info" :closable="false" show-icon
       title="暂未配置单据。可只保存工单，稍后在采购单/加工单页面单独开单。" class="mb8" />
 
-    <PurchaseDocCard v-for="(d, i) in purchaseDocs" :key="'p' + i" :model-value="d" :process-options="processOptions"
-      :readonly="readonly" @remove="purchaseDocs.splice(i, 1)" />
+    <PurchaseDocCard v-for="(d, i) in purchaseDocs" :key="d.__docKey || ('p' + i)" :model-value="d" :process-options="processOptions"
+      :readonly="readonly || isLockedDoc(d)" @remove="purchaseDocs.splice(i, 1)" />
 
-    <ProcessDocCard v-for="(d, i) in processDocs" :key="'o' + i" :model-value="d" :process-options="processOptions"
-      :readonly="readonly" @remove="processDocs.splice(i, 1)" />
+    <ProcessDocCard v-for="(d, i) in processDocs" :key="d.__docKey || ('o' + i)" :model-value="d" :process-options="processOptions"
+      :product-size="productSize" :printing-req="printingReq" :readonly="readonly || isLockedDoc(d)" @remove="processDocs.splice(i, 1)" />
 
     <el-divider v-if="savedDocs.length" content-position="left">已生成单据（导出 / 打印）</el-divider>
     <el-table v-if="savedDocs.length" :data="savedDocs" size="small" border>
@@ -48,6 +48,7 @@
 import { computed, getCurrentInstance } from 'vue'
 import PurchaseDocCard from './PurchaseDocCard.vue'
 import ProcessDocCard from './ProcessDocCard.vue'
+import { isLockedDoc } from '../docSync'
 import { printPdfBlob } from '@/utils/pdfPrint'
 import {
   exportPurDocExcel, fetchPurDocPdf, exportProcessDocExcel, fetchProcessDocPdf
@@ -56,7 +57,7 @@ import {
 const { proxy } = getCurrentInstance() as any
 const { mes_order_status, mes_outsource_status } = proxy.useDict('mes_order_status', 'mes_outsource_status')
 
-const props = defineProps<{ purchaseDocs: any[]; processDocs: any[]; processOptions: any[]; readonly?: boolean }>()
+const props = defineProps<{ purchaseDocs: any[]; processDocs: any[]; processOptions: any[]; productSize?: string; printingReq?: string; readonly?: boolean }>()
 const emit = defineEmits<{ (e: 'update:purchaseDocs', v: any[]): void; (e: 'update:processDocs', v: any[]): void }>()
 
 const savedDocs = computed(() => {
@@ -70,8 +71,11 @@ const savedDocs = computed(() => {
   return rows
 })
 
+let docKeySeq = 0
+
 function emptyPurDoc() {
   return {
+    __docKey: 'p-new-' + (++docKeySeq),
     docTitle: '原材料采购单', vendorId: null, vendorCode: '', vendorName: '',
     purchaseType: 'PAPER', orderDate: today(), purchaser: '', deliveryAddress: '', remark: '', lines: []
   }
@@ -79,6 +83,7 @@ function emptyPurDoc() {
 
 function emptyProcDoc() {
   return {
+    __docKey: 'o-new-' + (++docKeySeq),
     docTitle: '印刷加工单', supplierType: 'OUTSIDE', vendorId: null, vendorCode: '', vendorName: '',
     orderDate: today(), purchaser: '', deliveryAddress: '', remark: '', lines: []
   }

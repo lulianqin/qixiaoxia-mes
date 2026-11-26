@@ -56,7 +56,7 @@
       <el-table-column label="供应商" width="180">
         <template #default="{ row }">
           <el-input v-model="row.vendorName" readonly placeholder="选择供应商" size="small">
-            <template #append><el-button icon="Search" size="small" @click="pickVendor(row)" /></template>
+            <template #append><el-button icon="Search" size="small" :disabled="readonly" @click="pickVendor(row)" /></template>
           </el-input>
         </template>
       </el-table-column>
@@ -148,6 +148,7 @@ function move(idx: number, dir: number) {
 }
 
 function pickVendor(row: any) {
+  if (props.readonly) return
   currentRow = row
   vendorRef.value?.open()
 }

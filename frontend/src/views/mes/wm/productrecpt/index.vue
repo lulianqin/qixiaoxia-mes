@@ -173,7 +173,7 @@
 
 <script setup lang="ts" name="WmProductRecpt">
 import { ref, reactive, toRefs, getCurrentInstance } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { WmProductRecptQueryParams, WmProductRecpt, WmProductRecptLine } from '@/api/mes/wm/product_recpt'
 import { listWmProductRecpt, getWmProductRecpt, delWmProductRecpt, addWmProductRecpt, updateWmProductRecpt } from '@/api/mes/wm/product_recpt'
 import request from '@/utils/request'
@@ -186,6 +186,7 @@ import WorkorderSelect from '@/components/workorderSelect/single.vue'
 const { proxy } = getCurrentInstance() as any
 const { mes_itemrecpt_status } = useDict('mes_itemrecpt_status')
 const router = useRouter()
+const route = useRoute()
 const warehouseSelectRef = ref()
 const createWarehouseRef = ref()
 const woSelectRef = ref()
@@ -366,6 +367,8 @@ async function handlePrintLabels(row: WmProductRecpt) {
 }
 
 getList()
+// 工单看板「入库单号」入口：自动打开单据详情
+if (route.query.openId) handleView({ recptId: Number(route.query.openId) } as any)
 </script>
 
 <style scoped>

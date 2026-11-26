@@ -46,7 +46,7 @@ public class MdItemTypeAttr extends BaseEntity
     /** 属性类型 */
     private String attrType;
 
-    /** 属性域:PRODUCT-产品属性,PRODUCTION-生产/流转单属性 */
+    /** 属性域:PRODUCT-产品属性,PRODUCTION-生产/流转单属性,DOC-单据属性(采购单/加工单) */
     private String attrScope;
 
     /** 控件类型 */

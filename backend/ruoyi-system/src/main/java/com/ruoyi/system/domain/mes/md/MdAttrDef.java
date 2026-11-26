@@ -33,7 +33,7 @@ public class MdAttrDef extends BaseEntity
     @Excel(name = "类型")
     private String attrType;
 
-    /** 属性域:PRODUCT-产品属性,PRODUCTION-生产/流转单属性 */
+    /** 属性域:PRODUCT-产品属性,PRODUCTION-生产/流转单属性,DOC-单据属性(采购单/加工单) */
     @Excel(name = "属性域")
     private String attrScope;
 

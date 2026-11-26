@@ -6,15 +6,19 @@
         <span class="page-title">{{ pageTitle }}</span>
         <el-tag v-if="form.workorderCode" size="small" type="success">{{ form.workorderCode }}</el-tag>
       </div>
-      <div class="head-right" v-if="!readonly">
+      <div class="head-right" v-if="!pageReadonly">
         <el-button @click="goBack">取 消</el-button>
         <el-button type="primary" :loading="submitting" @click="submit">保 存</el-button>
       </div>
     </div>
 
+    <el-alert v-if="mode !== 'view' && status !== 'PREPARE'" type="info" :closable="false" show-icon
+      style="margin-bottom:12px"
+      title="工单已开工，本页只读；如需调整单据，请到采购单/加工单页面操作" />
+
     <el-tabs v-model="activeTab">
       <el-tab-pane label="主工单" name="base">
-        <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" :disabled="readonly">
+        <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" :disabled="pageReadonly">
           <el-row :gutter="12">
             <el-col :span="8">
               <el-form-item label="工单编码" prop="workorderCode">
@@ -43,7 +47,7 @@
             <el-col :span="8">
               <el-form-item label="产品" prop="productId">
                 <el-input :model-value="productLabel" readonly placeholder="请选择产品">
-                  <template #append><el-button icon="Search" @click="itemRef?.open()" :disabled="readonly" /></template>
+                  <template #append><el-button icon="Search" @click="itemRef?.open()" :disabled="pageReadonly" /></template>
                 </el-input>
               </el-form-item>
             </el-col>
@@ -109,7 +113,7 @@
           </el-row>
           <template v-if="productionAttrs.length">
             <el-divider content-position="left">生产属性</el-divider>
-            <ExtAttrForm :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCTION" :columns="3" sortable />
+            <ExtAttrForm :schema="attrSchema" v-model="form.lineAttrs" :readonly="pageReadonly" scope="PRODUCTION" :columns="3" sortable />
           </template>
           <el-row :gutter="12">
             <el-col :span="24">
@@ -148,7 +152,7 @@
           <el-row :gutter="12">
             <el-col :span="24">
               <el-form-item label="产品图片">
-                <image-upload v-model="form.productImage" :limit="1" :disabled="readonly" class="img-100" />
+                <image-upload v-model="form.productImage" :limit="1" :disabled="pageReadonly" class="img-100" />
                 <span class="tip">导出采购单/加工单时作为单据底部图片</span>
               </el-form-item>
             </el-col>
@@ -156,13 +160,13 @@
 
           <template v-if="productAttrs.length">
             <el-divider content-position="left">产品属性</el-divider>
-            <ExtAttrForm ref="extAttrRef" :schema="attrSchema" v-model="form.lineAttrs" :readonly="readonly" scope="PRODUCT" :columns="3" sortable />
+            <ExtAttrForm ref="extAttrRef" :schema="attrSchema" v-model="form.lineAttrs" :readonly="pageReadonly" scope="PRODUCT" :columns="3" sortable />
           </template>
         </el-form>
 
         <el-divider content-position="left">工艺路线与工序（开单配置）</el-divider>
         <WorkorderRouteEditor v-model="routeProcesses" :process-options="processOptions"
-          :config="routeConfig" :default-qty="form.quantity" :readonly="readonly" />
+          :config="routeConfig" :default-qty="form.quantity" :readonly="pageReadonly" />
       </el-tab-pane>
 
       <el-tab-pane name="docs">
@@ -170,16 +174,18 @@
           单据配置
           <el-badge v-if="docCount" :value="docCount" class="doc-badge" />
         </template>
-        <div class="doc-toolbar" v-if="!readonly">
-          <el-button type="primary" icon="MagicStick" @click="generateDocs">根据配置生成单据</el-button>
-          <span class="tip">按「开单类型 + 供应商」自动合并生成，生成后仍可手动调整</span>
+        <div class="doc-toolbar" v-if="!pageReadonly">
+          <el-button type="primary" icon="MagicStick" @click="openDocSync">按工序配置同步单据</el-button>
+          <span class="tip">只补新增明细、确认后删除已移除工序的明细；供应商/开单类型变更仅提示人工处理</span>
         </div>
         <WorkorderDocPanel v-model:purchase-docs="purchaseDocs" v-model:process-docs="processDocs"
-          :process-options="routeProcesses" :readonly="readonly" />
+          :process-options="routeProcesses" :product-size="form.productSize" :printing-req="form.printingReq" :readonly="pageReadonly" />
       </el-tab-pane>
     </el-tabs>
 
     <ItemSelect ref="itemRef" @onSelected="onProductSelected" />
+
+    <DocSyncDialog v-model="docSyncOpen" :plan="docSyncPlan" @confirm="confirmDocSync" />
 
     <el-dialog title="选择销售订单明细行" v-model="orderPickerOpen" width="860px" append-to-body>
       <el-alert title="默认展示当前来源订单及同产品明细行；可转数量为 0 的行不可选择" type="info" :closable="false" show-icon style="margin-bottom:12px" />
@@ -227,6 +233,8 @@ import ItemSelect from '@/components/itemSelect/single.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
 import WorkorderRouteEditor from './components/WorkorderRouteEditor.vue'
 import WorkorderDocPanel from './components/WorkorderDocPanel.vue'
+import DocSyncDialog from './components/DocSyncDialog.vue'
+import { buildDocSyncPlan, applyDocSyncPlan, type DocSyncPlan } from './docSync'
 
 const { proxy } = getCurrentInstance() as any
 const route = useRoute()
@@ -256,6 +264,11 @@ const itemRouteBindings = ref<any[]>([])
 
 const purchaseDocs = ref<any[]>([])
 const processDocs = ref<any[]>([])
+/** 加载时的工序ID快照：用于识别本次被移除的工序 */
+const loadedProcessIds = ref<Set<number>>(new Set())
+/** 单据同步确认弹窗 */
+const docSyncOpen = ref(false)
+const docSyncPlan = ref<DocSyncPlan | null>(null)
 const bomRows = ref<any[]>([])
 // 复制模式下选择目标销售订单行
 const orderPickerOpen = ref(false)
@@ -308,6 +321,10 @@ const rules = {
 }
 
 const readonly = computed(() => mode.value === 'view')
+/** 工单状态：PREPARE-待生产，其余（PRODUCING/COMPLETED/CLOSED/CANCEL）视为已开工或已结束 */
+const status = computed(() => String(form.status || 'PREPARE').toUpperCase())
+/** 非待生产工单：本页整体只读，单据请到采购单/加工单页面维护 */
+const pageReadonly = computed(() => readonly.value || status.value !== 'PREPARE')
 const pageTitle = computed(() => {
   if (mode.value === 'add') return '新增生产工单'
   if (mode.value === 'copy') return '复制生产工单'
@@ -479,8 +496,22 @@ function loadDetail(id: number) {
       itemId: form.productId, itemCode: form.productCode, itemName: form.productName,
       unitOfMeasure: form.unitOfMeasure, unitName: form.unitName
     }, true)
-    purchaseDocs.value = (d.purchaseDocs || []).map((x: any) => ({ ...x.order, lines: x.lines || [] }))
-    processDocs.value = (d.processDocs || []).map((x: any) => ({ ...x, lines: x.processLines || [] }))
+    purchaseDocs.value = (d.purchaseDocs || []).map((x: any, i: number) => ({
+      ...x.order,
+      // 稳定 key：删除单据后按下标复用时不会串卡片
+      __docKey: 'p-' + (x.order?.orderId ?? i),
+      // 回显字段对齐：后端行是 quantityOrdered，单据卡片绑定的是 quantity
+      lines: (x.lines || []).map((l: any) => ({ ...l, quantity: l.quantity ?? l.quantityOrdered ?? 0 }))
+    }))
+    processDocs.value = (d.processDocs || []).map((x: any, i: number) => ({
+      ...x,
+      __docKey: 'o-' + (x.orderId ?? i),
+      lines: x.processLines || []
+    }))
+    // 记录加载时的工序快照，供同步时识别“本次删除的工序”
+    loadedProcessIds.value = new Set(
+      routeProcesses.value.map((p: any) => Number(p.processId)).filter((id: number) => !!id)
+    )
   })
 }
 
@@ -508,8 +539,22 @@ function loadCopyTemplate(sourceId: number) {
       itemId: form.productId, itemCode: form.productCode, itemName: form.productName,
       unitOfMeasure: form.unitOfMeasure, unitName: form.unitName
     }, true)
-    purchaseDocs.value = (d.purchaseDocs || []).map((x: any) => ({ ...x.order, lines: x.lines || [] }))
-    processDocs.value = (d.processDocs || []).map((x: any) => ({ ...x, lines: x.processLines || [] }))
+    purchaseDocs.value = (d.purchaseDocs || []).map((x: any, i: number) => ({
+      ...x.order,
+      // 稳定 key：删除单据后按下标复用时不会串卡片
+      __docKey: 'p-' + (x.order?.orderId ?? i),
+      // 回显字段对齐：后端行是 quantityOrdered，单据卡片绑定的是 quantity
+      lines: (x.lines || []).map((l: any) => ({ ...l, quantity: l.quantity ?? l.quantityOrdered ?? 0 }))
+    }))
+    processDocs.value = (d.processDocs || []).map((x: any, i: number) => ({
+      ...x,
+      __docKey: 'o-' + (x.orderId ?? i),
+      lines: x.processLines || []
+    }))
+    // 记录加载时的工序快照，供同步时识别“本次删除的工序”
+    loadedProcessIds.value = new Set(
+      routeProcesses.value.map((p: any) => Number(p.processId)).filter((id: number) => !!id)
+    )
     genWorkorderCode().then((res: any) => {
       form.workorderCode = res.data
       autoGen.value = true
@@ -748,78 +793,41 @@ function searchOwners(kw: string) {
     .finally(() => { ownerLoading.value = false })
 }
 
-/** 根据工序配置生成单据：按「开单类型 + 供应商」合并，已存在的单据只补缺失明细，不覆盖/删除 */
-function generateDocs() {
-  const rows = routeProcesses.value.filter((r: any) => r.vendorId)
-  if (!rows.length) {
-    ElMessage.warning('请先在工序配置中选择供应商')
+/** 按工序配置同步单据：计算差异 → 弹窗确认 → 应用到页面数据（保存时才落库） */
+function openDocSync() {
+  const plan = buildDocSyncPlan({
+    routeProcesses: routeProcesses.value,
+    purchaseDocs: purchaseDocs.value,
+    processDocs: processDocs.value,
+    loadedProcessIds: loadedProcessIds.value,
+    ctx: {
+      productName: routeConfig.productName || form.productName,
+      unitOfMeasure: form.unitOfMeasure,
+      unitName: form.unitName,
+      orderDate: routeConfig.orderDate,
+      purchaser: routeConfig.purchaser || '',
+      deliveryAddress: routeConfig.deliveryAddress
+    }
+  })
+  if (plan.isEmpty) {
+    ElMessage.info('单据与当前工序配置一致，无需同步')
     return
   }
-  const purGroups: Record<string, any[]> = {}
-  const procGroups: Record<string, any[]> = {}
-  rows.forEach((r: any) => {
-    const key = String(r.vendorId)
-    const group = r.docType === 'PURCHASE' ? purGroups : procGroups
-    group[key] = group[key] || []
-    if (!group[key].some((x: any) => x.processId === r.processId)) group[key].push(r)
-  })
-  let newPur = 0
-  let newProc = 0
-  // 采购单：同供应商已有单据则复用，仅补充缺少的工序明细
-  Object.entries(purGroups).forEach(([, rs]) => {
-    const exist = purchaseDocs.value.find((d: any) => String(d.vendorId) === String(rs[0].vendorId))
-    const lines = rs
-      .filter((r: any) => !(exist?.lines || []).some((l: any) => l.processId === r.processId))
-      .map((r: any) => ({
-        // 采购的是工序服务（非库存物料），用负数伪物料ID避免同一单据内物料重复校验
-        itemId: -Math.abs(Number(r.processId) || 1), itemCode: 'PROC-' + (r.processCode || r.processId),
-        itemName: r.processName,
-        productName: routeConfig.productName || form.productName, specification: '',
-        unitOfMeasure: form.unitOfMeasure, unitName: form.unitName,
-        quantity: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
-        processId: r.processId, processCode: r.processCode, processName: r.processName,
-        lineAttrs: {}, remark: ''
-      }))
-    if (exist) {
-      if (lines.length) { exist.lines = [...(exist.lines || []), ...lines]; newPur += lines.length }
-      return
-    }
-    newPur++
-    purchaseDocs.value.push({
-      docTitle: (rs[0].processName || '') + '采购单', vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
-      purchaseType: 'OTHER', orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '',
-      deliveryAddress: routeConfig.deliveryAddress, remark: '',
-      lines
-    })
-  })
-  // 加工单：同供应商已有单据则复用，仅补充缺少的工序明细
-  Object.entries(procGroups).forEach(([, rs]) => {
-    const exist = processDocs.value.find((d: any) => String(d.vendorId) === String(rs[0].vendorId))
-    const lines = rs
-      .filter((r: any) => !(exist?.lines || []).some((l: any) => l.processId === r.processId))
-      .map((r: any) => ({
-        processId: r.processId, processCode: r.processCode, processName: r.processName,
-        productName: routeConfig.productName || form.productName,
-        planQty: r.planQty, unitPrice: r.unitPrice, expectedDate: r.expectedDate,
-        vendorId: r.vendorId, vendorCode: r.vendorCode, vendorName: r.vendorName,
-        extAttrs: {}, attrSchema: [], remark: ''
-      }))
-    if (exist) {
-      if (lines.length) { exist.lines = [...(exist.lines || []), ...lines]; newProc += lines.length }
-      return
-    }
-    newProc++
-    processDocs.value.push({
-      docTitle: (rs[0].processName || '') + '加工单',
-      supplierType: rs[0].isOutsource === '1' ? 'OUTSIDE' : (rs[0].vendorId ? 'OUTSIDE' : 'INSIDE'),
-      vendorId: rs[0].vendorId, vendorCode: rs[0].vendorCode, vendorName: rs[0].vendorName,
-      orderDate: routeConfig.orderDate, purchaser: routeConfig.purchaser || '', deliveryAddress: routeConfig.deliveryAddress, remark: '',
-      lines
-    })
-  })
+  docSyncPlan.value = plan
+  docSyncOpen.value = true
+}
+
+function confirmDocSync() {
+  if (!docSyncPlan.value) return
+  const res = applyDocSyncPlan(docSyncPlan.value, purchaseDocs.value, processDocs.value)
+  purchaseDocs.value = res.purchaseDocs
+  processDocs.value = res.processDocs
+  docSyncOpen.value = false
+  docSyncPlan.value = null
   activeTab.value = 'docs'
-  if (!newPur && !newProc) ElMessage.info('所选供应商的单据均已生成，未新增明细')
-  else ElMessage.success(`已生成采购单 ${newPur} 张、加工单 ${newProc} 张，其余单据保持不变`)
+  ElMessage.success(
+    `同步完成：新增 ${res.addedLines} 行/新建 ${res.addedDocs} 张，删除 ${res.removedLines} 行/整单 ${res.removedDocs} 张`
+  )
 }
 
 function submit() {

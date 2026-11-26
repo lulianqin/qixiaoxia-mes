@@ -28,10 +28,10 @@ server:
     # 连接数满后的排队数，默认为100
     accept-count: 1000
     threads:
-      # tomcat最大线程数，默认为200
-      max: 800
-      # Tomcat启动初始化的线程数，默认值10
-      min-spare: 100
+      # tomcat最大线程数（原800过大，1.8G内存服务器线程栈占用过高；默认200，内网MES设150足够）
+      max: 150
+      # Tomcat启动初始化的线程数（原100空闲时也常驻，浪费内存；默认10，这里设20）
+      min-spare: 20
 
 # 日志配置
 logging:
@@ -109,8 +109,8 @@ token:
   header: Authorization
   # 令牌密钥
   secret: abcdefghijklmnopqrstuvwxyz
-  # 令牌有效期（默认30分钟）
-  expireTime: 30
+  # 令牌有效期（原30分钟过短，车间扫码等场景静置易过期；改为12小时=720分钟）
+  expireTime: 720
 
 # MyBatis配置
 mybatis:

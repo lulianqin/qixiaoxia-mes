@@ -1007,6 +1007,8 @@ function handleExport() {
 const q = route.query
 if (q.status) queryParams.status = q.status
 getList()
+// 工单看板「报工编码」入口：自动打开只读详情
+if (q.openId) handleView({ recordId: Number(q.openId) })
 // 看板「报工」入口：自动打开新增报工并带入指定工序任务
 if (q.add === '1' && q.taskId) {
   handleAdd()

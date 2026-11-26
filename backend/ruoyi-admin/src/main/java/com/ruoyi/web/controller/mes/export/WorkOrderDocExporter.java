@@ -86,6 +86,7 @@ public class WorkOrderDocExporter
             r = body(sh, r, m, st, cols);
             r = total(sh, r, m, st, cols);
             r = footer(sh, r, m, st, cols);
+            fitRows(sh);
             r = image(sh, r, m, cols);
             for (int i = 0; i < cols; i++)
             {
@@ -161,6 +162,69 @@ public class WorkOrderDocExporter
             // 图片格式不支持时忽略，不影响单据主体
         }
         return r + imgRows;
+    }
+
+    /** 按实际内容调高行高，避免自动换行后被固定行高截断（合并单元格按合并宽度计算） */
+    private static void fitRows(Sheet sh)
+    {
+        Map<Integer, Map<Integer, Integer>> merged = new java.util.HashMap<>();
+        for (CellRangeAddress region : sh.getMergedRegions())
+        {
+            int width = 0;
+            for (int c = region.getFirstColumn(); c <= region.getLastColumn(); c++)
+            {
+                width += (int) colWidthPx(c);
+            }
+            for (int row = region.getFirstRow(); row <= region.getLastRow(); row++)
+            {
+                merged.computeIfAbsent(row, k -> new java.util.HashMap<>())
+                        .put(region.getFirstColumn(), width);
+            }
+        }
+        for (Row row : sh)
+        {
+            float need = 0;
+            for (Cell c : row)
+            {
+                String value = c.getStringCellValue();
+                if (value == null || value.isEmpty())
+                {
+                    continue;
+                }
+                int px = merged.getOrDefault(row.getRowNum(), java.util.Map.of())
+                        .getOrDefault(c.getColumnIndex(), (int) colWidthPx(c.getColumnIndex()));
+                int fontSize = sh.getWorkbook()
+                        .getFontAt(c.getCellStyle().getFontIndex()).getFontHeightInPoints();
+                need = Math.max(need, fitHeight(value, px, fontSize));
+            }
+            if (need > row.getHeightInPoints())
+            {
+                row.setHeightInPoints(need);
+            }
+        }
+    }
+
+    /** 估算单元格按宽度换行后需要的高度（磅） */
+    private static float fitHeight(String text, int widthPx, int fontSize)
+    {
+        int capacity = Math.max(2, (int) ((widthPx - 10d) * 10d / (7.2d * fontSize)));
+        int lines = 0;
+        for (String segment : text.split("\\n", -1))
+        {
+            lines += Math.max(1, (int) Math.ceil(visualWidth(segment) / (double) capacity));
+        }
+        return Math.min(409f, lines * fontSize * 1.5f + 4f);
+    }
+
+    /** 中文/全角按 2 个字符宽度估算，半角按 1 */
+    private static int visualWidth(String s)
+    {
+        int width = 0;
+        for (int i = 0; i < s.length(); i++)
+        {
+            width += s.charAt(i) > 0x7F ? 2 : 1;
+        }
+        return width;
     }
 
     private static int[] imageSize(byte[] bytes)
@@ -314,22 +378,24 @@ public class WorkOrderDocExporter
     {
         PdfRendererBuilder b = new PdfRendererBuilder();
         b.useFastMode();
-        b.useFont(() -> fontStream(), "NotoSansSC");
+        b.useFont(() -> fontStream("fonts/MicrosoftYaHei-Regular.ttf"), "Microsoft YaHei");
+        b.useFont(() -> fontStream("fonts/MicrosoftYaHei-Bold.ttf"), "Microsoft YaHei", 700,
+                com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle.NORMAL, true);
+        b.useFont(() -> fontStream("fonts/NotoSansSC-Regular.ttf"), "NotoSansSC");
         b.withHtmlContent(html(m), null);
         b.toStream(out);
         b.run();
     }
 
-    private static InputStream fontStream()
+    private static InputStream fontStream(String path)
     {
         try
         {
-            return new org.springframework.core.io.ClassPathResource(
-                    "fonts/NotoSansSC-Regular.ttf").getInputStream();
+            return new org.springframework.core.io.ClassPathResource(path).getInputStream();
         }
         catch (Exception e)
         {
-            throw new RuntimeException("无法加载 PDF 中文字体", e);
+            throw new RuntimeException("无法加载 PDF 中文字体：" + path, e);
         }
     }
 
@@ -337,15 +403,16 @@ public class WorkOrderDocExporter
     {
         StringBuilder sb = new StringBuilder();
         sb.append("<!DOCTYPE html><html><head><meta charset='utf-8'/><style>")
-          .append("@page{size:A4 landscape;margin:12mm}")
-          .append("body{font-family:'NotoSansSC';font-size:11px;color:#222}")
-          .append(".c{text-align:center}.t1{font-size:18px;font-weight:bold}.t2{font-size:14px;font-weight:bold;margin:2px 0 8px}")
-          .append("table{width:100%;border-collapse:collapse}")
-          .append(".grid th,.grid td{border:1px solid #bbb;padding:4px 5px;text-align:center;font-size:10px}")
-          .append(".grid th{background:#f0f2f5}")
-          .append(".info td{padding:3px 4px}")
-          .append(".notice{font-size:10px;color:#555;line-height:1.7;white-space:pre-wrap}")
-          .append(".foot{margin-top:14px;font-size:11px}")
+          .append("@page{size:A4 landscape;margin:6mm 6mm}")
+          .append("body{margin:0;font-family:'Microsoft YaHei','NotoSansSC';font-size:14px;color:#000;word-wrap:break-word}")
+          .append(".c{text-align:center;line-height:1.5}.t1{font-size:22px;font-weight:bold}.t2{font-size:18px;font-weight:bold;margin:0 0 8px}")
+          .append("table{width:100%;max-width:100%;border-collapse:collapse}")
+          .append("th,td{white-space:normal;word-wrap:break-word;vertical-align:middle;line-height:1.5}")
+          .append(".grid th,.grid td{border:1px solid #bbb;padding:4px 5px;text-align:center;font-size:13px}")
+          .append(".grid th{background:#f0f2f5;white-space:nowrap;word-wrap:normal}")
+          .append(".info td{padding:3px 4px;vertical-align:top;line-height:1.5}")
+          .append(".notice{font-size:13px;color:#000;line-height:1.5;white-space:pre-wrap}")
+          .append(".foot{margin-top:6px;font-size:13px;line-height:1.5}")
           .append("</style></head><body>");
         sb.append("<div class='c t1'>").append(COMPANY).append("</div>");
         sb.append("<div class='c t2'>").append(esc(m.title)).append("</div>");
@@ -354,7 +421,19 @@ public class WorkOrderDocExporter
           .append(m.showBizNo ? esc(m.bizNoLabel) + esc(m.bizNo) : "")
           .append("</td></tr><tr><td></td><td style='text-align:right'>")
           .append(esc(m.docCodeLabel)).append(esc(m.docCode)).append("</td></tr></table>");
-        sb.append("<table class='grid'><tr>");
+        sb.append("<table class='grid'><colgroup>");
+        for (String h : m.headers)
+        {
+            if (h != null && h.contains("材料+工艺"))
+            {
+                sb.append("<col style='width:160px;max-width:300px'/>");
+            }
+            else
+            {
+                sb.append("<col/>");
+            }
+        }
+        sb.append("</colgroup><tr>");
         for (String h : m.headers)
         {
             sb.append("<th>").append(esc(h)).append("</th>");
@@ -519,7 +598,7 @@ public class WorkOrderDocExporter
             head = base(wb, 10, true, HorizontalAlignment.CENTER, true);
             cell = base(wb, 10, false, HorizontalAlignment.CENTER, true);
             totalLabel = base(wb, 10, true, HorizontalAlignment.RIGHT, false);
-            totalValue = base(wb, 11, true, HorizontalAlignment.RIGHT, false);
+            totalValue = base(wb, 11, true, HorizontalAlignment.LEFT, false);
             wrap = base(wb, 10, false, HorizontalAlignment.LEFT, false);
             wrap.setWrapText(true);
         }
@@ -533,6 +612,7 @@ public class WorkOrderDocExporter
             s.setFont(f);
             s.setAlignment(align);
             s.setVerticalAlignment(VerticalAlignment.CENTER);
+            s.setWrapText(true);
             if (border)
             {
                 s.setBorderTop(BorderStyle.THIN);

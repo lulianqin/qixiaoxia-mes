@@ -78,7 +78,7 @@
 
 <script setup lang="ts" name="WmItemRecpt">
 import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { MdVendor } from '@/types/api/mes/md/vendor'
 import type { WmItemRecptQueryParams, WmItemRecpt } from '@/types/api/mes/wm/item_recpt'
 import type { WmItemRecptLine } from '@/types/api/mes/wm/item_recpt_line'
@@ -165,6 +165,7 @@ function onPurOrderSelected(row: PurOrder) {
 
 // 检验状态 tag：点击跳转 IQC 列表页并按来源单据过滤
 const router = useRouter()
+const route = useRoute()
 const QC_TAG: Record<string, { type: string; text: string }> = {
   PASSED: { type: 'success', text: '检验合格' },
   CONCESSION: { type: 'warning', text: '让步接收' },
@@ -201,6 +202,8 @@ async function handlePrintLabels(row: WmItemRecpt) {
 
 onMounted(() => {
   loadVendorOptions()
+  // 工单看板「收料单号」入口：自动打开只读详情
+  if (route.query.openId) formDialogRef.value?.openView(Number(route.query.openId))
 })
 getList()
 </script>

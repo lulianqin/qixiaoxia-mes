@@ -10,6 +10,8 @@ import java.util.List;
  */
 public class WorkorderPurDocVO
 {
+    /** 已存在的采购单ID（草稿就地更新用；为空表示新增） */
+    private Long orderId;
     private String docTitle;
     private Long vendorId;
     private String vendorCode;
@@ -23,6 +25,8 @@ public class WorkorderPurDocVO
     private String remark;
     private List<WorkorderPurLineVO> lines;
 
+    public Long getOrderId() { return orderId; }
+    public void setOrderId(Long v) { this.orderId = v; }
     public String getDocTitle() { return docTitle; }
     public void setDocTitle(String v) { this.docTitle = v; }
     public Long getVendorId() { return vendorId; }

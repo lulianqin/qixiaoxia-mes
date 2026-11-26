@@ -11,6 +11,7 @@ export interface OutsourceProcessAttr {
   attrCode?: string
   attrName?: string
   attrType?: string
+  widgetType?: string
   attrUnit?: string
   optionsJson?: string
 }

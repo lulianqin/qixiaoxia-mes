@@ -156,8 +156,10 @@ onMounted(async () => {
     queryParams.pendingOnly = true
   }
   getList()
-  // 报工页「去领料」带入：工单/任务/工序，自动按当前工序生成领料草稿
   const q = route.query
+  // 工单看板「单据编码」入口：自动打开领料单详情
+  if (q.openId) handleView({ issueId: Number(q.openId) })
+  // 报工页「去领料」带入：工单/任务/工序，自动按当前工序生成领料草稿
   if (!q.workorderId) return
   try {
     const r: any = await buildFromWorkorder(Number(q.workorderId))

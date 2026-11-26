@@ -64,7 +64,9 @@
           <el-collapse-item name="feedback" v-if="dims.feedback.total >= 0">
             <template #title><span class="dim-title">报工记录（{{ dims.feedback.total }}）<el-tag v-if="dims.feedback.pending" size="small" type="warning" class="ml8">待审核 {{ dims.feedback.pending }}</el-tag><el-tag v-if="dims.feedback.audited" size="small" type="success" class="ml8">已审核 {{ dims.feedback.audited }}</el-tag></span></template>
             <el-table :data="dims.feedback.list" size="small" border>
-              <el-table-column label="报工编码" align="center" prop="feedbackCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="报工编码" align="center" width="140" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('FEEDBACK', s.row)">{{ s.row.feedbackCode }}</el-button></template>
+              </el-table-column>
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="报工数量" align="center" prop="quantityFeedback" width="90"  :show-overflow-tooltip="true" />
               <el-table-column label="合格" align="center" prop="quantityQualified" width="80"  :show-overflow-tooltip="true" />
@@ -76,7 +78,9 @@
           <el-collapse-item name="inspection">
             <template #title><span class="dim-title">检验记录（{{ dims.inspection.total }}）</span></template>
             <el-table :data="dims.inspection.list" size="small" border>
-              <el-table-column label="检验编码" align="center" prop="ipqcCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="检验编码" align="center" width="140" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('INSPECTION', s.row)">{{ s.row.ipqcCode }}</el-button></template>
+              </el-table-column>
               <el-table-column label="检验类型" align="center" prop="ipqcName" width="110"  :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="状态" align="center" width="90"><template #default="s">{{ s.row.status || '-' }}</template></el-table-column>
@@ -85,7 +89,10 @@
           <el-collapse-item name="outsource">
             <template #title><span class="dim-title">加工单（{{ dims.outsource.total }}）</span></template>
             <el-table :data="dims.outsource.list" size="small" border>
-              <el-table-column label="加工单号" align="center" prop="orderCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="加工单号" align="center" width="140" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('OUTSOURCE', s.row)">{{ s.row.orderCode }}</el-button></template>
+              </el-table-column>
+              <el-table-column label="单据标题" align="center" prop="docTitle" min-width="130" :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="加工类型" align="center" width="110">
@@ -122,7 +129,9 @@
           <el-collapse-item name="purchase">
             <template #title><span class="dim-title">采购单（{{ dims.purchase.total || 0 }}）</span></template>
             <el-table :data="dims.purchase.list || []" size="small" border>
-              <el-table-column label="采购单号" align="center" prop="orderCode" width="150" :show-overflow-tooltip="true" />
+              <el-table-column label="采购单号" align="center" width="150" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('PURCHASE', s.row)">{{ s.row.orderCode }}</el-button></template>
+              </el-table-column>
               <el-table-column label="单据名称" align="center" prop="orderName" min-width="130" :show-overflow-tooltip="true" />
               <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="采购数量" align="center" prop="totalQuantity" width="100" />
@@ -144,7 +153,9 @@
           <el-collapse-item name="issue">
             <template #title><span class="dim-title">领料/发料（{{ dims.issue.total }}）</span></template>
             <el-table :data="dims.issue.list" size="small" border>
-              <el-table-column label="单据编码" align="center" prop="issueCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="单据编码" align="center" width="140" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('ISSUE', s.row)">{{ s.row.issueCode }}</el-button></template>
+              </el-table-column>
               <el-table-column label="单据名称" align="center" prop="issueName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="工序" align="center" prop="processName" min-width="110" :show-overflow-tooltip="true" />
               <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
@@ -154,7 +165,9 @@
           <el-collapse-item name="itemRecpt">
             <template #title><span class="dim-title">收料（{{ dims.itemRecpt.total }}）</span></template>
             <el-table :data="dims.itemRecpt.list" size="small" border>
-              <el-table-column label="收料单号" align="center" prop="recptCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="收料单号" align="center" width="140" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('ITEM_RECPT', s.row)">{{ s.row.recptCode }}</el-button></template>
+              </el-table-column>
               <el-table-column label="采购单号" align="center" prop="purOrderCode" width="130"  :show-overflow-tooltip="true" />
               <el-table-column label="供应商" align="center" prop="vendorName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="数量" align="center" prop="totalQuantity" width="90"  :show-overflow-tooltip="true" />
@@ -165,7 +178,9 @@
           <el-collapse-item name="productRecpt">
             <template #title><span class="dim-title">成品入库（{{ dims.productRecpt.total }}）</span></template>
             <el-table :data="dims.productRecpt.list" size="small" border>
-              <el-table-column label="入库单号" align="center" prop="recptCode" width="140"  :show-overflow-tooltip="true" />
+              <el-table-column label="入库单号" align="center" width="140" :show-overflow-tooltip="true">
+                <template #default="s"><el-button link type="primary" size="small" @click="openDoc('PRODUCT_RECPT', s.row)">{{ s.row.recptCode }}</el-button></template>
+              </el-table-column>
               <el-table-column label="客户" align="center" prop="clientName" min-width="120" :show-overflow-tooltip="true" />
               <el-table-column label="数量" align="center" prop="totalQuantity" width="90"  :show-overflow-tooltip="true" />
               <el-table-column label="仓库" align="center" prop="warehouseName" width="110"  :show-overflow-tooltip="true" />
@@ -246,6 +261,24 @@ function doExportDoc(row: any, type: 'PUR' | 'PROC', format: 'excel' | 'pdf') {
   }
   const req = type === 'PUR' ? fetchPurDocPdf(row.orderId) : fetchProcessDocPdf(row.orderId)
   req.then((blob: Blob) => printPdfBlob(blob)).catch(() => {})
+}
+
+/** 关联单据编号 → 对应单据详情/列表页（列表页用 openId 自动打开详情） */
+const DOC_NAV: Record<string, any> = {
+  FEEDBACK: { path: '/mes/pro/feedback', id: (r: any) => r.recordId },
+  INSPECTION: { path: '/qc/qcipqc', id: (r: any) => r.ipqcId, extra: { ro: '1' } },
+  OUTSOURCE: { path: '/mes/wm/outsource', id: (r: any) => r.orderId },
+  PURCHASE: { path: '/mes/pur/order_detail', param: 'orderId', id: (r: any) => r.orderId },
+  ISSUE: { path: '/mes/wm/issue', id: (r: any) => r.issueId },
+  ITEM_RECPT: { path: '/mes/wm/item_recpt', id: (r: any) => r.recptId },
+  PRODUCT_RECPT: { path: '/mes/wm/product_recpt', id: (r: any) => r.recptId }
+}
+function openDoc(type: string, row: any) {
+  const cfg = DOC_NAV[type]
+  if (!cfg || !row) return
+  const id = cfg.id(row)
+  if (!id) return
+  router.push({ path: cfg.path, query: { [cfg.param || 'openId']: String(id), ...(cfg.extra || {}) } })
 }
 
 /** 工序快捷状态（弱流程记录，不校验机台/负责人/质检） */

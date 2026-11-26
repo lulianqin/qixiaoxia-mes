@@ -3,7 +3,7 @@
     动态扩展属性表单（物料/销售行/采购行/工单/流转单 共用）
     schema: 属性定义列表（来自 getEffAttrSchema，含继承）
     modelValue: { attrCode: value } 扁平值对象
-    scope: 只渲染指定属性域（PRODUCT-产品属性 / PRODUCTION-生产属性），不传则全部
+    scope: 只渲染指定属性域（PRODUCT-产品属性 / PRODUCTION-生产属性 / DOC-单据属性），不传则不渲染单据属性
     plain: 只读展示形态（流转单预览用），不渲染输入控件
     schema 中没有但 modelValue 里存在的 key → 作为"游离历史值"只读降级展示（设计文档 12.1）
   -->
@@ -96,8 +96,8 @@ const props = defineProps<{
   modelValue?: Record<string, any>
   /** 是否只读（单据查看态） */
   readonly?: boolean
-  /** 只渲染指定属性域：PRODUCT-产品属性 / PRODUCTION-生产属性 */
-  scope?: 'PRODUCT' | 'PRODUCTION'
+  /** 只渲染指定属性域：PRODUCT-产品属性 / PRODUCTION-生产属性 / DOC-单据属性 */
+  scope?: 'PRODUCT' | 'PRODUCTION' | 'DOC'
   /** 只读展示形态：不渲染输入控件，按文本/图片/附件展示 */
   plain?: boolean
   /** 每行列数（默认 1，开单页传 3） */
@@ -143,7 +143,9 @@ const renderList = computed<(MdItemTypeAttr & { readonly?: boolean })[]>(() => {
   const covered = new Set<string>()
   for (const s of props.schema || []) {
     if (!s.attrCode) continue
-    if (props.scope && (s.attrScope || 'PRODUCT') !== props.scope) continue
+    const scope = s.attrScope || 'PRODUCT'
+    // 单据属性只在单据配置页显式指定 DOC 时渲染，避免混入产品/生产等页面
+    if (props.scope ? scope !== props.scope : scope === 'DOC') continue
     list.push({ ...s, readonly: props.readonly })
     covered.add(s.attrCode)
   }

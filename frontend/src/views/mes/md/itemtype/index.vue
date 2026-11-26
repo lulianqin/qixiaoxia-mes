@@ -122,8 +122,8 @@
         <el-table-column label="属性名称" prop="attrName" width="140"  :show-overflow-tooltip="true" />
         <el-table-column label="属性域" width="90" align="center">
           <template #default="scope">
-            <el-tag size="small" :type="scope.row.attrScope === 'PRODUCTION' ? 'warning' : 'info'">
-              {{ scope.row.attrScope === 'PRODUCTION' ? '生产' : '产品' }}
+            <el-tag size="small" :type="scopeTagType(scope.row.attrScope)">
+              {{ scopeLabel(scope.row.attrScope) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -161,8 +161,8 @@
             :label="`${a.attrName}(${a.attrCode})`">
             <div class="attr-opt">
               <span class="attr-opt-name">{{ a.attrName }}（{{ a.attrCode }}）</span>
-              <el-tag size="small" :type="a.attrScope === 'PRODUCTION' ? 'warning' : 'info'" class="ml6">
-                {{ a.attrScope === 'PRODUCTION' ? '生产属性' : '产品属性' }}
+              <el-tag size="small" :type="scopeTagType(a.attrScope)" class="ml6">
+                {{ scopeLabelFull(a.attrScope) }}
               </el-tag>
             </div>
           </el-option>
@@ -192,6 +192,7 @@
                 <el-select v-model="newAttrForm.attrScope" style="width:100%">
                   <el-option label="产品属性" value="PRODUCT" />
                   <el-option label="生产/流转属性" value="PRODUCTION" />
+                  <el-option label="单据属性（采购单/加工单）" value="DOC" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -380,11 +381,30 @@ const widgetOptions = [
   { label: '附件', value: 'FILE' }
 ]
 const newAttrForm = reactive<{
-  attrCode: string; attrName: string; attrScope: 'PRODUCT' | 'PRODUCTION';
+  attrCode: string; attrName: string; attrScope: 'PRODUCT' | 'PRODUCTION' | 'DOC';
   widgetType: string; attrUnit: string; required: boolean; optionsInput: string
 }>({
   attrCode: '', attrName: '', attrScope: 'PRODUCT', widgetType: 'TEXT', attrUnit: '', required: false, optionsInput: ''
 })
+
+/** 属性域中文简称 / 全称 / 标签颜色 */
+function scopeLabel(scope?: string): string {
+  if (scope === 'PRODUCTION') return '生产'
+  if (scope === 'DOC') return '单据'
+  return '产品'
+}
+
+function scopeLabelFull(scope?: string): string {
+  if (scope === 'PRODUCTION') return '生产属性'
+  if (scope === 'DOC') return '单据属性'
+  return '产品属性'
+}
+
+function scopeTagType(scope?: string): 'info' | 'warning' | 'success' {
+  if (scope === 'PRODUCTION') return 'warning'
+  if (scope === 'DOC') return 'success'
+  return 'info'
+}
 
 function widgetLabel(type?: string): string {
   return widgetOptions.find(w => w.value === type)?.label || type || '-'

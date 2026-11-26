@@ -501,6 +501,8 @@ onMounted(() => {
     queryParams.pendingOnly = true
   }
   getList()
+  // 工单看板「加工单号」入口：自动打开单据详情
+  if (route.query.openId) handleDetail({ orderId: Number(route.query.openId) } as any)
 })
 </script>
 

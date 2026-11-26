@@ -7,6 +7,9 @@
       </el-table-column>
       <el-table-column label="字段名称" prop="attrName" min-width="140" :show-overflow-tooltip="true" />
       <el-table-column label="字段编码" prop="attrCode" width="140" :show-overflow-tooltip="true" />
+      <el-table-column label="属性域" width="90" align="center">
+        <template #default="{ row }">{{ scopeLabel(row.attrScope) }}</template>
+      </el-table-column>
       <el-table-column label="类型" prop="attrType" width="90" align="center" />
       <el-table-column label="单位" prop="attrUnit" width="80" align="center" />
       <el-table-column label="必填" width="80" align="center">
@@ -40,6 +43,13 @@ const processId = ref<number | null>(null)
 const processName = ref('')
 const rows = ref<any[]>([])
 
+/** 属性域中文名：产品属性 / 生产属性 / 单据属性 */
+function scopeLabel(scope?: string): string {
+  if (scope === 'PRODUCTION') return '生产属性'
+  if (scope === 'DOC') return '单据属性'
+  return '产品属性'
+}
+
 async function open(row: any) {
   processId.value = row.processId
   processName.value = row.processName || row.processCode || ''
@@ -58,6 +68,7 @@ async function open(row: any) {
         attrCode: d.attrCode,
         attrName: d.attrName,
         attrType: d.attrType,
+        attrScope: d.attrScope,
         attrUnit: d.attrUnit,
         checked: !!b,
         required: b?.required || '0',

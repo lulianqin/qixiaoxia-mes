@@ -24,6 +24,19 @@ public interface WmOutsourceOrderMapper
     /** 删除外协单头（仅 DRAFT 状态，由 Service 层校验状态后调用） */
     int deleteOutsourceOrderByOrderId(Long orderId);
 
+    /**
+     * 物理删除外协单头。
+     * <p>仅用于工单开单页保存时重建草稿单：软删除会继续占用
+     * uk_wo_process(workorder_id, process_id) 唯一键，导致同工序无法重新建单。</p>
+     */
+    int deleteOutsourceOrderHardByOrderId(Long orderId);
+
+    /** 工单开单页保存：先清空草稿单头工序ID，避免首道工序变更时唯一键中间态冲突 */
+    int clearDraftProcessId(Long orderId);
+
+    /** 工单开单页保存：就地更新草稿单头（保留单号与发料行，显式覆盖可空字段） */
+    int updateDraftHeaderForWorkorder(WmOutsourceOrder order);
+
     /** 仅回写 IQC 挂点两列（工厂生成检验单后回填，避免并发覆盖整头） */
     int updateOutsourceOrderHeaderRefs(@Param("orderId") Long orderId,
                                        @Param("iqcId") Long iqcId,

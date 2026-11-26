@@ -26,6 +26,8 @@ public class WmOutsourceProcessAttr extends BaseEntity
     private String attrCode;
     private String attrName;
     private String attrType;
+    /** 控件类型（联查 qxx_md_attr_def，非持久字段），如 TEXT/TEXTAREA/NUMBER */
+    private String widgetType;
     private String attrUnit;
     private String optionsJson;
 
@@ -49,6 +51,8 @@ public class WmOutsourceProcessAttr extends BaseEntity
     public void setAttrName(String v) { this.attrName = v; }
     public String getAttrType() { return attrType; }
     public void setAttrType(String v) { this.attrType = v; }
+    public String getWidgetType() { return widgetType; }
+    public void setWidgetType(String v) { this.widgetType = v; }
     public String getAttrUnit() { return attrUnit; }
     public void setAttrUnit(String v) { this.attrUnit = v; }
     public String getOptionsJson() { return optionsJson; }
