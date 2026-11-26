@@ -50,13 +50,17 @@
     </el-row>
     <el-row :gutter="12">
       <el-col :span="8">
-        <el-form-item :label="`主单位数量（${form.unitName || '主单位'}）`" prop="quantityOnhand">
-          <el-input-number v-model="form.quantityOnhand" :min="0" :precision="4" controls-position="right" style="width:100%" />
+        <el-form-item label="主单位数量" prop="quantityOnhand">
+          <el-input-number v-model="form.quantityOnhand" :min="0" :precision="4" controls-position="right" style="width:100%">
+            <template #suffix><span class="unit-suffix">{{ form.unitName }}</span></template>
+          </el-input-number>
         </el-form-item>
       </el-col>
       <el-col v-if="form.unit2" :span="8">
-        <el-form-item :label="`辅助单位数量（${form.unit2Name || form.unit2}）`">
-          <el-input-number v-model="form.quantityOnhand2" :min="0" :precision="4" controls-position="right" style="width:100%" />
+        <el-form-item label="辅助单位数量">
+          <el-input-number v-model="form.quantityOnhand2" :min="0" :precision="4" controls-position="right" style="width:100%">
+            <template #suffix><span class="unit-suffix">{{ form.unit2Name || form.unit2 }}</span></template>
+          </el-input-number>
         </el-form-item>
       </el-col>
     </el-row>
@@ -187,3 +191,11 @@ function validate() {
 
 defineExpose({ validate })
 </script>
+
+<style scoped>
+.unit-suffix {
+  color: #909399;
+  font-size: 12px;
+  white-space: nowrap;
+}
+</style>
