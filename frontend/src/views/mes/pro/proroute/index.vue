@@ -56,9 +56,10 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="操作" align="center" width="80" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="120" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:proroute:edit']"></el-button></el-tooltip>
+          <el-tooltip content="复制" placement="top"><el-button link type="primary" icon="DocumentCopy" @click="handleCopy(scope.row)" v-hasPermi="['mes:pro:proroute:add']"></el-button></el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -424,11 +425,47 @@
         <el-button @click="_procParamOpen = false">关 闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 复制工艺路线弹窗 -->
+    <el-dialog title="复制工艺路线" v-model="copyOpen" width="520px" append-to-body>
+      <el-alert type="info" :closable="false" show-icon style="margin-bottom:12px"
+        title="将完整复制源路线的工序（含工序BOM、参数）和关联产品；新路线的默认产品标记不复制，后续可在编辑中调整。" />
+      <el-form ref="copyForm" :model="copyForm" :rules="copyRules" label-width="100px">
+        <el-form-item label="源路线">
+          <el-input :model-value="(copyForm.sourceRouteCode || '') + ' ' + (copyForm.sourceRouteName || '')" disabled />
+        </el-form-item>
+        <el-form-item label="新路线名称" prop="routeName">
+          <el-input v-model="copyForm.routeName" placeholder="请输入新路线名称" maxlength="255" />
+        </el-form-item>
+        <el-row>
+          <el-col :span="16">
+            <el-form-item label="新路线编码" prop="routeCode">
+              <el-input v-model="copyForm.routeCode" placeholder="请输入新路线编码" maxlength="64" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label-width="80">
+              <el-switch v-model="copyAutoGenFlag" size="small" @change="handleCopyAutoGenChange" />
+              <span style="margin-left:6px;font-size:12px;color:#909399">自动生成</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="备注">
+          <el-input v-model="copyForm.remark" type="textarea" maxlength="500" placeholder="可选，将追加复制来源说明" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitCopyForm">确 定</el-button>
+          <el-button @click="copyOpen = false">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listRoute, getRoute, delRoute, addRoute, updateRoute } from '@/api/mes/pro/proroute'
+import { listRoute, getRoute, delRoute, addRoute, copyRoute, updateRoute } from '@/api/mes/pro/proroute'
 import { listRouteProcessByRouteId, addRouteProcess, updateRouteProcess, delRouteProcess } from '@/api/mes/pro/routeprocess'
 import { listRouteProductByRouteId, addRouteProduct, updateRouteProduct, delRouteProduct } from '@/api/mes/pro/routeproduct'
 import { listRouteProductBomByRouteId, addRouteProductBom, updateRouteProductBom, delRouteProductBom } from '@/api/mes/pro/routeproductbom'
@@ -451,6 +488,9 @@ export default {
       ids: [], single: true, multiple: true, showSearch: true, total: 0,
       routeList: [], processList: [], productList: [], bomList: [], paramList: [], allProcessOptions: [], vendorOptions: [], ownerOptions: [], ownerLoading: false,
       title: '', open: false,
+      // 复制弹窗
+      copyOpen: false, copyAutoGenFlag: false,
+      copyForm: { sourceRouteId: null, sourceRouteCode: null, sourceRouteName: null, routeCode: null, routeName: null, remark: null },
       // 路线工序弹窗
       rpOpen: false, rpTitle: '', rpForm: {},
       // 关联产品搜索
@@ -482,6 +522,10 @@ export default {
       rules: {
         routeCode: [{ required: true, message: '路线编码不能为空', trigger: 'blur' }, { max: 64, message: '字段过长', trigger: 'blur' }],
         routeName: [{ required: true, message: '路线名称不能为空', trigger: 'blur' }, { max: 255, message: '字段过长', trigger: 'blur' }],
+      },
+      copyRules: {
+        routeCode: [{ required: true, message: '新路线编码不能为空', trigger: 'blur' }, { max: 64, message: '字段过长', trigger: 'blur' }],
+        routeName: [{ required: true, message: '新路线名称不能为空', trigger: 'blur' }, { max: 255, message: '字段过长', trigger: 'blur' }],
       },
       rpRules: { processId: [{ required: true, message: '工序不能为空', trigger: 'change' }] },
       prodRules: { itemId: [{ required: true, message: '产品物料不能为空', trigger: 'blur' }], quantity: [{ required: true, message: '批量不能为空', trigger: 'blur' }] },
@@ -562,6 +606,37 @@ export default {
       this.$modal.confirm('确认删除路线编号为"' + ids + '"的数据项？').then(() => delRoute(ids)).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {})
     },
     handleAutoGenChange(f) { if (f) { genSerialCode('ROUTE_CODE').then(r => { this.form.routeCode = r.data }) } else { this.form.routeCode = null } },
+    // 复制工艺路线：一次复制主表/工序/BOM/参数/关联产品，配置后续在编辑中调整
+    handleCopy(row) {
+      this.copyForm = {
+        sourceRouteId: row.routeId, sourceRouteCode: row.routeCode, sourceRouteName: row.routeName,
+        routeCode: null, routeName: (row.routeName || '') + '-副本', remark: null,
+      }
+      this.copyAutoGenFlag = true
+      this.copyOpen = true
+      genSerialCode('ROUTE_CODE').then(r => {
+        if (this.copyOpen && this.copyAutoGenFlag) this.copyForm.routeCode = r.data
+      }).catch(() => { this.copyAutoGenFlag = false })
+    },
+    handleCopyAutoGenChange(f) {
+      if (f) { genSerialCode('ROUTE_CODE').then(r => { this.copyForm.routeCode = r.data }) }
+      else { this.copyForm.routeCode = null }
+    },
+    submitCopyForm() {
+      this.$refs.copyForm.validate(valid => {
+        if (!valid) return
+        copyRoute({
+          sourceRouteId: this.copyForm.sourceRouteId,
+          routeCode: this.copyForm.routeCode,
+          routeName: this.copyForm.routeName,
+          remark: this.copyForm.remark,
+        }).then(() => {
+          this.$modal.msgSuccess('复制成功，可在编辑中调整配置')
+          this.copyOpen = false
+          this.getList()
+        })
+      })
+    },
     // 工序组成
     loadProcessList(routeId) { this.processLoading = true; listRouteProcessByRouteId(routeId).then(r => { this.processList = r.data || []; this.processLoading = false }).catch(() => { this.processLoading = false }) },
     handleAddRouteProcess() {

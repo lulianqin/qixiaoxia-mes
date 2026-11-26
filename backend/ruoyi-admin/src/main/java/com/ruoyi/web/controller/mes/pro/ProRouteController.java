@@ -18,6 +18,8 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.mes.pro.ProRoute;
+import com.ruoyi.system.domain.mes.pro.ProRouteCopyRequest;
+import com.ruoyi.system.service.mes.pro.IProRouteCopyService;
 import com.ruoyi.system.service.mes.pro.IProRouteService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -34,6 +36,9 @@ public class ProRouteController extends BaseController
 {
     @Autowired
     private IProRouteService proRouteService;
+
+    @Autowired
+    private IProRouteCopyService proRouteCopyService;
 
     /**
      * 查询工艺路线列表
@@ -89,6 +94,17 @@ public class ProRouteController extends BaseController
         proRouteService.checkRouteCodeUnique(proRoute);
         proRouteService.insertProRoute(proRoute);
         return success(proRoute);
+    }
+
+    /**
+     * 复制工艺路线（含工序/BOM/参数/关联产品），复用新增权限
+     */
+    @PreAuthorize("@ss.hasPermi('mes:pro:proroute:add')")
+    @Log(title = "工艺路线", businessType = BusinessType.INSERT)
+    @PostMapping("/copy")
+    public AjaxResult copy(@RequestBody ProRouteCopyRequest request)
+    {
+        return success(proRouteCopyService.copyProRoute(request));
     }
 
     /**
