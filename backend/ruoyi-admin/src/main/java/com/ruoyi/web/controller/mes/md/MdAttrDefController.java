@@ -115,7 +115,21 @@ public class MdAttrDefController extends BaseController
         return toAjax(mdAttrDefService.updateMdAttrDef(mdAttrDef));
     }
 
-    @PreAuthorize("@ss.hasPermi('mes:md:attrDef:remove')")
+    /**
+     * 属性被引用情况（分类/工序模板/物料填写数），供删除前提示影响面。
+     * 与 /map 一样不校验权限，避免物料分类页正常删除流程被权限卡住。
+     */
+    @GetMapping("/usage/{attrId}")
+    public AjaxResult usage(@PathVariable Long attrId)
+    {
+        return success(mdAttrDefService.selectAttrUsage(attrId));
+    }
+
+    /**
+     * 彻底删除属性字典记录（同时级联清理分类/工序绑定）。
+     * 有 attrDef:remove 或分类扩展属性配置权限即可，避免非管理员在分类页删不掉属性。
+     */
+    @PreAuthorize("@ss.hasAnyPermi('mes:md:attrDef:remove,mes:md:itemtype:attr')")
     @Log(title = "物料扩展属性字典", businessType = BusinessType.DELETE)
     @DeleteMapping("/{attrIds}")
     public AjaxResult remove(@PathVariable Long[] attrIds)

@@ -26,4 +26,12 @@ public interface WmOutsourceProcessAttrMapper
     /** 新增绑定。@SkipFactoryId：factory_id 显式写入列 */
     @SkipFactoryId
     int insertBind(WmOutsourceProcessAttr attr);
+
+    /** 按属性ID删除全部工序绑定（属性字典物理删除时级联清理），跨工厂 */
+    @SkipFactoryId
+    int deleteByAttrId(@Param("attrId") Long attrId);
+
+    /** 列出引用了某属性的工序名称（删除前影响面提示用），跨工厂 */
+    @SkipFactoryId
+    List<String> selectProcessNamesByAttrId(@Param("attrId") Long attrId);
 }

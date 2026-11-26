@@ -45,4 +45,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             (#{factoryId}, #{processId}, #{attrId}, #{required}, #{sortOrder}, #{enableFlag},
              #{createBy}, now())
     </insert>
+
+    <!-- 属性字典删除时级联清理：全局字典，绑定可能跨工厂，故不加 factory_id -->
+    <delete id="deleteByAttrId">
+        delete from qxx_wm_outsource_process_attr where attr_id = #{attrId}
+    </delete>
+
+    <select id="selectProcessNamesByAttrId" resultType="java.lang.String">
+        select distinct p.process_name
+          from qxx_wm_outsource_process_attr a
+          join qxx_pro_process p on p.process_id = a.process_id
+         where a.attr_id = #{attrId}
+         order by p.process_name
+    </select>
 </mapper>

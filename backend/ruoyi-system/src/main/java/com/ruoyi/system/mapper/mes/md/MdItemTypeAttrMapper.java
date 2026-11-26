@@ -38,4 +38,15 @@ public interface MdItemTypeAttrMapper
     public int deleteItemTypeAttrById(Long id);
     @SkipFactoryId
     public int deleteBindByTypeId(MdItemTypeAttr query);
+
+    /**
+     * 按属性ID删除全部分类绑定（属性字典物理删除时级联清理）。
+     * attr_def 为全局字典，绑定可能散落在多个工厂，故不加 factory_id 条件。
+     */
+    @SkipFactoryId
+    public int deleteBindByAttrId(Long attrId);
+
+    /** 列出引用了某属性的分类名称（删除前影响面提示用），跨工厂 */
+    @SkipFactoryId
+    public List<String> selectTypeNamesByAttrId(Long attrId);
 }

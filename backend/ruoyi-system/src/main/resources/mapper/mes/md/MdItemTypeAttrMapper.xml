@@ -86,4 +86,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         delete from qxx_md_item_type_attr where factory_id = #{factoryId} and item_type_id = #{itemTypeId}
     </delete>
 
+    <!-- 属性字典删除时级联清理：全局字典，绑定可能跨工厂，故不加 factory_id -->
+    <delete id="deleteBindByAttrId" parameterType="Long">
+        delete from qxx_md_item_type_attr where attr_id = #{attrId}
+    </delete>
+
+    <select id="selectTypeNamesByAttrId" parameterType="Long" resultType="java.lang.String">
+        select distinct t.item_type_name
+          from qxx_md_item_type_attr ta
+          join qxx_md_item_type t on t.item_type_id = ta.item_type_id
+         where ta.attr_id = #{attrId}
+         order by t.item_type_name
+    </select>
+
 </mapper>

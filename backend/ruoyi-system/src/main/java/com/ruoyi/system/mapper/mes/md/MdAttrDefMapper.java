@@ -34,4 +34,8 @@ public interface MdAttrDefMapper
 
     @SkipFactoryId
     public int deleteMdAttrDefByAttrIds(Long[] attrIds);
+
+    /** 统计有多少物料在 ext_attrs 里填过该属性（删除前影响面提示用） */
+    @SkipFactoryId
+    public int countItemUsage(String attrCode);
 }

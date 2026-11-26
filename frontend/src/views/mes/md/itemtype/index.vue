@@ -116,6 +116,7 @@
     <el-dialog :title="'扩展属性配置 - ' + (attrBindRow?.itemTypeName || '')" v-model="attrBindOpen" width="760px" append-to-body>
       <el-alert type="info" :closable="false" style="margin-bottom: 12px">
         为本分类勾选需要填写的扩展属性。父分类已绑定的属性子类会自动继承，通常只需在大类配置。
+        「移除」只解除本类关联（属性仍留在全局字典）；「删除」会把属性从全局字典彻底删除。
       </el-alert>
       <el-table :data="attrBindList" v-loading="attrBindLoading" border size="small">
         <el-table-column label="属性编码" prop="attrCode" width="160"  :show-overflow-tooltip="true" />
@@ -146,10 +147,13 @@
             <el-tag v-else type="success" size="small">本类</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" align="center">
+        <el-table-column label="操作" width="130" align="center">
           <template #default="scope">
-            <el-button v-if="!scope.row.inheritFromParent" link type="danger" size="small" @click="removeAttrFromBind(scope.$index)">移除</el-button>
-            <span v-else style="color:#bbb;font-size:12px">—</span>
+            <template v-if="!scope.row.inheritFromParent">
+              <el-button link type="primary" size="small" @click="removeAttrFromBind(scope.$index)">移除</el-button>
+              <el-button link type="danger" size="small" @click="confirmDeleteAttr(scope.row)">删除</el-button>
+            </template>
+            <span v-else style="color:#bbb;font-size:12px" title="继承自父分类，请在父分类上操作">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -168,6 +172,7 @@
           </el-option>
         </el-select>
         <el-button type="success" plain size="small" style="margin-left:16px" @click="toggleNewAttrForm">{{ newAttrOpen ? '收起新建' : '+ 新建属性' }}</el-button>
+        <el-button type="warning" plain size="small" style="margin-left:8px" @click="openAttrDict">属性字典管理</el-button>
       </div>
 
       <!-- 新建属性内联表单 -->
@@ -228,6 +233,45 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 全局属性字典管理（彻底删除属性定义） -->
+    <el-dialog title="属性字典管理" v-model="attrDictOpen" width="820px" append-to-body>
+      <el-alert type="warning" :closable="false" style="margin-bottom: 12px">
+        这里列出全部全局扩展属性。「删除」会把属性从字典中彻底移除，并同时解除所有分类、工序模板的绑定，不可恢复；
+        历史单据里已填写的值仍保留在数据中，但不再展示。
+      </el-alert>
+      <el-input v-model="attrDictKeyword" placeholder="按编码/名称筛选" clearable size="small" style="width: 260px; margin-bottom: 10px" />
+      <el-table :data="filteredAttrDictList" v-loading="attrDictLoading" border size="small" max-height="420">
+        <el-table-column label="属性编码" prop="attrCode" width="150" :show-overflow-tooltip="true" />
+        <el-table-column label="属性名称" prop="attrName" width="150" :show-overflow-tooltip="true" />
+        <el-table-column label="属性域" width="90" align="center">
+          <template #default="scope">
+            <el-tag size="small" :type="scopeTagType(scope.row.attrScope)">{{ scopeLabel(scope.row.attrScope) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="控件" width="100" align="center" :show-overflow-tooltip="true">
+          <template #default="scope">{{ widgetLabel(scope.row.widgetType || scope.row.attrType) }}</template>
+        </el-table-column>
+        <el-table-column label="单位" prop="attrUnit" width="80" align="center" />
+        <el-table-column label="状态" width="80" align="center">
+          <template #default="scope">
+            <el-tag size="small" :type="scope.row.enableFlag === '1' ? 'success' : 'info'">
+              {{ scope.row.enableFlag === '1' ? '启用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="scope">
+            <el-button link type="danger" size="small" @click="confirmDeleteAttr(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="attrDictOpen = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -238,7 +282,7 @@ import type { MdItemType, ItemTypeQueryParams } from '@/types/api/mes/md/itemtyp
 import type { TreeSelect } from '@/types/api/common'
 import type { MdAttrDef, MdItemTypeAttr } from '@/types/api/mes/md/attr'
 import { listItemtype, treeselect, listExcludeChild, getItemtype, delItemtype, addItemtype, updateItemtype } from '@/api/mes/md/itemtype'
-import { listAttrDef, getAttrBind, saveAttrBind, getEffAttrSchema, createAttrAndBind } from '@/api/mes/md/attr'
+import { listAttrDef, getAttrBind, saveAttrBind, getEffAttrSchema, createAttrAndBind, delAttrDef, getAttrUsage } from '@/api/mes/md/attr'
 import { handleTree } from '@/utils/ruoyi'
 
 const { proxy } = getCurrentInstance() as any
@@ -366,6 +410,17 @@ const attrBindLoading = ref(false)
 const attrBindList = ref<Array<MdItemTypeAttr & { checked?: string; inheritFromParent?: boolean }>>([])
 const attrDefOptions = ref<MdAttrDef[]>([])
 const addAttrId = ref<number | undefined>(undefined)
+// 全局属性字典管理弹窗
+const attrDictOpen = ref(false)
+const attrDictLoading = ref(false)
+const attrDictList = ref<MdAttrDef[]>([])
+const attrDictKeyword = ref('')
+const filteredAttrDictList = computed(() => {
+  const kw = attrDictKeyword.value.trim().toLowerCase()
+  if (!kw) return attrDictList.value
+  return attrDictList.value.filter(a =>
+    (a.attrCode || '').toLowerCase().includes(kw) || (a.attrName || '').toLowerCase().includes(kw))
+})
 // 新建属性内联表单
 const newAttrOpen = ref(false)
 const newAttrSubmitting = ref(false)
@@ -422,17 +477,28 @@ function toAttrType(widgetType: string): string {
 function handleAttrBind(row: MdItemType) {
   attrBindRow.value = row
   attrBindOpen.value = true
-  attrBindLoading.value = true
   addAttrId.value = undefined
   attrBindList.value = []
-  // 加载属性字典（用于"添加属性"下拉）
-  listAttrDef({ enableFlag: '1' }).then(res => {
+  newAttrOpen.value = false
+  loadAttrDict()
+  reloadBind()
+}
+
+/** 加载全局属性字典（"添加已有属性"下拉数据源） */
+function loadAttrDict() {
+  return listAttrDef({ enableFlag: '1' }).then(res => {
     attrDefOptions.value = (res as any).rows || []
   })
+}
+
+/** 重新加载本类绑定 + 继承项（删除属性后也要刷新） */
+function reloadBind() {
+  if (!attrBindRow.value) return
+  attrBindLoading.value = true
   // 加载本类直接绑定 + 有效属性(含继承)，合并展示
   Promise.all([
-    getAttrBind(row.itemTypeId!),
-    getEffAttrSchema(row.itemTypeId!)
+    getAttrBind(attrBindRow.value.itemTypeId!),
+    getEffAttrSchema(attrBindRow.value.itemTypeId!)
   ]).then(([bindRes, effRes]) => {
     const binds = bindRes.data || []
     const effs = effRes.data || []
@@ -449,6 +515,7 @@ function handleAttrBind(row: MdItemType) {
       }
     }
     attrBindList.value = merged
+  }).finally(() => {
     attrBindLoading.value = false
   })
 }
@@ -477,18 +544,66 @@ function removeAttrFromBind(index: number) {
 }
 
 /** 将当前列表全量保存到后端（统一落库，避免加属性后忘点保存丢失） */
-function persistBinds(msg = '保存成功') {
+function persistBinds(msg = '保存成功', showMsg = true) {
   if (!attrBindRow.value) return
   const binds = attrBindList.value
     .filter(b => !b.inheritFromParent && b.enableFlag === '1')
     .map(b => ({ attrId: b.attrId, required: b.checked || '0', sortOrder: b.sortOrder || 0, enableFlag: b.enableFlag || '1' }))
   return saveAttrBind({ typeId: attrBindRow.value.itemTypeId!, binds }).then(() => {
-    proxy.$modal.msgSuccess(msg)
+    if (showMsg) proxy.$modal.msgSuccess(msg)
   })
 }
 
 function saveAttrBindForm() {
   persistBinds().then(() => { attrBindOpen.value = false })
+}
+
+// ==================== 全局属性字典管理 ====================
+
+/** 打开属性字典管理弹窗（列表含停用项，便于清理） */
+function openAttrDict() {
+  attrDictOpen.value = true
+  attrDictKeyword.value = ''
+  loadAttrDictList()
+}
+
+function loadAttrDictList() {
+  attrDictLoading.value = true
+  listAttrDef({}).then(res => {
+    attrDictList.value = (res as any).rows || []
+  }).finally(() => {
+    attrDictLoading.value = false
+  })
+}
+
+/**
+ * 彻底删除属性字典记录（不是解除绑定）。
+ * 先查引用情况做影响面提示，确认后再删；后端会级联清理分类/工序绑定。
+ */
+function confirmDeleteAttr(row: { attrId?: number; attrName?: string }) {
+  const attrId = row.attrId
+  if (!attrId) return
+  const name = row.attrName || ''
+  getAttrUsage(attrId).then(res => {
+    const usage = (res.data || {}) as { typeNames?: string[]; processNames?: string[]; itemCount?: number }
+    const typeNames = usage.typeNames || []
+    const processNames = usage.processNames || []
+    const itemCount = usage.itemCount || 0
+    const parts = [`确定要彻底删除属性「${name}」吗？删除后会从全局属性字典中移除，无法恢复。`]
+    if (typeNames.length) parts.push(`当前被 ${typeNames.length} 个分类引用（${typeNames.join('、')}），将一并解除绑定。`)
+    if (processNames.length) parts.push(`当前被 ${processNames.length} 个工序模板引用（${processNames.join('、')}），将一并解除绑定。`)
+    if (itemCount > 0) parts.push(`已有 ${itemCount} 个物料填写过该属性，历史值会保留但不再展示。`)
+    proxy.$modal.confirm(parts.join('')).then(() => delAttrDef(attrId)).then(() => {
+      proxy.$modal.msgSuccess('已彻底删除')
+      const inCurType = attrBindList.value.some(b => b.attrId === attrId && !b.inheritFromParent)
+      // 同步本地三处数据
+      attrBindList.value = attrBindList.value.filter(b => b.attrId !== attrId)
+      attrDefOptions.value = attrDefOptions.value.filter(a => a.attrId !== attrId)
+      attrDictList.value = attrDictList.value.filter(a => a.attrId !== attrId)
+      // 后端已级联删除本类绑定，剩余项重新落库，保持与服务端一致
+      if (inCurType && attrBindOpen.value) persistBinds('', false)
+    }).catch(() => {})
+  })
 }
 
 /** 展开/收起新建属性内联表单 */

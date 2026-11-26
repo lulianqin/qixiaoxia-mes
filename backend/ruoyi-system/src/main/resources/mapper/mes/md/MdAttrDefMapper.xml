@@ -118,4 +118,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
+    <!-- 统计填过该属性的物料数（ext_attrs 为 JSON，按 attrCode 作为 key 判断是否存在） -->
+    <select id="countItemUsage" parameterType="String" resultType="int">
+        select count(1)
+          from qxx_md_item
+         where del_flag = '0'
+           and json_contains_path(ext_attrs, 'one', concat('$."', #{attrCode}, '"'))
+    </select>
+
 </mapper>

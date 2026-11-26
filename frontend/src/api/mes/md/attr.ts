@@ -24,6 +24,13 @@ export function delAttrDef(attrId: number | number[]): Promise<AjaxResult> {
   return request({ url: '/mes/md/attrDef/' + attrId, method: 'delete' })
 }
 
+/** 属性被引用情况（分类名/工序名/物料填写数），彻底删除前提示影响面 */
+export function getAttrUsage(attrId: number): Promise<AjaxResult<{
+  typeNames: string[]; processNames: string[]; itemCount: number
+}>> {
+  return request({ url: '/mes/md/attrDef/usage/' + attrId, method: 'get' })
+}
+
 // ============ 分类-属性绑定 ============
 
 /** 查某分类直接绑定（配置页用，不含继承） */
