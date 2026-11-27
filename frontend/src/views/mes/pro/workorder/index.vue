@@ -73,16 +73,16 @@
       <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true"><template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span></template></el-table-column>
       <el-table-column label="操作" align="center" width="300" fixed="right" class-name="small-padding fixed-width compact-actions">
         <template #default="scope">
+          <el-button link type="warning" size="small" @click="handleCheckMaterial(scope.row)">齐套</el-button>
           <el-button link type="success" size="small" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'" @click="handleSchedule(scope.row)" v-hasPermi="['mes:pro:task:add']">排产</el-button>
           <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleStart(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">开工</el-button>
-          <el-button link type="warning" size="small" @click="handleCheckMaterial(scope.row)">齐套</el-button>
           <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">修改</el-button>
-          <el-button link type="primary" size="small" @click="handleCopy(scope.row)" v-hasPermi="['mes:pro:workorder:add']">复制</el-button>
-          <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']">删除</el-button>
-          <el-button link type="danger" size="small" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">取消</el-button>
-          <el-button link type="warning" size="small" @click="goWorkorderBoard(scope.row)">看板</el-button>
           <el-button link type="success" size="small" @click="handleFlowSheet(scope.row)" v-hasPermi="['mes:pro:workorder:flowSheet']">流转单</el-button>
+          <el-button link type="warning" size="small" @click="goWorkorderBoard(scope.row)">看板</el-button>
           <el-button link type="primary" size="small" @click="handleView(scope.row)">查看</el-button>
+          <el-button link type="primary" size="small" @click="handleCopy(scope.row)" v-hasPermi="['mes:pro:workorder:add']">复制</el-button>
+          <el-button link type="danger" size="small" v-if="scope.row.status==='PREPARE' || scope.row.status==='PRODUCING'" @click="handleCancel(scope.row)" v-hasPermi="['mes:pro:workorder:edit']">取消</el-button>
+          <el-button link type="primary" size="small" v-if="scope.row.status==='PREPARE'" @click="handleDelete(scope.row)" v-hasPermi="['mes:pro:workorder:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
