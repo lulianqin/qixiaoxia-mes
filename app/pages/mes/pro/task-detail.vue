@@ -123,8 +123,11 @@
       </view>
     </view>
 
-    <!-- 底部操作：仅生产中可进入报工页（外协工序由报工页引导转外协发货） -->
-    <view v-if="task && task.status === 'PRODUCING'" class="footer">
+    <!-- 底部操作：已下发/已停止可开工；生产中可进入报工页（外协工序由报工页引导转外协发货） -->
+    <view v-if="task && (task.status === 'DISPATCHED' || task.status === 'PAUSED')" class="footer">
+      <button class="report-btn" type="primary" @click="doStart">开工</button>
+    </view>
+    <view v-else-if="task && task.status === 'PRODUCING'" class="footer">
       <button class="report-btn" type="primary" @click="goReport">去报工</button>
     </view>
   </view>
@@ -138,6 +141,7 @@
   import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
   import QcBlockBar from './components/qc-block-bar.vue'
   import { getProcessBoard } from '@/api/mes/pro/feedback'
+  import { startTask } from '@/api/mes/pro/task'
   import { useUserStore } from '@/store'
   import { hasPermission, tintColor } from '@/utils/mobileMenu'
 
@@ -154,7 +158,7 @@
   const FB_STATUS_MAP = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
   const DIM_LABEL_MAP = { feedback: '报工', inspection: '检验', outsource: '外协', issue: '领料' }
 
-  const TASK_STATUS_MAP = { NORMAL: '未开工', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消' }
+  const TASK_STATUS_MAP = { NORMAL: '待下发', PREPARE: '待排产', DISPATCHED: '已下发', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 
   const statusText = computed(() => {
     if (!task.value) return ''
@@ -166,7 +170,7 @@
   const statusTagType = computed(() => {
     if (!task.value) return 'default'
     if (task.value.qcBlocked) return 'error'
-    const m = { COMPLETED: 'success', PRODUCING: 'warning', CANCEL: 'error' }
+    const m = { COMPLETED: 'success', PRODUCING: 'warning', DISPATCHED: 'warning', PAUSED: 'warning', CANCEL: 'error' }
     return m[task.value.status] || 'default'
   })
 
@@ -210,6 +214,22 @@
     const code = (wo.value && wo.value.workorderCode) || workorderCode
     uni.navigateTo({
       url: '/pages/mes/pro/report?workorderCode=' + encodeURIComponent(code) + '&taskId=' + taskId
+    })
+  }
+
+  function doStart() {
+    const id = (task.value && task.value.taskId) || taskId
+    if (!id) return
+    uni.showModal({
+      title: '确认开工',
+      content: '确认开始生产该工序？',
+      success: (r) => {
+        if (!r.confirm) return
+        startTask(id).then(() => {
+          uni.showToast({ title: '已开工', icon: 'success' })
+          load()
+        }).catch(() => {})
+      }
     })
   }
 

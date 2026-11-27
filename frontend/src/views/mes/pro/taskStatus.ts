@@ -4,7 +4,8 @@
  */
 export const TASK_STATUS_LABEL: Record<string, string> = {
   PREPARE: '待排产',
-  NORMAL: '正常',
+  NORMAL: '待下发',
+  DISPATCHED: '已下发',
   PRODUCING: '生产中',
   COMPLETED: '已完成',
   PAUSED: '暂停',
@@ -13,8 +14,9 @@ export const TASK_STATUS_LABEL: Record<string, string> = {
 
 /** el-tag type（与任务列表内联配色保持同一语义） */
 export const TASK_STATUS_TAG_TYPE: Record<string, '' | 'success' | 'info' | 'warning' | 'danger' | 'primary'> = {
-  PREPARE: 'warning',
+  PREPARE: 'info',
   NORMAL: 'primary',
+  DISPATCHED: 'warning',
   PRODUCING: 'success',
   COMPLETED: 'info',
   PAUSED: 'warning',
@@ -22,8 +24,9 @@ export const TASK_STATUS_TAG_TYPE: Record<string, '' | 'success' | 'info' | 'war
 }
 
 export const TASK_STATUS_COLOR: Record<string, string> = {
-  PREPARE: '#E6A23C',
+  PREPARE: '#909399',
   NORMAL: '#409EFF',
+  DISPATCHED: '#E6A23C',
   PRODUCING: '#67C23A',
   COMPLETED: '#909399',
   PAUSED: '#E6A23C',

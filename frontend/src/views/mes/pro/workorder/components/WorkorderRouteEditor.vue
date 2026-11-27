@@ -55,8 +55,8 @@
       </el-table-column>
       <el-table-column label="供应商" width="180">
         <template #default="{ row }">
-          <el-input v-model="row.vendorName" readonly placeholder="选择供应商" size="small">
-            <template #append><el-button icon="Search" size="small" :disabled="readonly" @click="pickVendor(row)" /></template>
+          <el-input v-model="row.vendorName" readonly :placeholder="row.isOutsource === '1' ? '选择供应商' : '厂内工序无需供应商'" size="small">
+            <template #append><el-button icon="Search" size="small" :disabled="readonly || row.isOutsource !== '1'" @click="pickVendor(row)" /></template>
           </el-input>
         </template>
       </el-table-column>

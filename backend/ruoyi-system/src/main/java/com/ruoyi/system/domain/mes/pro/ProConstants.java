@@ -23,6 +23,8 @@ public class ProConstants
     /** 任务状态 */
     public static final String TASK_STATUS_NORMAL = "NORMAL";
     public static final String TASK_STATUS_PREPARE = "PREPARE";
+    /** 已下发：工位可见但尚未开工，不可报工 */
+    public static final String TASK_STATUS_DISPATCHED = "DISPATCHED";
     public static final String TASK_STATUS_PRODUCING = "PRODUCING";
     public static final String TASK_STATUS_PAUSED = "PAUSED";
     public static final String TASK_STATUS_COMPLETED = "COMPLETED";

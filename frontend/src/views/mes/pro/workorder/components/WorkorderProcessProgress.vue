@@ -61,7 +61,7 @@
           @click.stop="emit('action', s.row, 'PAUSE')" v-hasPermi="['mes:pro:task:start']">停止</el-button>
         <el-button v-if="canReport(s.row)" link type="success" size="small"
           @click.stop="emit('report', s.row)" v-hasPermi="['mes:pro:feedback:add']">报工</el-button>
-        <el-button v-if="!isFinal(s.row)" link type="success" size="small"
+        <el-button v-if="canComplete(s.row)" link type="success" size="small"
           @click.stop="emit('action', s.row, 'COMPLETE')" v-hasPermi="['mes:pro:task:complete']">完成</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('edit', s.row)" v-hasPermi="['mes:pro:task:edit']">编辑</el-button>
         <el-button link type="primary" size="small" @click.stop="emit('qrcode', s.row)" v-hasPermi="['mes:pro:card:query']">二维码</el-button>
@@ -89,18 +89,19 @@ const emit = defineEmits<{
 }>()
 
 const TASK_STATUS: Record<string, string> = {
-  NORMAL: '未开工', PREPARE: '未开工', PRODUCING: '生产中',
+  NORMAL: '待下发', PREPARE: '待排产', DISPATCHED: '已下发', PRODUCING: '生产中',
   PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消'
 }
 
 function taskStatusText(t: any) { return t.qcBlocked ? '不可开工' : (TASK_STATUS[t.status] || t.status || '') }
 function taskTagType(t: any) {
   if (t.qcBlocked) return 'error'
-  return ({ COMPLETED: 'success', PRODUCING: 'warning', PAUSED: 'info', CANCEL: 'error' } as any)[t.status] || 'info'
+  return ({ COMPLETED: 'success', PRODUCING: 'warning', DISPATCHED: 'warning', PAUSED: 'info', CANCEL: 'error' } as any)[t.status] || 'info'
 }
-function canStartTask(t: any) { return ['NORMAL', 'PREPARE', 'PAUSED'].includes(t.status) }
+function canStartTask(t: any) { return ['DISPATCHED', 'PAUSED'].includes(t.status) }
 function canDispatch(t: any) { return ['NORMAL', 'PREPARE'].includes(t.status) && !t.qcBlocked }
 function canReport(t: any) { return t.status === 'PRODUCING' && !t.qcBlocked }
+function canComplete(t: any) { return ['PRODUCING', 'PAUSED'].includes(t.status) }
 function isFinal(t: any) { return t.status === 'COMPLETED' || t.status === 'CANCEL' }
 function onRowClick(row: any) { emit('process-board', row) }
 function fmtTime(v: any) { return v ? parseTime(v, '{m}-{d} {h}:{i}') : '-' }

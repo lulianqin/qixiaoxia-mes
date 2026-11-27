@@ -6,8 +6,11 @@ import com.ruoyi.system.domain.mes.md.MdWorkstation;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
+import com.ruoyi.system.domain.mes.pro.ProWorkorder;
 import com.ruoyi.system.mapper.mes.md.MdWorkstationMapper;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
+import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
+import com.ruoyi.system.service.mes.pro.IProQcBlockService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +35,9 @@ import static org.mockito.Mockito.*;
 class ProTaskDispatchUnitTest {
 
     @Mock private ProTaskMapper proTaskMapper;
+    @Mock private ProWorkorderMapper proWorkorderMapper;
     @Mock private MdWorkstationMapper mdWorkstationMapper;
+    @Mock private IProQcBlockService qcBlockService;
     @InjectMocks private ProTaskServiceImpl taskService;
 
     private MockedStatic<SecurityUtils> securityUtilsMock;
@@ -41,6 +46,11 @@ class ProTaskDispatchUnitTest {
     void setUp() {
         securityUtilsMock = mockStatic(SecurityUtils.class);
         securityUtilsMock.when(SecurityUtils::getUsername).thenReturn("admin");
+        // 工序投产前置：工单必须已开工
+        ProWorkorder wo = new ProWorkorder();
+        wo.setWorkorderId(900L);
+        wo.setStatus(ProConstants.WORKORDER_STATUS_PRODUCING);
+        lenient().when(proWorkorderMapper.selectProWorkorderByWorkorderId(anyLong())).thenReturn(wo);
     }
 
     @AfterEach
@@ -52,6 +62,7 @@ class ProTaskDispatchUnitTest {
         ProTask t = new ProTask();
         t.setTaskId(100L);
         t.setTaskCode("WO-1-001");
+        t.setWorkorderId(900L);
         t.setStatus(ProConstants.TASK_STATUS_NORMAL);
         t.setWorkstationId(216L);
         t.setWorkstationCode("WST-01");
@@ -83,14 +94,14 @@ class ProTaskDispatchUnitTest {
 
         taskService.dispatchTask(100L);
 
-        assertThat(t.getStatus()).isEqualTo(ProConstants.TASK_STATUS_PRODUCING);
+        assertThat(t.getStatus()).isEqualTo(ProConstants.TASK_STATUS_DISPATCHED);
         verify(proTaskMapper).updateProTask(t);
         // 外协不查厂内机台表
         verifyNoInteractions(mdWorkstationMapper);
     }
 
     @Test
-    @DisplayName("外协任务指派负责人后可正常下发到生产中")
+    @DisplayName("外协任务指派负责人后可正常下发为已下发")
     void dispatchesOutsourceTaskWithLeader() {
         ProTask t = internalTask();
         t.setWorkstationId(0L);
@@ -100,7 +111,7 @@ class ProTaskDispatchUnitTest {
 
         taskService.dispatchTask(100L);
 
-        assertThat(t.getStatus()).isEqualTo(ProConstants.TASK_STATUS_PRODUCING);
+        assertThat(t.getStatus()).isEqualTo(ProConstants.TASK_STATUS_DISPATCHED);
         verify(proTaskMapper).updateProTask(t);
     }
 
@@ -108,6 +119,7 @@ class ProTaskDispatchUnitTest {
         ProTask t = new ProTask();
         t.setTaskId(taskId);
         t.setTaskCode("WO-1-" + taskId);
+        t.setWorkorderId(900L);
         t.setProcessName(processName);
         t.setStatus(ProConstants.TASK_STATUS_NORMAL);
         t.setWorkstationId(ProConstants.WS_CODE_VENDOR.equals(wsCode) ? 0L : 216L);
@@ -147,7 +159,7 @@ class ProTaskDispatchUnitTest {
         taskService.dispatchByWorkorder(900L);
 
         verify(proTaskMapper).updateStatusByWorkorder(
-                eq(900L), anyList(), eq(ProConstants.TASK_STATUS_PRODUCING));
+                eq(900L), anyList(), eq(ProConstants.TASK_STATUS_DISPATCHED));
         verifyNoInteractions(mdWorkstationMapper);
     }
 
@@ -169,7 +181,7 @@ class ProTaskDispatchUnitTest {
     }
 
     @Test
-    @DisplayName("工单开工批量下发：机台与负责人齐全（含外协）才批量置生产中")
+    @DisplayName("工单开工批量下发：机台与负责人齐全（含外协）才批量置已下发")
     void dispatchesWorkorderWhenMachineAndLeaderReady() {
         MdWorkstation ws = new MdWorkstation();
         ws.setEnableFlag("1");
@@ -181,7 +193,7 @@ class ProTaskDispatchUnitTest {
         taskService.dispatchByWorkorder(900L);
 
         verify(proTaskMapper).updateStatusByWorkorder(
-                eq(900L), anyList(), eq(ProConstants.TASK_STATUS_PRODUCING));
+                eq(900L), anyList(), eq(ProConstants.TASK_STATUS_DISPATCHED));
     }
 
     @Test

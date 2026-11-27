@@ -788,12 +788,14 @@ public class ProWorkorderController extends BaseController
                 wo.setActionLabel("报工");
                 wo.setActionPerm("mes:pro:feedback:add");
             }
-            else if (current.getLeaderId() != null
+            else if ((ProConstants.TASK_STATUS_DISPATCHED.equals(current.getStatus())
+                    || ProConstants.TASK_STATUS_PAUSED.equals(current.getStatus()))
+                    && current.getLeaderId() != null
                     && current.getWorkstationId() != null && current.getWorkstationId() > 0
                     && (admin || userId.equals(current.getLeaderId())
                         || (wo.getOwnerId() != null && userId.equals(wo.getOwnerId()))))
             {
-                // 未开工：工单负责人/当前工序负责人可开工（负责人/机台未指派时下发会失败，不展示）
+                // 已下发/已停止：工单负责人或当前工序负责人可开工（未下发不展示，等工单开工批量下发）
                 setAction(wo, "start", "开工", null);
             }
         }

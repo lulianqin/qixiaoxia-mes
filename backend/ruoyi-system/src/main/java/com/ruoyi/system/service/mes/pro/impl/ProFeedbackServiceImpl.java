@@ -345,7 +345,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
             throw new ServiceException("报工必须指定生产任务，请从待报工列表进入");
         }
         if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus())) {
-            throw new ServiceException("任务「" + task.getTaskCode() + "」未下发或不处于生产中（当前状态："
+            throw new ServiceException("任务「" + task.getTaskCode() + "」未开工或不处于生产中（当前状态："
                     + taskStatusLabel(task.getStatus()) + "），不能报工");
         }
     }
@@ -386,6 +386,7 @@ public class ProFeedbackServiceImpl implements IProFeedbackService {
         switch (status) {
             case ProConstants.TASK_STATUS_NORMAL: return "待排产";
             case ProConstants.TASK_STATUS_PREPARE: return "待下发";
+            case ProConstants.TASK_STATUS_DISPATCHED: return "已下发";
             case ProConstants.TASK_STATUS_PRODUCING: return "生产中";
             case ProConstants.TASK_STATUS_PAUSED: return "已暂停";
             case ProConstants.TASK_STATUS_COMPLETED: return "已完成";

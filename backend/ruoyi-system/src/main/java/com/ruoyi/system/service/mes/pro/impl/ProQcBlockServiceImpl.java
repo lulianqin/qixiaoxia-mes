@@ -237,7 +237,8 @@ public class ProQcBlockServiceImpl implements IProQcBlockService
         for (ProTask task : tasks)
         {
             if (!ProConstants.TASK_STATUS_NORMAL.equals(task.getStatus())
-                    && !ProConstants.TASK_STATUS_PREPARE.equals(task.getStatus()))
+                    && !ProConstants.TASK_STATUS_PREPARE.equals(task.getStatus())
+                    && !ProConstants.TASK_STATUS_DISPATCHED.equals(task.getStatus()))
             {
                 continue;
             }

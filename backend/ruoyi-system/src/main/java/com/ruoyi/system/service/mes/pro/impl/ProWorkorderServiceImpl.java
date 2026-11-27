@@ -1148,7 +1148,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
         wo.setUpdateTime(DateUtils.getNowDate());
         wo.setUpdateBy(SecurityUtils.getUsername());
         int rows = qxxProWorkorderMapper.updateProWorkorder(wo);
-        // 级联：工单开工 → 该工单下所有 NORMAL/PREPARE 任务自动下发为 PRODUCING
+        // 级联：工单开工 → 该工单下所有 NORMAL/PREPARE 任务批量下发为 DISPATCHED（已下发待开工）
         proTaskService.dispatchByWorkorder(workorderId);
         // 开工自动建流转卡（一工单至少一张卡，追溯载体）
         try {

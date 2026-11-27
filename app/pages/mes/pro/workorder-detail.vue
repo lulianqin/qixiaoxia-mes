@@ -149,7 +149,7 @@
 
   const WO_STATUS_MAP = { PREPARE: '待生产', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消', CLOSED: '已关闭' }
   const WO_STATUS_TAG_MAP = { PREPARE: 'default', PRODUCING: 'warning', COMPLETED: 'success', CANCEL: 'error', CLOSED: 'info' }
-  const TASK_STATUS_MAP = { NORMAL: '未开工', PRODUCING: '生产中', COMPLETED: '已完成', CANCEL: '已取消' }
+  const TASK_STATUS_MAP = { NORMAL: '待下发', PREPARE: '待排产', DISPATCHED: '已下发', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 
   const progressPercent = computed(() => {
     const q = num(workorder.value && workorder.value.quantity)
@@ -173,7 +173,7 @@
 
   function taskStatusTagType(task) {
     if (task.qcBlocked) return 'error'
-    const m = { COMPLETED: 'success', PRODUCING: 'warning', CANCEL: 'error' }
+    const m = { COMPLETED: 'success', PRODUCING: 'warning', DISPATCHED: 'warning', PAUSED: 'warning', CANCEL: 'error' }
     return m[task.status] || 'default'
   }
 

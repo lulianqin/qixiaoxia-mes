@@ -220,6 +220,11 @@ export function buildDocSyncPlan(args: {
       manual.push({ processName: row.processName || '', reason: '未选择供应商，未生成单据' })
       return
     }
+    // 自动开单只服务外协工序；厂内工序需要单据时请在「单据配置」手工新增（含厂内加工单）
+    if (String(row.isOutsource) !== '1') {
+      manual.push({ processName: row.processName || '', reason: '厂内工序不自动生成单据，如需厂内加工单请在单据配置手工新增' })
+      return
+    }
     const docs = kind === 'PURCHASE' ? (args.purchaseDocs || []) : (args.processDocs || [])
     let docIndex = -1
     for (let i = 0; i < docs.length; i++) {

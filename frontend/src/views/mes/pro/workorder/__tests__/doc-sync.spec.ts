@@ -22,7 +22,7 @@ function procDoc(overrides: any = {}) {
 
 function routeRow(overrides: any = {}) {
   return {
-    processId: 217, processName: '原纸', docType: 'PURCHASE', vendorId: 202,
+    processId: 217, processName: '原纸', docType: 'PURCHASE', isOutsource: '1', vendorId: 202,
     vendorName: '德欣', vendorCode: 'V202', planQty: 100, unitPrice: 5,
     expectedDate: '2026-01-01', ...overrides
   }
@@ -160,6 +160,18 @@ describe('docSync', () => {
     })
     expect(plan.additions).toHaveLength(0)
     expect(plan.manual[0].reason).toContain('未选择供应商')
+  })
+
+  it('厂内工序不自动生成单据（即使选了供应商）', () => {
+    const plan = buildDocSyncPlan({
+      routeProcesses: [routeRow({ isOutsource: '0', docType: 'PROCESS' })],
+      purchaseDocs: [],
+      processDocs: [],
+      loadedProcessIds: [],
+      ctx
+    })
+    expect(plan.additions).toHaveLength(0)
+    expect(plan.manual[0].reason).toContain('厂内工序不自动生成单据')
   })
 
   it('processId 为空的手工物料行不会被删除', () => {

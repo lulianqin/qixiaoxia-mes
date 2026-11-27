@@ -117,7 +117,7 @@ const dims = ref<any>({ feedback: {}, inspection: {}, outsource: {}, issue: {} }
 const activeDims = ref<string[]>([])
 const qrOpen = ref(false)
 
-const TASK_STATUS = { NORMAL: '未开工', PREPARE: '未开工', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
+const TASK_STATUS = { NORMAL: '待下发', PREPARE: '待排产', DISPATCHED: '已下发', PRODUCING: '生产中', PAUSED: '已停止', COMPLETED: '已完成', CANCEL: '已取消' }
 const FB_STATUS = { PREPARE: '待审核', CONFIRMED: '已确认', AUDITED: '已审核' }
 
 const statusText = computed(() => {
@@ -127,7 +127,7 @@ const statusText = computed(() => {
 })
 const statusTagType = computed(() => {
   if (task.value.qcBlocked) return 'error'
-  return ({ COMPLETED: 'success', PRODUCING: 'warning', CANCEL: 'error' })[task.value.status] || 'info'
+  return ({ COMPLETED: 'success', PRODUCING: 'warning', DISPATCHED: 'warning', CANCEL: 'error' })[task.value.status] || 'info'
 })
 const dimCards = computed(() => [
   { key: 'feedback', label: '报工', total: dims.value.feedback.total ?? 0 },
@@ -142,9 +142,9 @@ function fmtTime(v?: string) { return v ? proxy.parseTime(v, '{m}-{d} {h}:{i}') 
 function goBack() { router.push('/mes/pro/workorder') }
 function goWorkorder() { router.push({ path: '/mes/pro/workorder_board', query: { workorderId: wo.value.workorderId } }) }
 
-const canStart = computed(() => ['NORMAL', 'PREPARE', 'PAUSED'].includes(task.value.status))
+const canStart = computed(() => ['DISPATCHED', 'PAUSED'].includes(task.value.status))
 const canStop = computed(() => task.value.status === 'PRODUCING')
-const canComplete = computed(() => !['COMPLETED', 'CANCEL'].includes(task.value.status))
+const canComplete = computed(() => ['PRODUCING', 'PAUSED'].includes(task.value.status))
 const canReport = computed(() => task.value.status === 'PRODUCING' && !task.value.qcBlocked)
 
 /** 跳转报工页并自动带入当前工序任务 */

@@ -361,7 +361,9 @@ public class ProTaskServiceImpl implements IProTaskService
     /** 可下发的前置状态 */
     private static final List<String> TASK_DISPATCHABLE = Arrays.asList(ProConstants.TASK_STATUS_NORMAL, ProConstants.TASK_STATUS_PREPARE);
     /** 可取消的前置状态（所有非终态）*/
-    private static final List<String> TASK_CANCELLABLE = Arrays.asList(ProConstants.TASK_STATUS_NORMAL, ProConstants.TASK_STATUS_PREPARE, ProConstants.TASK_STATUS_PRODUCING, ProConstants.TASK_STATUS_PAUSED);
+    private static final List<String> TASK_CANCELLABLE = Arrays.asList(ProConstants.TASK_STATUS_NORMAL, ProConstants.TASK_STATUS_PREPARE, ProConstants.TASK_STATUS_DISPATCHED, ProConstants.TASK_STATUS_PRODUCING, ProConstants.TASK_STATUS_PAUSED);
+    /** 可开工的前置状态：已下发待开工 / 暂停后恢复 */
+    private static final List<String> TASK_STARTABLE = Arrays.asList(ProConstants.TASK_STATUS_DISPATCHED, ProConstants.TASK_STATUS_PAUSED);
 
     @Override
     public void dispatchTask(Long taskId)
@@ -370,17 +372,30 @@ public class ProTaskServiceImpl implements IProTaskService
         if (task == null) throw new ServiceException("任务不存在");
         if (!TASK_DISPATCHABLE.contains(task.getStatus()))
             throw new ServiceException("只有待排产/正常状态的任务才能下发，当前状态：" + task.getStatus());
+        // 工单闸门：工单未开工（未整单投产授权）时不允许工序下发
+        assertWorkorderProducing(task);
         // 机台闸门：厂内工序必须指派真实且启用的机台才能下发（外协 VENDOR 不占厂内机台，放行）
         assertWorkstationAssigned(task);
-        // 负责人闸门：下发即推进到生产中，负责人是质检拦截等待办的第一责任人（厂内必填；
+        // 负责人闸门：下发即派工到工位，负责人是质检拦截等待办的第一责任人（厂内必填；
         // 外协 VENDOR 任务在甘特上没有指派内部负责人的入口，放行，质检待办按报工人/判定人兜底）
         assertLeaderAssigned(task);
         // 质检闸门：上游检验不合格且未放行时禁止下发/开工
         qcBlockService.assertTaskDispatchable(task);
-        task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
+        // 下发只代表派工到工位（可见、待开工），不写开工时间、不可报工
+        task.setStatus(ProConstants.TASK_STATUS_DISPATCHED);
         task.setUpdateTime(DateUtils.getNowDate());
         task.setUpdateBy(SecurityUtils.getUsername());
         proTaskMapper.updateProTask(task);
+    }
+
+    /** 工序投产前置：工单必须已开工（PRODUCING） */
+    private void assertWorkorderProducing(ProTask task)
+    {
+        if (task.getWorkorderId() == null) throw new ServiceException("任务未关联工单，不能下发");
+        ProWorkorder wo = proWorkorderMapper.selectProWorkorderByWorkorderId(task.getWorkorderId());
+        if (wo == null) throw new ServiceException("工单不存在，不能下发");
+        if (!ProConstants.WORKORDER_STATUS_PRODUCING.equals(wo.getStatus()))
+            throw new ServiceException("工单尚未开工，请先执行工单开工后再下发工序任务");
     }
 
     @Override
@@ -389,8 +404,9 @@ public class ProTaskServiceImpl implements IProTaskService
     {
         ProTask task = proTaskMapper.selectProTaskByTaskId(taskId);
         if (task == null) throw new ServiceException("任务不存在");
-        if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus()))
-            throw new ServiceException("只有生产中的任务才能完成，当前状态：" + task.getStatus());
+        if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus())
+                && !ProConstants.TASK_STATUS_PAUSED.equals(task.getStatus()))
+            throw new ServiceException("只有生产中或已停止的任务才能完成，当前状态：" + task.getStatus());
         task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
         task.setFinishDate(DateUtils.getNowDate());
         task.setUpdateTime(DateUtils.getNowDate());
@@ -412,8 +428,12 @@ public class ProTaskServiceImpl implements IProTaskService
         Date now = DateUtils.getNowDate();
         if ("START".equals(action))
         {
-            if (TASK_INACTIVE.contains(task.getStatus()))
-                throw new ServiceException("已完成/取消的任务不能开工");
+            // 开工仅用于：已下发 → 生产中（实际开始），或 暂停 → 生产中（恢复）
+            if (!TASK_STARTABLE.contains(task.getStatus()))
+                throw new ServiceException("只有已下发或已停止的任务才能开工，当前状态：" + task.getStatus());
+            // 下发到开工之间可能有新的上游检验判定，开工前再查一次质检锁
+            if (ProConstants.TASK_STATUS_DISPATCHED.equals(task.getStatus()))
+                qcBlockService.assertTaskDispatchable(task);
             task.setStatus(ProConstants.TASK_STATUS_PRODUCING);
             if (task.getStartTime() == null) task.setStartTime(now);
         }
@@ -428,6 +448,9 @@ public class ProTaskServiceImpl implements IProTaskService
             if (ProConstants.TASK_STATUS_COMPLETED.equals(task.getStatus())) return;
             if (ProConstants.TASK_STATUS_CANCEL.equals(task.getStatus()))
                 throw new ServiceException("已取消的任务不能完成");
+            if (!ProConstants.TASK_STATUS_PRODUCING.equals(task.getStatus())
+                    && !ProConstants.TASK_STATUS_PAUSED.equals(task.getStatus()))
+                throw new ServiceException("只有生产中或已停止的任务才能完成，当前状态：" + task.getStatus());
             task.setStatus(ProConstants.TASK_STATUS_COMPLETED);
             task.setFinishDate(now);
         }
@@ -543,7 +566,8 @@ public class ProTaskServiceImpl implements IProTaskService
                     + "或在工单上设置工单负责人后再开工：" + String.join("、", noLeaderNames));
         // 质检闸门：任一待下发任务上游检验不合格且未放行，整单拒绝开工
         qcBlockService.assertWorkorderStartable(workorderId);
-        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_PRODUCING);
+        // 工单开工批量下发：任务进入「已下发待开工」，工人可见但未开始生产
+        proTaskMapper.updateStatusByWorkorder(workorderId, TASK_DISPATCHABLE, ProConstants.TASK_STATUS_DISPATCHED);
     }
 
     /** 收集工单下"未指定负责人"的可下发任务工序名（仅厂内；外协 VENDOR 无内部负责人指派入口，豁免） */

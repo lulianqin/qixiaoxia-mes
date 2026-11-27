@@ -53,7 +53,7 @@ public class ProTaskController extends BaseController
     private com.ruoyi.system.service.mes.pro.IProQcBlockService qcBlockService;
 
     /**
-     * 移动端开工：仅工单负责人/当前工序负责人（或管理员）可操作。
+     * 移动端开工：已下发/已停止 → 生产中。仅工单负责人/当前工序负责人（或管理员）可操作。
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:task:start')")
     @Log(title = "移动端开工", businessType = BusinessType.UPDATE)
@@ -74,7 +74,7 @@ public class ProTaskController extends BaseController
         {
             return error("仅工单负责人或当前工序负责人可开工");
         }
-        proTaskService.dispatchTask(taskId);
+        proTaskService.quickChangeStatus(taskId, "START");
         return success();
     }
 
@@ -184,7 +184,7 @@ public class ProTaskController extends BaseController
     }
 
     /**
-     * 下发排产任务：NORMAL/PREPARE → PRODUCING
+     * 下发排产任务：NORMAL/PREPARE → DISPATCHED（已下发待开工）
      */
     @PreAuthorize("@ss.hasPermi('mes:pro:task:dispatch')")
     @Log(title = "生产任务下发", businessType = BusinessType.UPDATE)

@@ -17,7 +17,8 @@
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择" clearable style="width:150px">
           <el-option label="待排产" value="PREPARE" />
-          <el-option label="正常" value="NORMAL" />
+          <el-option label="待下发" value="NORMAL" />
+          <el-option label="已下发" value="DISPATCHED" />
           <el-option label="生产中" value="PRODUCING" />
           <el-option label="已完成" value="COMPLETED" />
           <el-option label="暂停" value="PAUSED" />
@@ -107,7 +108,8 @@
             <el-button link type="info" icon="Lock" disabled>待负责人放行</el-button>
           </el-tooltip>
           <el-button link type="success" icon="Position" @click="handleDispatch(scope.row)" v-if="scope.row.status==='NORMAL'||scope.row.status==='PREPARE'" :disabled="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:dispatch']">下发</el-button>
-          <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="scope.row.status==='PRODUCING' && !isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:complete']">完成</el-button>
+          <el-button link type="primary" icon="VideoPlay" @click="handleStart(scope.row)" v-if="(scope.row.status==='DISPATCHED'||scope.row.status==='PAUSED')" :disabled="isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:start']">开工</el-button>
+          <el-button link type="primary" icon="CircleCheck" @click="handleComplete(scope.row)" v-if="(scope.row.status==='PRODUCING'||scope.row.status==='PAUSED') && !isQcBlocked(scope.row)" v-hasPermi="['mes:pro:task:complete']">完成</el-button>
           <el-button link type="warning" icon="CircleClose" @click="handleCancelTask(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:task:cancel']">取消</el-button>
           <el-button link type="danger" icon="Warning" @click="handleReportException(scope.row)" v-if="scope.row.status!=='COMPLETED'&&scope.row.status!=='CANCEL'" v-hasPermi="['mes:pro:exception:add']">报异常</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:pro:task:edit']">修改</el-button>
@@ -264,7 +266,7 @@
 <script setup lang="ts" name="ProSchedule">
 import { ref, reactive, toRefs, computed, getCurrentInstance } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, getQcBlockState } from '@/api/mes/pro/task'
+import { listTask, getTask, delTask, addTask, updateTask, dispatchTask, completeTask, cancelTask, quickTaskStatus, getQcBlockState } from '@/api/mes/pro/task'
 import { listWorkorder, getWorkorder } from '@/api/mes/pro/workorder'
 import { listAllProcess } from '@/api/mes/pro/process'
 import { listRouteProcessByRouteId } from '@/api/mes/pro/routeprocess'
@@ -392,7 +394,7 @@ function producedDisplay(row: any) {
 }
 function loadQcBlockStates(rows: any[]) {
   // 待下发/待开工/生产中均可能被上游检验拦截，需展示锁态与放行入口
-  const ids = rows.filter((r: any) => ['NORMAL', 'PREPARE', 'PRODUCING'].includes(r.status)).map((r: any) => r.taskId)
+  const ids = rows.filter((r: any) => ['NORMAL', 'PREPARE', 'DISPATCHED', 'PRODUCING', 'PAUSED'].includes(r.status)).map((r: any) => r.taskId)
   if (ids.length === 0) { qcBlockMap.value = {}; return }
   // 按 100 分批后合并，避免分页调大时超上限导致整页锁态静默丢失
   const batches: number[][] = []
@@ -633,6 +635,12 @@ function handleDelete(row?: any) {
 function handleDispatch(row: any) {
   proxy.$modal.confirm(`确认下发任务"${row.taskName || row.taskCode}"到工作站生产？`).then(() => {
     dispatchTask(row.taskId).then(() => { proxy.$modal.msgSuccess('下发成功'); getList() })
+  }).catch(() => {})
+}
+
+function handleStart(row: any) {
+  proxy.$modal.confirm(`确认开工任务"${row.taskName || row.taskCode}"？`).then(() => {
+    quickTaskStatus(row.taskId, 'START').then(() => { proxy.$modal.msgSuccess('已开工'); getList() })
   }).catch(() => {})
 }
 
