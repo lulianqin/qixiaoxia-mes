@@ -10,6 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="processCode"    column="process_code"    />
         <result property="processName"    column="process_name"    />
         <result property="bizType"    column="biz_type"    />
+        <result property="orderNum"    column="order_num"    />
         <result property="attention"    column="attention"    />
         <result property="enableFlag"    column="enable_flag"    />
         <result property="remark"    column="remark"    />
@@ -20,7 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProProcessVo">
-        select process_id, factory_id, process_code, process_name, biz_type, attention, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_process
+        select process_id, factory_id, process_code, process_name, biz_type, order_num, attention, enable_flag, remark, create_by, create_time, update_by, update_time from qxx_pro_process
     </sql>
 
     <select id="selectProProcessList" parameterType="ProProcess" resultMap="ProProcessResult">
@@ -31,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
             <if test="enableFlag != null  and enableFlag != ''"> and enable_flag = #{enableFlag}</if>
         </where>
-        order by process_id desc
+        order by order_num asc, process_id asc
     </select>
 
     <select id="selectProProcessByProcessId" parameterType="Long" resultMap="ProProcessResult">
@@ -58,6 +59,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processCode != null and processCode != ''">process_code,</if>
             <if test="processName != null and processName != ''">process_name,</if>
             <if test="bizType != null and bizType != ''">biz_type,</if>
+            <if test="orderNum != null">order_num,</if>
             <if test="attention != null">attention,</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag,</if>
             <if test="remark != null">remark,</if>
@@ -68,6 +70,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processCode != null and processCode != ''">#{processCode},</if>
             <if test="processName != null and processName != ''">#{processName},</if>
             <if test="bizType != null and bizType != ''">#{bizType},</if>
+            <if test="orderNum != null">#{orderNum},</if>
             <if test="attention != null">#{attention},</if>
             <if test="enableFlag != null and enableFlag != ''">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
@@ -82,6 +85,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processCode != null and processCode != ''">process_code = #{processCode},</if>
             <if test="processName != null and processName != ''">process_name = #{processName},</if>
             <if test="bizType != null and bizType != ''">biz_type = #{bizType},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
             <if test="attention != null">attention = #{attention},</if>
             <if test="enableFlag != null and enableFlag != ''">enable_flag = #{enableFlag},</if>
             <if test="remark != null">remark = #{remark},</if>

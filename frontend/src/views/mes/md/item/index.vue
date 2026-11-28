@@ -73,7 +73,7 @@
           <el-table-column label="装箱规格" align="center" prop="packageSpec" width="120" :show-overflow-tooltip="true">
             <template #default="scope">{{ scope.row.packageSpec || '-' }}</template>
           </el-table-column>
-          <el-table-column label="扩展属性" align="center" min-width="180" :show-overflow-tooltip="true">
+          <el-table-column label="扩展属性" align="center" min-width="220" class-name="attr-cell">
             <template #default="scope">{{ attrText(scope.row.extAttrs) }}</template>
           </el-table-column>
           <el-table-column label="分类" align="center" prop="itemTypeName" width="100" :show-overflow-tooltip="true">
@@ -242,7 +242,7 @@
     </el-dialog>
 
     <!-- 基于 SPU 新建 SKU：复用后端 specVariant（同规格查重、自动生成编码/名称、继承父级属性） -->
-    <el-dialog title="基于SPU新建SKU" v-model="skuOpen" width="680px" append-to-body>
+    <el-dialog title="基于SPU新建SKU" v-model="skuOpen" width="680px" append-to-body destroy-on-close>
       <el-form ref="skuFormRef" :model="skuForm" :rules="skuRules" label-width="100px">
         <el-row>
           <el-col :span="24">
@@ -275,8 +275,12 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="扩展属性" class="sku-ext-attr-item">
+          <ExtAttrForm ref="skuExtAttrFormRef" :key="skuForm.parentId || 0" :schema="skuAttrSchema"
+                       v-model="skuForm.extAttrs" scope="PRODUCT" :columns="2" />
+        </el-form-item>
         <el-alert type="info" :closable="false" show-icon
-                  title="同规格已存在时直接复用旧SKU；新SKU的编码/名称自动生成，分类、单位和扩展属性继承父产品。" />
+                  title="编码/名称自动生成，分类和单位继承父产品；扩展属性默认带出父产品值、可修改，属性项或值不同会创建新SKU。" />
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -311,6 +315,7 @@ interface SkuForm {
   productSize: string
   packageSpec: string
   printingReq: string
+  extAttrs?: Record<string, any>
 }
 
 const { proxy } = getCurrentInstance() as any
@@ -340,12 +345,14 @@ const BATCH_CONFIG_ENABLED = false
 // 高价值物资暂无业务消费，先隐藏（字段默认值保留，后续启用只需打开开关）
 const HIGH_VALUE_ENABLED = false
 const effAttrSchema = ref<MdItemTypeAttr[]>([])
+const skuAttrSchema = ref<MdItemTypeAttr[]>([])
 const attrMap = ref<Record<string, { attrName: string; attrUnit?: string }>>({})
 const extAttrFormRef = ref<any>(null)
+const skuExtAttrFormRef = ref<any>(null)
 const skuOpen = ref(false)
 const skuSaving = ref(false)
 const skuFormRef = ref<any>(null)
-const skuForm = ref<SkuForm>({ specification: '', productSize: '', packageSpec: '', printingReq: '' })
+const skuForm = ref<SkuForm>({ specification: '', productSize: '', packageSpec: '', printingReq: '', extAttrs: {} })
 const skuRules = { specification: [{ required: true, message: '请输入规格型号', trigger: 'blur' }] }
 
 const data = reactive({
@@ -412,11 +419,22 @@ function syncItemTypeName() {
   }
 }
 
-/** 加载分类有效属性 schema */
+/** 获取分类有效属性 schema（含继承） */
+function fetchEffAttrSchema(typeId?: number): Promise<MdItemTypeAttr[]> {
+  if (!typeId) return Promise.resolve([])
+  return getEffAttrSchema(typeId).then(res => (res.data || []) as MdItemTypeAttr[]).catch(() => [])
+}
+
+/** 加载物料档案分类的属性 schema */
 function loadEffAttrSchema(typeId: number) {
-  getEffAttrSchema(typeId).then(res => {
-    effAttrSchema.value = res.data || []
-  }).catch(() => { effAttrSchema.value = [] })
+  fetchEffAttrSchema(typeId).then(list => { effAttrSchema.value = list })
+}
+
+/** 加载 SKU 弹窗属性 schema（按父 SPU 分类，仅产品属性；避免必填校验混入生产属性） */
+function loadSkuAttrSchema(typeId?: number) {
+  fetchEffAttrSchema(typeId).then(list => {
+    skuAttrSchema.value = list.filter(a => !a.attrScope || a.attrScope === 'PRODUCT')
+  })
 }
 
 /** 扩展属性列：中文名+单位:值，属性名取属性字典 */
@@ -551,7 +569,7 @@ function handleUpdate(row?: MdItem) {
   })
 }
 
-/** SPU 行「新建SKU」：只收集规格维度，其余由后端继承父产品 */
+/** SPU 行「新建SKU」：收集规格维度与扩展属性，扩展属性默认继承父产品、可修改 */
 function handleAddSku(row: MdItem) {
   skuForm.value = {
     parentId: row.itemId,
@@ -560,8 +578,10 @@ function handleAddSku(row: MdItem) {
     specification: '',
     productSize: '',
     packageSpec: '',
-    printingReq: ''
+    printingReq: '',
+    extAttrs: { ...(row.extAttrs || {}) }
   }
+  loadSkuAttrSchema(row.itemTypeId)
   skuOpen.value = true
 }
 
@@ -572,6 +592,10 @@ async function submitSku() {
     )
     if (!valid) return
   }
+  if (skuExtAttrFormRef.value) {
+    try { await skuExtAttrFormRef.value.validate() }
+    catch (e: any) { proxy.$modal.msgError(e.message || '扩展属性校验失败'); return }
+  }
   const f = skuForm.value
   skuSaving.value = true
   try {
@@ -580,7 +604,8 @@ async function submitSku() {
       specification: f.specification,
       productSize: f.productSize,
       packageSpec: f.packageSpec,
-      printingReq: f.printingReq
+      printingReq: f.printingReq,
+      extAttrs: f.extAttrs || {}
     } as any)
     const created = r?.data || r
     proxy.$modal.msgSuccess(created?.itemCode ? `已保存SKU：${created.itemCode}` : '保存成功')
@@ -647,7 +672,19 @@ getList()
   overflow: hidden;
   text-overflow: clip;
 }
+/* 扩展属性完整展示：属性项多行换行，不被全局 ellipsis 截断 */
+:deep(.attr-cell .cell) {
+  white-space: normal !important;
+  word-break: break-all;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.5;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
 .item-code-text { word-break: break-all; }
 .variant-tag { margin-left: 4px; }
 :deep(.el-form-item__label) { padding-right: 16px !important; }
+/* SKU 弹窗扩展属性：占满内容区，避免 label 与多行控件垂直居中错位 */
+:deep(.sku-ext-attr-item .el-form-item__content) { display: block; line-height: normal; }
 </style>

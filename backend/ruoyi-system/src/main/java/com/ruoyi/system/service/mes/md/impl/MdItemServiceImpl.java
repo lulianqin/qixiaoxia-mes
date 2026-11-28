@@ -148,12 +148,13 @@ public class MdItemServiceImpl implements IMdItemService
         MdItem parent = mdItemMapper.selectMdItemById(spec.getParentId());
         if (parent == null) throw new ServiceException("产品大类不存在");
 
-        // 统一规则匹配兄弟变体；印刷/包装作为变体额外判据（双方都有值时比较）
+        // 统一规则匹配兄弟变体；扩展属性严格比对（属性项/值任一变化即视为不同物料）
+        // 印刷/包装作为变体额外判据（双方都有值时比较）
         MdItem query = new MdItem();
         query.setParentId(spec.getParentId());
         for (MdItem candidate : mdItemMapper.selectMdItemList(query))
         {
-            if (isSameItem(candidate, spec)
+            if (isSameItem(candidate, spec, true)
                 && normalize(candidate.getProductSize()).equals(normalize(spec.getProductSize()))
                 && valuesCompatible(candidate.getPrintingReq(), spec.getPrintingReq())
                 && valuesCompatible(candidate.getPackageSpec(), spec.getPackageSpec()))

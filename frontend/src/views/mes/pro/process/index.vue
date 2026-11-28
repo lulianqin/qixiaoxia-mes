@@ -36,6 +36,7 @@
 
     <el-table v-loading="loading" :data="processList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
+      <el-table-column label="排序号" align="center" prop="orderNum" width="90" />
       <el-table-column label="工序编码" align="center" prop="processCode" width="130" :show-overflow-tooltip="true" />
       <el-table-column label="工序名称" align="center" prop="processName">
         <template #default="scope">
@@ -90,6 +91,15 @@
           <el-col :span="12">
             <el-form-item label="工序名称" prop="processName">
               <el-input v-model="form.processName" placeholder="请输入" :disabled="optType === 'view'" maxlength="255" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="排序号" prop="orderNum">
+              <el-input-number v-model="form.orderNum" :min="0" :max="999999" controls-position="right"
+                               style="width:100%" :disabled="optType === 'view'" />
+              <div class="form-tip">列表按排序号升序展示，数字越小越靠前</div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -374,6 +384,9 @@ export default {
           { required: true, message: '工序名称不能为空', trigger: 'blur' },
           { max: 255, message: '字段过长', trigger: 'blur' }
         ],
+        orderNum: [
+          { required: true, message: '排序号不能为空', trigger: 'blur' }
+        ],
         enableFlag: [
           { required: true, message: '请选择是否启用', trigger: 'change' }
         ]
@@ -430,6 +443,7 @@ export default {
         processCode: null,
         processName: null,
         bizType: 'NORMAL',
+        orderNum: 0,
         attention: null,
         enableFlag: '1',
         remark: null
@@ -454,6 +468,8 @@ export default {
     },
     handleAdd() {
       this.reset()
+      // 默认排在当前列表末尾，避免新增工序全部落在最前
+      this.form.orderNum = this.processList.reduce((max, p) => Math.max(max, p.orderNum || 0), 0) + 1
       this.open = true
       this.title = '新增生产工序'
       this.optType = 'add'

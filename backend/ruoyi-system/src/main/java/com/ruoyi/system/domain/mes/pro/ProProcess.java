@@ -34,6 +34,10 @@ public class ProProcess extends BaseEntity
     @Excel(name = "业务类型", readConverterExp = "NORMAL=普通工序,SLITTING=分切")
     private String bizType;
 
+    /** 排序号（升序） */
+    @Excel(name = "排序号")
+    private Integer orderNum;
+
     /** 工艺要求/注意事项 */
     @Excel(name = "工艺要求")
     private String attention;
@@ -92,6 +96,16 @@ public class ProProcess extends BaseEntity
         return bizType;
     }
 
+    public void setOrderNum(Integer orderNum)
+    {
+        this.orderNum = orderNum;
+    }
+
+    public Integer getOrderNum()
+    {
+        return orderNum;
+    }
+
     public void setAttention(String attention)
     {
         this.attention = attention;
@@ -119,6 +133,7 @@ public class ProProcess extends BaseEntity
             .append("factoryId", getFactoryId())
             .append("processCode", getProcessCode())
             .append("processName", getProcessName())
+            .append("orderNum", getOrderNum())
             .append("attention", getAttention())
             .append("enableFlag", getEnableFlag())
             .append("remark", getRemark())
