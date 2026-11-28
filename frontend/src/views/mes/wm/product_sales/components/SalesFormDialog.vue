@@ -71,6 +71,14 @@
               <el-form-item label="来源销售订单"><el-input v-model="form.salesOrderCode" disabled /></el-form-item>
             </el-col>
           </el-row>
+          <el-row v-if="form.applyCode">
+            <el-col :span="12">
+              <el-form-item label="来源出库申请"><el-input v-model="form.applyCode" disabled /></el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="申请来源"><el-input model-value="ERP 平台端下发" disabled /></el-form-item>
+            </el-col>
+          </el-row>
           <el-row>
             <el-col :span="24"><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item></el-col>
           </el-row>

@@ -1,7 +1,9 @@
 <template>
   <el-dialog title="出库确认（批次拣货）" v-model="show" width="960px" append-to-body @close="handleClose">
-    <el-alert v-if="header" :title="`出库单：${header.salesCode} | 客户：${header.clientName || '-'} | 仓库：${header.warehouseName || '-'}`"
+    <el-alert v-if="header" :title="`出库单：${header.salesCode} | 客户：${header.clientName || '-'} | 仓库：${header.warehouseName || uniformWarehouseName || '-'}`"
               type="info" :closable="false" class="mb8" />
+    <el-alert v-if="header && warehouseMissing" class="mb8" type="error" :closable="false"
+              title="该出库单未指定仓库（出库申请阶段仓库未知，且各行仓库不一致），请先返回单据选择出库仓库后再确认出库" />
 
     <!-- 批次码识别：USB 扫码枪=键盘输入回车触发，也支持手输 -->
     <div class="mb8 scan-bar">
@@ -118,6 +120,27 @@ function remain(row: WmProductSalesLine): number {
   return Math.max(0, need - posted)
 }
 
+/** 待出库行若全部指向同一个行仓，出库确认时后端可直接采用该仓（头仓为空也允许） */
+const uniformLineWarehouse = computed<number | null>(() => {
+  const pending = postableLines.value as WmProductSalesLine[]
+  if (!pending.length) return null
+  if (pending.some(l => !l.warehouseId)) return null
+  const ids = [...new Set(pending.map(l => Number(l.warehouseId)))]
+  return ids.length === 1 ? ids[0] : null
+})
+
+/** 出库仓库缺失且无法自动定仓（行仓缺失或分属多仓） */
+const warehouseMissing = computed(() => !header.value?.warehouseId && uniformLineWarehouse.value == null)
+
+/** 本次过账实际使用的仓库：单据头仓优先，其次“全部待出库行一致的仓” */
+const effectiveWarehouseId = computed<number | null>(() => header.value?.warehouseId ?? uniformLineWarehouse.value ?? null)
+const uniformWarehouseName = computed(() => {
+  if (header.value?.warehouseName) return header.value.warehouseName
+  const pending = postableLines.value as WmProductSalesLine[]
+  return pending.length ? (pending[0].warehouseName || '') : ''
+})
+const effectiveWarehouseName = computed(() => uniformWarehouseName.value)
+
 function availOf(row: WmProductSalesLine): number | null {
   return row.itemId ? (availMap.value[row.itemId] ?? null) : null
 }
@@ -131,7 +154,7 @@ const insufficientHint = computed(() => {
     const a = availOf(l); return a != null && a < remain(l)
   })
   if (!lack.length) return ''
-  return `以下物料在仓库[${header.value?.warehouseName || ''}]可用库存不足：${lack.map((l: WmProductSalesLine) => l.itemCode).join('、')}。请先入库或调拨，否则出库将失败。`
+  return `以下物料在仓库[${effectiveWarehouseName.value}]可用库存不足：${lack.map((l: WmProductSalesLine) => l.itemCode).join('、')}。请先入库或调拨，否则出库将失败。`
 })
 
 /** 拉取本单各 item 在指定仓库的可用量聚合 */
@@ -159,7 +182,7 @@ function open(headerData: WmProductSales) {
     header.value = d
     lines.value = d.lines || []
     historyDetails.value = d.details || []
-    loadAvail(d.warehouseId, d.lines || [])
+    loadAvail(d.warehouseId ?? uniformLineWarehouse.value ?? undefined, d.lines || [])
   })
 }
 
@@ -214,7 +237,7 @@ function extractBatchCode(raw: string): string | null {
 
 /** 该批次多仓时取出库仓库内可用量最大的一行；批次不在出库仓库返回 null */
 function pickStockRow(rows: WmMaterialStock[]): WmMaterialStock | null {
-  const inWh = rows.filter(r => r.warehouseId === header.value?.warehouseId)
+  const inWh = rows.filter(r => r.warehouseId === effectiveWarehouseId.value)
   if (!inWh.length) return null
   return inWh.reduce((best, r) => Number(r.quantityOnhand || 0) > Number(best.quantityOnhand || 0) ? r : best)
 }
@@ -230,7 +253,7 @@ async function handleScan() {
     const rows = res.data || []
     if (!rows.length) { proxy.$modal.msgError(`批次[${code}]不存在或无库存记录`); return }
     const row = pickStockRow(rows)
-    if (!row) { proxy.$modal.msgError(`批次[${code}]在出库仓库[${header.value?.warehouseName || ''}]无库存`); return }
+    if (!row) { proxy.$modal.msgError(`批次[${code}]在出库仓库[${effectiveWarehouseName.value}]无库存`); return }
     if (Number(row.quantityOnhand || 0) <= 0) { proxy.$modal.msgError(`批次[${code}]库存量为 0，无法出库`); return }
     const line = postableLines.value.find(l => l.itemCode === row.itemCode)
     if (!line) { proxy.$modal.msgError(`批次[${code}]物料[${row.itemCode}]不在待出库行或已出库完成`); return }
@@ -255,13 +278,17 @@ async function fillMissingBatchIds(valid: WmProductSalesDetail[]): Promise<boole
     getStockByBatchCode(d.batchCode as string).then(r => ({ d, rows: r.data || [] }))))
   for (const { d, rows } of resList) {
     const row = pickStockRow(rows)
-    if (!row || row.itemId !== d.itemId) { proxy.$modal.msgError(`批次[${d.batchCode}]在出库仓库[${header.value?.warehouseName || ''}]不存在或不属于物料[${d.itemCode}]，无法出库`); return false }
+    if (!row || row.itemId !== d.itemId) { proxy.$modal.msgError(`批次[${d.batchCode}]在出库仓库[${effectiveWarehouseName.value}]不存在或不属于物料[${d.itemCode}]，无法出库`); return false }
     d.batchId = row.batchId
   }
   return true
 }
 
 async function handleConfirm() {
+  if (warehouseMissing.value) {
+    proxy.$modal.msgError('该出库单未指定仓库且各行仓库不一致，请先选择出库仓库后再确认出库')
+    return
+  }
   const valid = details.value.filter((d: WmProductSalesDetail) => d.lineId && Number(d.quantity) > 0)
   if (!valid.length) { proxy.$modal.msgError('请添加有效的出库明细'); return }
   for (const d of valid) {
@@ -280,7 +307,7 @@ async function handleConfirm() {
     emit('success')
   } catch (e: any) {
     // 后端会返回具体批次/库存不足信息，统一 toast 已由 axios 拦截器处理；此处可补充刷新可用量
-    loadAvail(header.value?.warehouseId, lines.value)
+    loadAvail(effectiveWarehouseId.value ?? undefined, lines.value)
   } finally { submitting.value = false }
 }
 

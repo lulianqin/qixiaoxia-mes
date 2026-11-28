@@ -42,6 +42,12 @@ public class WmSalesApply extends BaseEntity
     /** 明细数量（列表展示，非DB字段） */
     private transient Integer lineCount;
 
+    /** 申请总量（列表汇总，非DB字段） */
+    private transient BigDecimal totalApplyQty;
+
+    /** 已出库总量（列表汇总，非DB字段） */
+    private transient BigDecimal totalPostedQty;
+
     public Long getApplyId() { return applyId; }
     public void setApplyId(Long v) { this.applyId = v; }
     public Long getFactoryId() { return factoryId; }
@@ -78,6 +84,10 @@ public class WmSalesApply extends BaseEntity
     public void setLines(List<WmSalesApplyLine> v) { this.lines = v; }
     public Integer getLineCount() { return lineCount; }
     public void setLineCount(Integer v) { this.lineCount = v; }
+    public BigDecimal getTotalApplyQty() { return totalApplyQty; }
+    public void setTotalApplyQty(BigDecimal v) { this.totalApplyQty = v; }
+    public BigDecimal getTotalPostedQty() { return totalPostedQty; }
+    public void setTotalPostedQty(BigDecimal v) { this.totalPostedQty = v; }
 
     /** 累计已出库比例 0-100（列表计算列） */
     public Integer getProgressPercent()

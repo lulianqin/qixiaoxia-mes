@@ -218,6 +218,8 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         // 检验单，否则抛 ServiceException 阻断，事务整体回滚 → 库存不扣、单据保持原状态）
         qcGateService.assertProductSalesPostable(header);
         Map<Long, WmProductSalesLine> lineMap = buildLineMap(salesId);
+        // 仓库时点：草稿（含 ERP 出库申请自动生成）允许无仓，出库确认时再明确出库仓库
+        resolveOutboundWarehouse(header, details, lineMap);
         validateClientWarehouseIsolation(header, details);
         BigDecimal postedThisTime = BigDecimal.ZERO;
         for (WmProductSalesDetail d : details) {
@@ -233,6 +235,44 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         // ERP 出库申请：累计已出库量并落回写任务（幂等，调度器可靠投递）
         salesOutboundNotifier.notifyIfErpApply(salesId);
         return salesId;
+    }
+
+    /**
+     * 出库确认落定出库仓库：头仓优先；头仓为空时（ERP 出库申请等自动建单场景），
+     * 若本次待出库明细指向同一个行仓则自动采用并回填单头，否则要求操作员先选仓。
+     * <p>不允许在“仓库未知”时走全仓 FIFO：那样可能扣到其他客户的客户专属仓。</p>
+     */
+    private void resolveOutboundWarehouse(WmProductSales header, List<WmProductSalesDetail> details,
+                                          Map<Long, WmProductSalesLine> lineMap) {
+        if (header.getWarehouseId() != null) return;
+        Long uniform = null;
+        for (WmProductSalesDetail d : details) {
+            BigDecimal qty = d.getQuantity() != null ? d.getQuantity() : BigDecimal.ZERO;
+            if (qty.compareTo(BigDecimal.ZERO) <= 0) continue;
+            Long wh = d.getWarehouseId();
+            if (wh == null) {
+                WmProductSalesLine line = lineMap.get(d.getLineId());
+                wh = line == null ? null : line.getWarehouseId();
+            }
+            if (wh == null) {
+                throw new ServiceException("出库单[" + header.getSalesCode()
+                        + "]明细[" + d.getItemCode() + "]未分配仓库，请先选择出库仓库后再确认出库");
+            }
+            if (uniform == null) {
+                uniform = wh;
+            } else if (!uniform.equals(wh)) {
+                throw new ServiceException("出库单[" + header.getSalesCode()
+                        + "]待出库明细分属多个仓库，请先在出库单指定出库仓库");
+            }
+        }
+        if (uniform == null) return;
+        // 回填单头仓库（随本次过账一起落库），便于查询/打印与后续批次校验
+        header.setWarehouseId(uniform);
+        WmWarehouse warehouse = wmWarehouseService.selectWmWarehouseByWarehouseId(uniform);
+        if (warehouse != null) {
+            header.setWarehouseCode(warehouse.getWarehouseCode());
+            header.setWarehouseName(warehouse.getWarehouseName());
+        }
     }
 
     /**
@@ -305,6 +345,10 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
      */
     private void postOutSingleBatch(WmProductSales header, WmProductSalesDetail d, BigDecimal qty, WmProductSalesLine line) {
         Long wh = d.getWarehouseId() != null ? d.getWarehouseId() : header.getWarehouseId();
+        if (wh == null) {
+            // 兜底：不允许在“未指定仓库”时全仓拣货（会串到其他客户的客户专属仓）
+            throw new ServiceException("物料[" + d.getItemCode() + "]未指定出库仓库，请先选择仓库后再确认出库");
+        }
         if (d.getBatchId() != null) {
             // 精确批次：单条扣减
             WmMaterialStock stock = loadStockForUpdate(d.getItemId(), d.getBatchId(), wh);
@@ -694,10 +738,13 @@ public class WmProductSalesServiceImpl implements IWmProductSalesService
         for (WmProductSalesLine l : lines) {
             l.setLineId(null);
             l.setSalesId(entity.getSalesId());
-            // 行仓库：无库存行可能为 null（头表 warehouse_id 已允许 NULL，仓库下沉到行）
+            // 行仓库允许为空（待定仓）：仓库由库存推导，申请/开单阶段可能还不知道仓，
+            // 出库确认时再指定（doPostOut 校验），不要用默认仓填充掩盖真实库存分布
             if (l.getWarehouseId() == null && entity.getWarehouseId() != null) {
                 l.setWarehouseId(entity.getWarehouseId());
             }
+            // 行表 warehouse_id 非空且无默认值：ERP 出库申请等自动开单场景无人工选仓，
+            // 缺省落公共成品仓（无成品仓取首个公共仓），可用量 0 由前端红标，过账前可改仓
             if (l.getQuantityPosted() == null) l.setQuantityPosted(BigDecimal.ZERO);
             l.setCreateTime(DateUtils.getNowDate());
             l.setCreateBy(SecurityUtils.getUsername());

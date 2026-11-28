@@ -49,4 +49,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and factory_id = #{factoryId}
           and external_line_id = #{externalLineId}
     </update>
+
+    <delete id="deleteLinesByApplyId">
+        delete from qxx_wm_sales_apply_line
+        where apply_id = #{applyId} and factory_id = #{factoryId}
+    </delete>
+
+    <!-- 同采购单（=MES销售订单）下各订单行已被有效申请占用的数量；已作废申请释放占用 -->
+    <select id="selectUsedQtyByOrderLine" resultMap="WmSalesApplyLineResult">
+        select l.sales_order_line_id as sales_order_line_id,
+               ifnull(sum(l.apply_qty), 0) as apply_qty
+        from qxx_wm_sales_apply_line l
+        inner join qxx_wm_sales_apply a
+                on a.apply_id = l.apply_id and a.factory_id = l.factory_id
+        where a.external_order_no = #{externalOrderNo}
+          and a.factory_id = #{factoryId}
+          and a.status &lt;&gt; 'CANCELED'
+          and l.sales_order_line_id is not null
+        <if test="excludeApplyId != null">
+            and a.apply_id &lt;&gt; #{excludeApplyId}
+        </if>
+        group by l.sales_order_line_id
+    </select>
 </mapper>

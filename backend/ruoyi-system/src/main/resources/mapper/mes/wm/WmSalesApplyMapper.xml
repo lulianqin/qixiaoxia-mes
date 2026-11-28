@@ -25,6 +25,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="createTime"          column="create_time"          />
         <result property="updateBy"            column="update_by"            />
         <result property="updateTime"          column="update_time"          />
+        <result property="lineCount"           column="line_count"           />
+        <result property="totalApplyQty"       column="total_apply_qty"      />
+        <result property="totalPostedQty"      column="total_posted_qty"     />
     </resultMap>
 
     <sql id="selectWmSalesApplyVo">
@@ -46,14 +49,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectWmSalesApplyList" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply" resultMap="WmSalesApplyResult">
-        <include refid="selectWmSalesApplyVo"/>
+        select a.apply_id, a.factory_id, a.apply_code, a.external_apply_no, a.external_order_no, a.purchase_order_id,
+               a.sales_order_id, a.sales_order_code, a.request_date, a.receiver_name, a.receiver_tel,
+               a.receiver_address, a.status, a.mes_sales_id, a.mes_sales_code, a.remark,
+               a.create_by, a.create_time, a.update_by, a.update_time,
+               count(l.line_id) as line_count,
+               ifnull(sum(l.apply_qty), 0) as total_apply_qty,
+               ifnull(sum(l.posted_qty), 0) as total_posted_qty
+        from qxx_wm_sales_apply a
+        left join qxx_wm_sales_apply_line l on l.apply_id = a.apply_id and l.factory_id = a.factory_id
         <where>
-            <if test="applyCode != null and applyCode != ''"> and apply_code like concat('%', #{applyCode}, '%')</if>
-            <if test="externalOrderNo != null and externalOrderNo != ''"> and external_order_no = #{externalOrderNo}</if>
-            <if test="salesOrderCode != null and salesOrderCode != ''"> and sales_order_code = #{salesOrderCode}</if>
-            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="applyCode != null and applyCode != ''"> and a.apply_code like concat('%', #{applyCode}, '%')</if>
+            <if test="externalOrderNo != null and externalOrderNo != ''"> and a.external_order_no = #{externalOrderNo}</if>
+            <if test="salesOrderCode != null and salesOrderCode != ''"> and a.sales_order_code = #{salesOrderCode}</if>
+            <if test="status != null and status != ''"> and a.status = #{status}</if>
         </where>
-        order by apply_id desc
+        group by a.apply_id
+        order by a.apply_id desc
     </select>
 
     <insert id="insertWmSalesApply" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply" useGeneratedKeys="true" keyProperty="applyId">
@@ -85,6 +97,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateWmSalesApplyStatus" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply">
         update qxx_wm_sales_apply
         set status = #{status}, update_time = now()
+        where apply_id = #{applyId} and factory_id = #{factoryId}
+    </update>
+
+    <!-- ERP 撤回后重新下发：全字段刷新（允许置空），复位为待出库并清掉旧草稿号 -->
+    <update id="reviveFromErp" parameterType="com.ruoyi.system.domain.mes.wm.WmSalesApply">
+        update qxx_wm_sales_apply
+        set external_order_no = #{externalOrderNo},
+            purchase_order_id = #{purchaseOrderId},
+            sales_order_id = #{salesOrderId},
+            sales_order_code = #{salesOrderCode},
+            request_date = #{requestDate},
+            receiver_name = #{receiverName},
+            receiver_tel = #{receiverTel},
+            receiver_address = #{receiverAddress},
+            remark = #{remark},
+            status = #{status},
+            mes_sales_id = #{mesSalesId},
+            mes_sales_code = #{mesSalesCode},
+            update_by = #{updateBy},
+            update_time = now()
         where apply_id = #{applyId} and factory_id = #{factoryId}
     </update>
 </mapper>

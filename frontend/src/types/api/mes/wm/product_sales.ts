@@ -51,6 +51,11 @@ export interface WmProductSales extends BaseEntity {
   oqcCode?: string
   salesOrderId?: number
   salesOrderCode?: string
+  /** 来源 ERP 出库申请（有值即为 ERP 下发申请生成的出库草稿） */
+  applyId?: number
+  applyCode?: string
+  /** 来源类型：ERP_APPLY（ERP申请）/ MANUAL（手工开单） */
+  sourceType?: string
   status?: string
   /** OQC 检验状态（最差优先聚合：PASSED/CONCESSION/PENDING/FAILED/NONE） */
   qcStatus?: string

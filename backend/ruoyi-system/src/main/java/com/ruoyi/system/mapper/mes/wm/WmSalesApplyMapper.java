@@ -25,4 +25,7 @@ public interface WmSalesApplyMapper
     int updateWmSalesApplyResult(WmSalesApply apply);
 
     int updateWmSalesApplyStatus(WmSalesApply apply);
+
+    /** ERP 撤回后重新下发：按最新报文刷新头信息并复位状态/草稿号 */
+    int reviveFromErp(WmSalesApply apply);
 }

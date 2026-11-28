@@ -34,6 +34,15 @@
       <el-table-column label="出库单名称" align="center" prop="salesName" :show-overflow-tooltip="true" min-width="140" />
       <el-table-column label="客户名称" align="center" prop="clientName" :show-overflow-tooltip="true" min-width="130" />
       <el-table-column label="客户订单号" align="center" prop="clientOrderCode" width="120" :show-overflow-tooltip="true" />
+      <el-table-column label="来源" align="center" width="100">
+        <template #default="scope">
+          <el-tag v-if="scope.row.applyCode || scope.row.sourceType === 'ERP_APPLY'" size="small" type="primary">ERP申请</el-tag>
+          <el-tag v-else size="small" type="info">手工开单</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="ERP申请单" align="center" prop="applyCode" width="160" :show-overflow-tooltip="true">
+        <template #default="scope">{{ scope.row.applyCode || '-' }}</template>
+      </el-table-column>
       <el-table-column label="出库日期" align="center" width="180" :show-overflow-tooltip="true">
         <template #default="scope">{{ parseTime(scope.row.salesDate, '{y}-{m}-{d}') }}</template>
       </el-table-column>
