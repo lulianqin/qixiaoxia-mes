@@ -10,7 +10,7 @@
  * 本模块不依赖 Vue，便于单测。
  */
 
-export type DocKind = 'PURCHASE' | 'PROCESS'
+export type DocKind = 'PURCHASE' | 'PROCESS' | 'SLITTING'
 
 export interface SyncContext {
   productName?: string | null
@@ -63,9 +63,30 @@ export interface DocSyncPlan {
   isEmpty: boolean
 }
 
-/** 开单类型归一化：PURCHASE-采购单，其余-加工单 */
+/** 开单类型归一化：PURCHASE-采购单，SLITTING-分切单，其余-加工单 */
 export function normDocType(t: any): DocKind {
-  return String(t || '').toUpperCase() === 'PURCHASE' ? 'PURCHASE' : 'PROCESS'
+  const v = String(t || '').toUpperCase()
+  if (v === 'PURCHASE') return 'PURCHASE'
+  if (v === 'SLITTING') return 'SLITTING'
+  return 'PROCESS'
+}
+
+/**
+ * 单据实际归属：分切单与加工单同存 processDocs，用 sourceType 区分。
+ * 分切单在库里就是 sourceType=SLITTING 的外协单（走分切外协策略）。
+ */
+export function docKindOf(doc: any): DocKind {
+  return String(doc?.sourceType || '').toUpperCase() === 'SLITTING' ? 'SLITTING' : 'PROCESS'
+}
+
+/** 工序是否分切：以工序主数据的业务类型为准，不看工序名称/编码 */
+export function isSlittingRow(row: any): boolean {
+  return String(row?.bizType || '').toUpperCase() === 'SLITTING'
+}
+
+/** 某类单据对应的前端数组（分切单与加工单共用 processDocs） */
+function docsOfKind(kind: DocKind, purchaseDocs: any[], processDocs: any[]): any[] {
+  return kind === 'PURCHASE' ? purchaseDocs : processDocs
 }
 
 /** 草稿单：页面新建（无 orderId）或状态为 DRAFT */
@@ -78,6 +99,11 @@ export function isDraftDoc(doc: any): boolean {
 /** 已保存且非草稿：后端会原样保留，前端也应只读 */
 export function isLockedDoc(doc: any): boolean {
   return !!doc?.orderId && String(doc.status || 'DRAFT').toUpperCase() !== 'DRAFT'
+}
+
+function kindLabel(kind: DocKind): string {
+  if (kind === 'PURCHASE') return '采购单'
+  return kind === 'SLITTING' ? '分切单' : '加工单'
 }
 
 function sameId(a: any, b: any): boolean {
@@ -133,7 +159,24 @@ function buildProcLine(row: any, ctx: SyncContext): any {
 }
 
 function buildNewDocHeader(kind: DocKind, row: any, ctx: SyncContext): any {
-  const title = `${row.vendorName || ''}${kind === 'PURCHASE' ? '采购单' : '加工单'}`
+  const title = `${row.vendorName || ''}${kind === 'PURCHASE' ? '采购单' : (kind === 'SLITTING' ? '分切单' : '加工单')}`
+  if (kind === 'SLITTING') {
+    // 分切单：外协单 + sourceType=SLITTING，母卷发料明细在发料环节或卡片里补录
+    return {
+      docTitle: title,
+      sourceType: 'SLITTING',
+      supplierType: 'OUTSIDE',
+      vendorId: row.vendorId,
+      vendorCode: row.vendorCode || '',
+      vendorName: row.vendorName || '',
+      orderDate: ctx.orderDate,
+      purchaser: ctx.purchaser || '',
+      deliveryAddress: ctx.deliveryAddress || '',
+      remark: '',
+      lines: [],
+      issueLines: []
+    }
+  }
   if (kind === 'PURCHASE') {
     return {
       docTitle: title,
@@ -185,8 +228,9 @@ export function buildDocSyncPlan(args: {
 
   const manual: SyncManualItem[] = []
   const existing = new Map<number, Array<{ kind: DocKind; docIndex: number; doc: any }>>()
-  const collect = (kind: DocKind, docs: any[]) => {
+  const collect = (fallbackKind: DocKind, docs: any[]) => {
     docs.forEach((doc, docIndex) => {
+      const kind = fallbackKind === 'PURCHASE' ? 'PURCHASE' : docKindOf(doc)
       ;(doc.lines || []).forEach((line: any) => {
         const id = toId(line?.processId)
         if (!id) return
@@ -202,7 +246,7 @@ export function buildDocSyncPlan(args: {
   rows.forEach((row) => {
     const id = toId(row?.processId)
     if (!id) return
-    const kind = normDocType(row.docType)
+    const kind: DocKind = isSlittingRow(row) ? 'SLITTING' : normDocType(row.docType)
     const refs = existing.get(id) || []
     if (refs.length) {
       const matched = refs.some((r) => r.kind === kind && sameId(r.doc?.vendorId, row.vendorId))
@@ -210,7 +254,7 @@ export function buildDocSyncPlan(args: {
       const ref = refs[0]
       manual.push({
         processName: row.processName || '',
-        reason: `供应商或开单类型已变更（原单据：${ref.doc?.vendorName || ''} / ${ref.kind === 'PURCHASE' ? '采购单' : '加工单'}），未自动迁移`,
+        reason: `供应商或开单类型已变更（原单据：${ref.doc?.vendorName || ''} / ${kindLabel(ref.kind)}），未自动迁移`,
         docTitle: ref.doc?.docTitle,
         orderCode: ref.doc?.orderCode
       })
@@ -222,17 +266,23 @@ export function buildDocSyncPlan(args: {
     }
     // 自动开单只服务外协工序；厂内工序需要单据时请在「单据配置」手工新增（含厂内加工单）
     if (String(row.isOutsource) !== '1') {
-      manual.push({ processName: row.processName || '', reason: '厂内工序不自动生成单据，如需厂内加工单请在单据配置手工新增' })
+      manual.push({
+        processName: row.processName || '',
+        reason: isSlittingRow(row)
+          ? '厂内分切不生成分切外协单，如需厂内加工单请在单据配置手工新增'
+          : '厂内工序不自动生成单据，如需厂内加工单请在单据配置手工新增'
+      })
       return
     }
-    const docs = kind === 'PURCHASE' ? (args.purchaseDocs || []) : (args.processDocs || [])
+    const docs = docsOfKind(kind, args.purchaseDocs || [], args.processDocs || [])
+    const sameKind = (d: any) => (kind === 'PURCHASE' ? true : docKindOf(d) === kind)
     let docIndex = -1
     for (let i = 0; i < docs.length; i++) {
       const d = docs[i]
-      if (isDraftDoc(d) && sameId(d.vendorId, row.vendorId)) { docIndex = i; break }
+      if (sameKind(d) && isDraftDoc(d) && sameId(d.vendorId, row.vendorId)) { docIndex = i; break }
     }
     if (docIndex < 0) {
-      const nonDraft = docs.find((d) => !isDraftDoc(d) && sameId(d.vendorId, row.vendorId))
+      const nonDraft = docs.find((d) => sameKind(d) && !isDraftDoc(d) && sameId(d.vendorId, row.vendorId))
       if (nonDraft) {
         manual.push({
           processName: row.processName || '',
@@ -263,8 +313,9 @@ export function buildDocSyncPlan(args: {
   })
 
   const removals: SyncRemovalGroup[] = []
-  const collectRemovals = (kind: DocKind, docs: any[]) => {
+  const collectRemovals = (fallbackKind: DocKind, docs: any[]) => {
     docs.forEach((doc, docIndex) => {
+      const kind: DocKind = fallbackKind === 'PURCHASE' ? 'PURCHASE' : docKindOf(doc)
       const lines = doc.lines || []
       const hitIndexes: number[] = []
       lines.forEach((line: any, li: number) => {
@@ -294,7 +345,7 @@ export function buildDocSyncPlan(args: {
       removals.push({
         kind,
         docIndex,
-        docTitle: doc.docTitle || (kind === 'PURCHASE' ? '采购单' : '加工单'),
+        docTitle: doc.docTitle || (kind === 'PURCHASE' ? '采购单' : (kind === 'SLITTING' ? '分切单' : '加工单')),
         orderCode: doc.orderCode || '',
         vendorName: doc.vendorName || '',
         lineIndexes: hitIndexes,

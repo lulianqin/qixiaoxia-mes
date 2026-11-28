@@ -312,6 +312,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
+    <select id="loadMaterialStockByIdForUpdate" parameterType="Long" resultMap="WmMaterialStockResult">
+        <include refid="selectWmMaterialStockVo"/>
+        where material_stock_id = #{materialStockId}
+        limit 1
+        for update
+    </select>
+
     <select id="loadMaterialStockForUpdate" parameterType="WmMaterialStock" resultMap="WmMaterialStockResult">
         <include refid="selectWmMaterialStockVo"/>
         where item_id = #{itemId}

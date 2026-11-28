@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -104,6 +105,9 @@ public class WmItemRecptLine extends BaseEntity
     /** 已收数量(展示用,不落库) — 从采购订单行带出，供草稿页核对 */
     private BigDecimal quantityReceived;
 
+    /** 逐实物实例明细（不落本表，保存时写入 qxx_wm_item_recpt_detail） */
+    private List<WmItemRecptDetail> details;
+
     public Long getLineId() { return lineId; }
     public void setLineId(Long v) { this.lineId = v; }
 
@@ -187,6 +191,9 @@ public class WmItemRecptLine extends BaseEntity
 
     public BigDecimal getQuantityReceived() { return quantityReceived; }
     public void setQuantityReceived(BigDecimal v) { this.quantityReceived = v; }
+
+    public List<WmItemRecptDetail> getDetails() { return details; }
+    public void setDetails(List<WmItemRecptDetail> details) { this.details = details; }
 
     @Override
     public String toString() {

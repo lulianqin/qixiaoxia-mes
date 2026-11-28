@@ -34,6 +34,14 @@ public class WmRtIssueLine extends BaseEntity
     private BigDecimal quantityRted;
     private Long batchId;
     private String batchCode;
+    /** 实物实例ID（按卷/根退料时必填） */
+    private Long instanceId;
+    /** 实物实例编号 */
+    private String instanceCode;
+    /** 本次退回该实例的主单位数量 */
+    private BigDecimal instanceQuantity;
+    /** 草稿用：该领料单发过的实物实例（退料默认退回原实例，不落库） */
+    private java.util.List<WmStockInstance> instanceOptions;
     private Long warehouseId;
     private Long locationId;
     private Long areaId;
@@ -70,6 +78,14 @@ public class WmRtIssueLine extends BaseEntity
     public void setBatchId(Long v) { this.batchId = v; }
     public String getBatchCode() { return batchCode; }
     public void setBatchCode(String v) { this.batchCode = v; }
+    public Long getInstanceId() { return instanceId; }
+    public void setInstanceId(Long v) { this.instanceId = v; }
+    public String getInstanceCode() { return instanceCode; }
+    public void setInstanceCode(String v) { this.instanceCode = v; }
+    public BigDecimal getInstanceQuantity() { return instanceQuantity; }
+    public void setInstanceQuantity(BigDecimal v) { this.instanceQuantity = v; }
+    public java.util.List<WmStockInstance> getInstanceOptions() { return instanceOptions; }
+    public void setInstanceOptions(java.util.List<WmStockInstance> v) { this.instanceOptions = v; }
     public Long getWarehouseId() { return warehouseId; }
     public void setWarehouseId(Long v) { this.warehouseId = v; }
     public Long getLocationId() { return locationId; }

@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="processId"    column="process_id"    />
         <result property="processCode"    column="process_code"    />
         <result property="processName"    column="process_name"    />
+        <result property="bizType"    column="biz_type"    />
         <result property="orderNum"    column="order_num"    />
         <result property="nextProcessId"    column="next_process_id"    />
         <result property="nextProcessCode"    column="next_process_code"    />
@@ -55,10 +56,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where record_id = #{recordId}
     </select>
 
+    <!-- 带出工序业务类型：工单单据配置据此判定是否需要开「分切单」 -->
     <select id="selectProRouteProcessByRouteId" parameterType="Long" resultMap="ProRouteProcessResult">
-        <include refid="selectProRouteProcessVo"/>
-        where route_id = #{routeId}
-        order by order_num asc
+        select rp.record_id, rp.factory_id, rp.route_id, rp.process_id, rp.process_code, rp.process_name,
+               rp.order_num, rp.next_process_id, rp.next_process_code, rp.next_process_name, rp.link_type,
+               rp.default_pre_time, rp.default_suf_time, rp.color_code, rp.key_flag, rp.is_check,
+               rp.is_outsource, rp.vendor_id, rp.vendor_code, rp.vendor_name, rp.outsource_factory_id,
+               rp.remark, rp.create_by, rp.create_time, rp.update_by, rp.update_time,
+               p.biz_type
+        from qxx_pro_route_process rp
+        left join qxx_pro_process p on p.process_id = rp.process_id
+        where rp.route_id = #{routeId}
+        order by rp.order_num asc
     </select>
 
     <select id="selectByRouteIds" resultMap="ProRouteProcessResult">

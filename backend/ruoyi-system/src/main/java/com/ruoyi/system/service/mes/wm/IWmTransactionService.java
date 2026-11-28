@@ -11,6 +11,12 @@ public interface IWmTransactionService
      */
     WmTransaction processTransaction(WmTransaction wmTransaction);
 
+    /**
+     * 刷新库存桶的辅助单位数量：对开启实例管理的物料，辅助数量 = 在库实例数，
+     * 不再由 conversionRate 推算。实例创建/领料完成后调用。
+     */
+    void refreshInstanceAuxQuantity(Long materialStockId);
+
     public List<WmTransaction> selectWmTransactionList(WmTransaction entity);
     public List<WmTransaction> selectWmTransactionAll();
     public WmTransaction selectWmTransactionByTransactionId(Long transactionId);

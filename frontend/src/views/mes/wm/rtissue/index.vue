@@ -172,6 +172,18 @@
                 <span v-else>{{ scope.row.batchCode }}</span>
               </template>
             </el-table-column>
+            <!-- 退料默认退回原实物实例（一发一退可追溯），也可改选其它在库实例 -->
+            <el-table-column label="退回实物实例" align="center" width="230">
+              <template #default="scope">
+                <el-select v-if="!isView && form.status === 'DRAFT' && (scope.row.instanceOptions || []).length"
+                  v-model="scope.row.instanceId" placeholder="退回原实例" size="small" clearable filterable style="width:210px"
+                  @change="(v) => onRtInstanceChange(scope.row, v)">
+                  <el-option v-for="i in scope.row.instanceOptions" :key="i.instanceId"
+                    :label="`${i.instanceCode} · 已发${i.remainingQuantity}${i.quantityUom || ''}`" :value="i.instanceId" />
+                </el-select>
+                <span v-else>{{ scope.row.instanceCode || '-' }}</span>
+              </template>
+            </el-table-column>
           </el-table>
           <el-empty v-if="!lineList.length" description="暂无退料明细" :image-size="80" />
         </el-tab-pane>
@@ -406,13 +418,29 @@ function onIssueRowDblClick(row: any) {
   onIssueSelected(row)
 }
 
+/** 退料默认退回原实物实例：优先取该物料在这张领料单里发过的第一件 */
+function applyDefaultInstance(line: any) {
+  if (!line.instanceId && Array.isArray(line.instanceOptions) && line.instanceOptions.length) {
+    line.instanceId = line.instanceOptions[0].instanceId
+    line.instanceCode = line.instanceOptions[0].instanceCode
+  }
+  return line
+}
+
+/** 切换退回实例：同步实例编码与本次退回量 */
+function onRtInstanceChange(row: any, instanceId: any) {
+  const inst = (row.instanceOptions || []).find((i: any) => i.instanceId === instanceId)
+  row.instanceCode = inst?.instanceCode || ''
+  row.instanceQuantity = instanceId ? row.quantityRt : null
+}
+
 // 用草稿打开编辑弹窗（领料单驱动，关联字段锁定只读，可调退料量/批次/日期/备注）
 function openAddDraft(draft: any) {
   reset()
   const { lines, ...header } = draft
   Object.assign(form.value, header)
   form.value.rtCode = '' // 草稿态无编码，保存时后端自动生成
-  lineList.value = (lines || []).map((l: any) => ({ ...l }))
+  lineList.value = (lines || []).map((l: any) => applyDefaultInstance({ ...l }))
   activeTab.value = 'header'
   title.value = '从领料单生成退料单'
   open.value = true
@@ -424,7 +452,7 @@ function handleReloadDraft() {
   buildFromIssue(form.value.issueId).then((r: any) => {
     const draft = r.data
     if (draft && draft.lines) {
-      lineList.value = draft.lines.map((l: any) => ({ ...l }))
+      lineList.value = draft.lines.map((l: any) => applyDefaultInstance({ ...l }))
       proxy.$modal.msgSuccess('已从领料单重新拉取明细')
     }
   })
@@ -502,7 +530,11 @@ function submitForm() {
     if (!valid) return
     submitLoading.value = true
     // 头+明细一次性提交（后端原子事务落库，修复旧版脏单/删行不生效问题）
-    form.value.lines = lineList.value.map((l: any) => ({ ...l, rtId: form.value.rtId || undefined }))
+    form.value.lines = lineList.value.map((l: any) => ({
+      ...l,
+      rtId: form.value.rtId || undefined,
+      instanceQuantity: l.instanceId ? l.quantityRt : null
+    }))
     const action = form.value.rtId ? updateRtIssue(form.value) : addRtIssue(form.value)
     action
       .then(() => {

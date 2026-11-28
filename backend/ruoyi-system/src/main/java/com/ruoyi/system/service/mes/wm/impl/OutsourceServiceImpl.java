@@ -27,11 +27,13 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.mes.md.MdItem;
 import com.ruoyi.system.domain.mes.md.MdVendor;
 import com.ruoyi.system.domain.mes.pro.ProCard;
 import com.ruoyi.system.domain.mes.pro.ProConstants;
 import com.ruoyi.system.domain.mes.pro.ProFeedback;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
+import com.ruoyi.system.domain.mes.pro.ProProcess;
 import com.ruoyi.system.domain.mes.pro.ProRouteProcess;
 import com.ruoyi.system.domain.mes.pro.ProTask;
 import com.ruoyi.system.domain.mes.pro.ProWorkorder;
@@ -46,12 +48,15 @@ import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessAttr;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceProcessLine;
 import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
+import com.ruoyi.system.domain.mes.wm.WmStockInstance;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.wm.vo.OutsourceBatchResult;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.md.MdVendorMapper;
 import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProFeedbackMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
+import com.ruoyi.system.mapper.mes.pro.ProProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProRouteProcessMapper;
 import com.ruoyi.system.mapper.mes.pro.ProTaskMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
@@ -59,12 +64,14 @@ import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceOrderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessAttrMapper;
+import com.ruoyi.system.service.mes.common.MesQuantityService;
 import com.ruoyi.system.service.mes.pro.IProWorkorderDocService;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IOutsourceService;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
+import com.ruoyi.system.service.mes.wm.IWmStockInstanceService;
 import com.ruoyi.system.service.mes.wm.IWmTransactionService;
 import com.ruoyi.system.service.mes.wm.OutsourceResultStrategy;
 
@@ -119,11 +126,15 @@ public class OutsourceServiceImpl implements IOutsourceService
     @Autowired private WmOutsourceOrderMapper orderMapper;
     @Autowired private WmOutsourceLineMapper lineMapper;
     @Autowired private MdVendorMapper vendorMapper;
+    @Autowired private MdItemMapper mdItemMapper;
+    @Autowired private MesQuantityService mesQuantityService;
+    @Autowired private IWmStockInstanceService stockInstanceService;
     @Autowired private IWmTransactionService transactionService;
     @Autowired private IWmBatchService wmBatchService;
     @Autowired private ProFeedbackMapper feedbackMapper;
     @Autowired private ProWorkorderMapper workorderMapper;
     @Autowired private ProRouteProcessMapper routeProcessMapper;
+    @Autowired private ProProcessMapper processMapper;
     @Autowired private WmOutsourceProcessAttrMapper processAttrMapper;
     @Autowired private com.ruoyi.system.mapper.mes.wm.WmOutsourceProcessLineMapper processLineMapper;
     @Autowired private ProCardMapper cardMapper;
@@ -221,6 +232,7 @@ public class OutsourceServiceImpl implements IOutsourceService
                 if (line.getItemId() == null) throw new ServiceException("发料行物料不能为空");
                 if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
                     throw new ServiceException("发料数量必须大于0");
+                validateIssueLineInstance(line);
             }
         }
         if (req.getProcessLines() != null && !req.getProcessLines().isEmpty())
@@ -235,6 +247,11 @@ public class OutsourceServiceImpl implements IOutsourceService
         else
         {
             validateProcessAttrs(req);
+        }
+        // 直接发货（非草稿）同样要求分切单指定母卷，避免跳过草稿环节绕过校验
+        if (!req.isDraft())
+        {
+            validateSlittingInstanceBound(resolveSourceTypeFor(req), req.getIssueLines());
         }
     }
 
@@ -274,10 +291,21 @@ public class OutsourceServiceImpl implements IOutsourceService
         return ids;
     }
 
+    /** 工序是否分切：以工序主数据业务类型为准（兼容历史按工序编码识别） */
+    private boolean isSlittingProcess(Long processId)
+    {
+        if (processId == null) return false;
+        ProProcess p = processMapper.selectProProcessByProcessId(processId);
+        if (p == null) return false;
+        if ("SLITTING".equalsIgnoreCase(p.getBizType())) return true;
+        return SOURCE_TYPE_SLITTING.equals(p.getProcessCode());
+    }
+
     /** 工序行扩展属性校验：按工序模板校验必填项，非法 JSON 拒绝 */
     private void validateProcessLineAttrs(WmOutsourceProcessLine line)
     {
-        if (SOURCE_TYPE_SLITTING.equals(line.getProcessCode())) return;
+        // 分切工序不套用工序属性模板（分切规格由厂商录结果时填子件门幅/克重）
+        if (isSlittingProcess(line.getProcessId())) return;
         List<WmOutsourceProcessAttr> schema = processAttrMapper.selectByProcessId(
                 SecurityUtils.getFactoryId(), line.getProcessId());
         if (schema == null || schema.isEmpty())
@@ -314,7 +342,7 @@ public class OutsourceServiceImpl implements IOutsourceService
     private void validateProcessAttrs(OutsourceRequest req)
     {
         if (req.getProcessId() == null) return;
-        String sourceType = resolveSourceType(req.getSourceType(), req.getProcessCode());
+        String sourceType = resolveSourceTypeFor(req);
         if (SOURCE_TYPE_SLITTING.equals(sourceType)) return;
         List<WmOutsourceProcessAttr> schema = processAttrMapper.selectByProcessId(
                 SecurityUtils.getFactoryId(), req.getProcessId());
@@ -468,7 +496,7 @@ public class OutsourceServiceImpl implements IOutsourceService
         order.setProcessId(req.getProcessId());
         order.setProcessCode(req.getProcessCode());
         order.setProcessName(req.getProcessName());
-        order.setSourceType(resolveSourceType(req.getSourceType(), req.getProcessCode()));
+        order.setSourceType(resolveSourceTypeFor(req));
         order.setSourceRefId(req.getSourceRefId());
         order.setDocTitle(req.getDocTitle());
         order.setOrderDate(req.getOrderDate() != null ? req.getOrderDate() : DateUtils.getNowDate());
@@ -509,12 +537,7 @@ public class OutsourceServiceImpl implements IOutsourceService
             lineMapper.insertIssueLine(line);
             if (!draft)
             {
-                // PC 端直接发货可能未指定批次，FIFO 自动解析最早可用批次
-                resolveFifoBatchIfMissing(line);
-                // 在制品/产品未入库即外发：先虚拟入库补齐，再正常出库
-                ensureStockForPick(line, order);
-                WmTransaction pickTx = transactionService.processTransaction(buildPickTx(line, order));
-                writeIssueTrace(line, order, pickTx.getMaterialStockId());
+                issueOneLine(line, order);
             }
         }
     }
@@ -655,6 +678,17 @@ public class OutsourceServiceImpl implements IOutsourceService
      * SLITTING（纸张分切）→ SLITTING；其余默认 GENERIC。
      * 让 OutsourceIssueHelper 等自动建单也能正确标注来源，避免分切单显示为通用、录结果走错策略。
      */
+    /**
+     * 建单时最终来源类型：显式传入优先；否则按工序编码/工序业务类型识别分切。
+     * 工序主数据标了「分切」（biz_type=SLITTING）就按分切单处理，不依赖工序名称或编码。
+     */
+    private String resolveSourceTypeFor(OutsourceRequest req)
+    {
+        String resolved = resolveSourceType(req.getSourceType(), req.getProcessCode());
+        if (!SOURCE_TYPE_GENERIC.equals(resolved)) return resolved;
+        return isSlittingProcess(req.getProcessId()) ? SOURCE_TYPE_SLITTING : resolved;
+    }
+
     public static String resolveSourceType(String sourceType, String processCode)
     {
         if (sourceType != null && !SOURCE_TYPE_GENERIC.equals(sourceType))
@@ -697,17 +731,15 @@ public class OutsourceServiceImpl implements IOutsourceService
         List<WmOutsourceIssueLine> lines = lineMapper.selectIssueLinesByOrderId(orderId);
         if (lines == null || lines.isEmpty())
             throw new ServiceException("无发料行，不能执行发料");
+        // 分切单：物料有在库实物实例时必须选母卷，否则子件无法追溯到母卷
+        validateSlittingInstanceBound(order.getSourceType(), lines);
         // 扣库存 + 写发料追溯（草稿创建时跳过的动作，此处补做）
         for (WmOutsourceIssueLine line : lines)
         {
-            // 草稿行可能未指定批次（PC 直接保存草稿），执行时按 FIFO 补最早可用批次
-            resolveFifoBatchIfMissing(line);
-            // 在制品/产品未入库即外发：先虚拟入库补齐，再正常出库
-            ensureStockForPick(line, order);
-            WmTransaction pickTx = buildPickTx(line, order);
-            transactionService.processTransaction(pickTx);
-            writeIssueTrace(line, order, pickTx.getMaterialStockId());
+            issueOneLine(line, order);
         }
+        // 单母卷分切单把实例回写单头 sourceRefId，录结果时子件据此挂 parent_instance_id
+        bindSlittingSourceInstance(order, lines);
         markCardOutsourcing(order);
         WmOutsourceOrder upd = new WmOutsourceOrder();
         upd.setOrderId(orderId);
@@ -744,6 +776,7 @@ public class OutsourceServiceImpl implements IOutsourceService
             if (line.getItemId() == null) throw new ServiceException("发料行物料不能为空");
             if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
                 throw new ServiceException("发料数量必须大于0");
+            validateIssueLineInstance(line);
             line.setOrderId(orderId);
             line.setCreateBy(operator);
             line.setCreateTime(DateUtils.getNowDate());
@@ -1527,6 +1560,155 @@ public class OutsourceServiceImpl implements IOutsourceService
     }
 
     /** 构建发料扣库存事务（ISSUE_OUT 负数） */
+    /**
+     * 单行发料：绑定母卷实例时先扣实例剩余、再按实例所属库存桶出库；
+     * 未绑定实例保持原逻辑（FIFO 批次 + 产品未入库时虚拟入库）。
+     */
+    private void issueOneLine(WmOutsourceIssueLine line, WmOutsourceOrder order)
+    {
+        WmMaterialStock instanceStock = deductInstanceIfBound(line, order);
+        if (instanceStock == null)
+        {
+            // 草稿行可能未指定批次，FIFO 自动解析最早可用批次
+            resolveFifoBatchIfMissing(line);
+            // 在制品/产品未入库即外发：先虚拟入库补齐，再正常出库
+            ensureStockForPick(line, order);
+        }
+        WmTransaction pickTx = buildPickTx(line, order);
+        if (instanceStock != null)
+        {
+            // 实例所属桶可能带 workorder/供应商维度，覆盖为实例实际桶，避免 6 元组匹配到别的桶
+            applyStockContext(pickTx, instanceStock);
+            pickTx.setInstanceId(line.getInstanceId());
+            pickTx.setInstanceCode(line.getInstanceCode());
+        }
+        transactionService.processTransaction(pickTx);
+        if (instanceStock != null && instanceStock.getMaterialStockId() != null)
+        {
+            // 实例已扣减：库存桶的辅助数量按「在库实例数」重算（卷/根/桶）
+            transactionService.refreshInstanceAuxQuantity(instanceStock.getMaterialStockId());
+        }
+        writeIssueTrace(line, order, pickTx.getMaterialStockId());
+    }
+
+    /**
+     * 发料行绑定实物实例时扣减实例剩余量，返回实例所属库存记录（用于精确扣桶）。
+     * 剩余量不足由 adjustRemaining 抛业务异常，整单回滚。
+     */
+    private WmMaterialStock deductInstanceIfBound(WmOutsourceIssueLine line, WmOutsourceOrder order)
+    {
+        if (line.getInstanceId() == null) return null;
+        WmStockInstance instance = stockInstanceService.selectWmStockInstanceById(line.getInstanceId());
+        if (instance == null) throw new ServiceException("实物实例不存在：" + line.getInstanceId());
+        if (line.getItemId() != null && !line.getItemId().equals(instance.getItemId()))
+            throw new ServiceException("实物实例[" + instance.getInstanceCode() + "]与发料物料不符");
+        BigDecimal qty = toBaseQuantity(line);
+        WmStockInstance updated = stockInstanceService.adjustRemaining(line.getInstanceId(), qty.negate(),
+                null, order.getWorkorderId(), order.getWorkorderCode());
+        line.setInstanceCode(updated.getInstanceCode());
+        if (instance.getMaterialStockId() == null)
+            throw new ServiceException("实物实例[" + instance.getInstanceCode() + "]未关联库存记录，不能发料");
+        WmMaterialStock stock = materialStockMapper.selectMaterialStockForUpdateById(instance.getMaterialStockId());
+        if (stock == null)
+            throw new ServiceException("实物实例[" + instance.getInstanceCode() + "]所属库存记录不存在");
+        return stock;
+    }
+
+    /** 发料数量折算到物料主单位（实例剩余量按主单位记录） */
+    private BigDecimal toBaseQuantity(WmOutsourceIssueLine line)
+    {
+        BigDecimal qty = nvl(line.getQuantity());
+        if (line.getItemId() == null) return qty;
+        MdItem item = mdItemMapper.selectMdItemById(line.getItemId());
+        return mesQuantityService.toBaseQty(qty, line.getUnitOfMeasure(), item);
+    }
+
+    /**
+     * 发料行实例校验：存在性、物料一致性、剩余量是否够本次发料；
+     * 顺带回填实例编号与批次/仓库快照，草稿列表也能看到母卷信息。
+     */
+    private void validateIssueLineInstance(WmOutsourceIssueLine line)
+    {
+        if (line.getInstanceId() == null) return;
+        WmStockInstance instance = stockInstanceService.selectWmStockInstanceById(line.getInstanceId());
+        if (instance == null) throw new ServiceException("实物实例不存在：" + line.getInstanceId());
+        if (line.getItemId() != null && !line.getItemId().equals(instance.getItemId()))
+            throw new ServiceException("实物实例[" + instance.getInstanceCode() + "]与发料物料不符");
+        BigDecimal need = toBaseQuantity(line);
+        BigDecimal remain = instance.getRemainingQuantity() != null ? instance.getRemainingQuantity() : BigDecimal.ZERO;
+        if (remain.compareTo(need) < 0)
+            throw new ServiceException("母卷[" + instance.getInstanceCode() + "]剩余 " + remain
+                    + "，不足本次发料 " + need);
+        line.setInstanceCode(instance.getInstanceCode());
+        if (line.getBatchId() == null && instance.getBatchId() != null)
+        {
+            line.setBatchId(instance.getBatchId());
+            line.setBatchCode(instance.getBatchCode());
+        }
+        if (line.getWarehouseId() == null && instance.getWarehouseId() != null)
+        {
+            line.setWarehouseId(instance.getWarehouseId());
+            line.setWarehouseCode(instance.getWarehouseCode());
+            line.setWarehouseName(instance.getWarehouseName());
+        }
+    }
+
+    /** 以实例实际库存记录覆盖事务的 6 元组，保证扣的就是实例所在桶 */
+    private void applyStockContext(WmTransaction tx, WmMaterialStock stock)
+    {
+        tx.setBatchId(stock.getBatchId());
+        tx.setBatchCode(stock.getBatchCode());
+        tx.setWarehouseId(stock.getWarehouseId());
+        tx.setWarehouseCode(stock.getWarehouseCode());
+        tx.setWarehouseName(stock.getWarehouseName());
+        tx.setVendorId(stock.getVendorId());
+        tx.setLocationId(stock.getLocationId());
+        tx.setAreaId(stock.getAreaId());
+        tx.setWorkorderId(stock.getWorkorderId());
+    }
+
+    /** 分切单发料行校验：物料有在库实例时必须指定母卷，避免按汇总桶发料导致母子追溯断链 */
+    private void validateSlittingInstanceBound(String sourceType, List<WmOutsourceIssueLine> lines)
+    {
+        if (!SOURCE_TYPE_SLITTING.equals(sourceType) || lines == null) return;
+        for (WmOutsourceIssueLine line : lines)
+        {
+            if (line.getInstanceId() != null || line.getItemId() == null) continue;
+            WmStockInstance query = new WmStockInstance();
+            query.setItemId(line.getItemId());
+            List<WmStockInstance> avail = stockInstanceService.selectAvailableInstances(query);
+            if (avail != null && !avail.isEmpty())
+                throw new ServiceException("分切单发料需指定母卷实物实例：" + line.getItemName()
+                        + "（在单据配置的发料明细里选择母卷编号后重试）");
+        }
+    }
+
+    /** 单母卷分切单：把母卷实例回写单头 sourceRefId（子件 parent_instance_id 取此值） */
+    private void bindSlittingSourceInstance(WmOutsourceOrder order, List<WmOutsourceIssueLine> lines)
+    {
+        if (!SOURCE_TYPE_SLITTING.equals(order.getSourceType())) return;
+        List<WmOutsourceIssueLine> bound = new ArrayList<>();
+        for (WmOutsourceIssueLine line : lines)
+        {
+            if (line.getInstanceId() != null) bound.add(line);
+        }
+        if (bound.size() != 1)
+        {
+            if (bound.size() > 1)
+                log.warn("分切单绑定多个母卷，子件母卷追溯按批次匹配: orderId={}, 母卷数={}",
+                        order.getOrderId(), bound.size());
+            return;
+        }
+        Long instanceId = bound.get(0).getInstanceId();
+        order.setSourceRefId(instanceId);
+        WmOutsourceOrder upd = new WmOutsourceOrder();
+        upd.setOrderId(order.getOrderId());
+        upd.setSourceRefId(instanceId);
+        upd.setUpdateBy(SecurityUtils.getUsername());
+        upd.setUpdateTime(DateUtils.getNowDate());
+        orderMapper.updateOutsourceOrder(upd);
+    }
+
     private WmTransaction buildPickTx(WmOutsourceIssueLine line, WmOutsourceOrder order)
     {
         WmTransaction tx = new WmTransaction();
@@ -1608,11 +1790,13 @@ public class OutsourceServiceImpl implements IOutsourceService
     {
         Long parentStockId = materialStockId != null ? materialStockId
                 : (line.getSourceRefId() != null ? line.getSourceRefId() : 0L);
+        boolean byInstance = line.getInstanceId() != null;
         ProMaterialTrace trace = new ProMaterialTrace();
         trace.setTraceType("OUTSOURCE_ISSUE");
-        trace.setParentType("MATERIAL_STOCK");
+        // 绑了母卷实例时以实例为父节点（与厂内领料一致），子件可据此反查具体母卷
+        trace.setParentType(byInstance ? "STOCK_INSTANCE" : "MATERIAL_STOCK");
         // 使用实际扣减的库存记录 ID（processTransaction 返回），避免 parentId=0 断链
-        trace.setParentId(parentStockId);
+        trace.setParentId(byInstance ? line.getInstanceId() : parentStockId);
         trace.setChildType("OUTSOURCE_ORDER");
         trace.setChildId(order.getOrderId());
         trace.setQuantity(line.getQuantity());
@@ -1632,8 +1816,8 @@ public class OutsourceServiceImpl implements IOutsourceService
         {
             ProMaterialTrace cardEdge = new ProMaterialTrace();
             cardEdge.setTraceType("OUTSOURCE_ISSUE");
-            cardEdge.setParentType("MATERIAL_STOCK");
-            cardEdge.setParentId(parentStockId);
+            cardEdge.setParentType(byInstance ? "STOCK_INSTANCE" : "MATERIAL_STOCK");
+            cardEdge.setParentId(byInstance ? line.getInstanceId() : parentStockId);
             cardEdge.setChildType("CARD");
             cardEdge.setChildId(order.getCardId());
             cardEdge.setQuantity(line.getQuantity());

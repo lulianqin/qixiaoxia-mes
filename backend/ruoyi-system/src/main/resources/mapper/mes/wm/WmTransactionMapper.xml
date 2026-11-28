@@ -40,6 +40,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="afterQuantity" column="after_quantity" />
         <result property="importBatchNo" column="import_batch_no" />
         <result property="operationSource" column="operation_source" />
+        <result property="instanceId" column="instance_id" />
+        <result property="instanceCode" column="instance_code" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -48,7 +50,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmTransactionVo">
-        select transaction_id, factory_id, transaction_type, source_doc_type, source_doc_id, source_doc_code, source_line_id, material_stock_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, unit2, unit2_name, quantity2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, workorder_id, workorder_code, vendor_id, client_id, related_transaction_id, transaction_time, before_quantity, after_quantity, import_batch_no, operation_source, remark, create_by, create_time, update_by, update_time from qxx_wm_transaction
+        select transaction_id, factory_id, transaction_type, source_doc_type, source_doc_id, source_doc_code, source_line_id, material_stock_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, quantity, unit2, unit2_name, quantity2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, workorder_id, workorder_code, vendor_id, client_id, related_transaction_id, transaction_time, before_quantity, after_quantity, import_batch_no, operation_source, instance_id, instance_code, remark, create_by, create_time, update_by, update_time from qxx_wm_transaction
     </sql>
 
     <select id="selectWmTransactionList" parameterType="WmTransaction" resultMap="WmTransactionResult">
@@ -129,6 +131,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="afterQuantity != null">after_quantity,</if>
             <if test="importBatchNo != null">import_batch_no,</if>
             <if test="operationSource != null">operation_source,</if>
+            <if test="instanceId != null">instance_id,</if>
+            <if test="instanceCode != null">instance_code,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -168,6 +172,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="afterQuantity != null">#{afterQuantity},</if>
             <if test="importBatchNo != null">#{importBatchNo},</if>
             <if test="operationSource != null">#{operationSource},</if>
+            <if test="instanceId != null">#{instanceId},</if>
+            <if test="instanceCode != null">#{instanceCode},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>

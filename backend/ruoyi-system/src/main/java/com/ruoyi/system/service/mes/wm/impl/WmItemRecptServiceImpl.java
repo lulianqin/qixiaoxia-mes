@@ -21,20 +21,29 @@ import com.ruoyi.system.domain.mes.pur.PurOrderLine;
 import com.ruoyi.system.domain.mes.wm.ItemRecptReceiveBody;
 import com.ruoyi.system.domain.mes.wm.WmBatch;
 import com.ruoyi.system.domain.mes.wm.WmItemRecpt;
+import com.ruoyi.system.domain.mes.wm.WmItemRecptDetail;
 import com.ruoyi.system.domain.mes.wm.WmItemRecptLine;
+import com.ruoyi.system.domain.mes.wm.WmStockInstance;
 import com.ruoyi.system.domain.mes.wm.WmWarehouse;
+import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdItemBatchConfig;
 import com.ruoyi.system.domain.mes.wm.tx.ItemRecptTxBean;
 import com.ruoyi.system.mapper.mes.wm.WmItemRecptMapper;
+import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.pur.PurOrderLineMapper;
 import com.ruoyi.system.service.mes.pur.IPurOrderLineService;
 import com.ruoyi.system.service.mes.pur.IPurOrderService;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
+import com.ruoyi.system.service.mes.md.IMdItemBatchConfigService;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmBatchService;
+import com.ruoyi.system.service.mes.wm.IWmItemRecptDetailService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptLineService;
 import com.ruoyi.system.service.mes.wm.IWmItemRecptService;
+import com.ruoyi.system.service.mes.wm.IWmStockInstanceService;
 import com.ruoyi.system.service.mes.wm.IWmStorageCoreService;
+import com.ruoyi.system.service.mes.wm.IWmTransactionService;
 import com.ruoyi.system.service.mes.wm.IWmWarehouseService;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
@@ -72,6 +81,21 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
     @Autowired
     private WmTransactionMapper wmTransactionMapper;
+
+    @Autowired
+    private IWmItemRecptDetailService wmItemRecptDetailService;
+
+    @Autowired
+    private IWmStockInstanceService wmStockInstanceService;
+
+    @Autowired
+    private IWmTransactionService wmTransactionService;
+
+    @Autowired
+    private MdItemMapper mdItemMapper;
+
+    @Autowired
+    private IMdItemBatchConfigService mdItemBatchConfigService;
 
     @Autowired
     private IWmWarehouseService wmWarehouseService;
@@ -274,6 +298,9 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
 
         // 1. 更新库存（内部使用 Redisson 锁 + TransactionTemplate）
         storageCoreService.processItemRecpt(txBeans);
+
+        // 1.0 逐实物实例建档（一卷/一根/一桶），并刷新库存桶辅助数量
+        createInstancesForReceipt(header, lines);
 
         // 1.1 到货回补：按需求日期 FIFO 自动把新库存分配给缺料工单
         for (WmItemRecptLine line : lines) {
@@ -482,6 +509,7 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
             line.setCreateTime(DateUtils.getNowDate());
             line.setCreateBy(SecurityUtils.getUsername());
             wmItemRecptLineService.insertWmItemRecptLine(line);
+            saveInstanceDetails(header, line);
             if (line.getQuantityRecpt() != null) {
                 totalQty = totalQty.add(line.getQuantityRecpt());
             }
@@ -490,6 +518,103 @@ public class WmItemRecptServiceImpl implements IWmItemRecptService
         header.setTotalQuantity(totalQty);
         header.setUpdateTime(DateUtils.getNowDate());
         wmItemRecptMapper.updateWmItemRecpt(header);
+    }
+
+    /** 保存行下的逐实例收货明细（头/行/实例三层） */
+    private void saveInstanceDetails(WmItemRecpt header, WmItemRecptLine line) {
+        if (line.getDetails() == null || line.getDetails().isEmpty()) return;
+        for (WmItemRecptDetail d : line.getDetails()) {
+            d.setRecptId(header.getRecptId());
+            d.setLineId(line.getLineId());
+            if (d.getItemId() == null) d.setItemId(line.getItemId());
+            if (d.getItemCode() == null) d.setItemCode(line.getItemCode());
+            if (d.getItemName() == null) d.setItemName(line.getItemName());
+            if (d.getSpecification() == null) d.setSpecification(line.getSpecification());
+            if (d.getUnitOfMeasure() == null) d.setUnitOfMeasure(line.getUnitOfMeasure());
+            if (d.getUnitName() == null) d.setUnitName(line.getUnitName());
+            if (d.getUnit2() == null) d.setUnit2(line.getUnit2());
+            if (d.getUnit2Name() == null) d.setUnit2Name(line.getUnit2Name());
+            if (d.getBatchId() == null) d.setBatchId(line.getBatchId());
+            if (d.getBatchCode() == null) d.setBatchCode(line.getBatchCode());
+            if (d.getWarehouseId() == null) d.setWarehouseId(line.getWarehouseId());
+            if (d.getWarehouseCode() == null) d.setWarehouseCode(line.getWarehouseCode());
+            if (d.getWarehouseName() == null) d.setWarehouseName(line.getWarehouseName());
+            if (d.getQuantity() == null) d.setQuantity(d.getInstanceQuantity());
+            d.setCreateTime(DateUtils.getNowDate());
+            d.setCreateBy(SecurityUtils.getUsername());
+            wmItemRecptDetailService.insertWmItemRecptDetail(d);
+        }
+    }
+
+    /** 确认收货后，按明细逐件建立库存实物实例，并刷新库存桶辅助数量 */
+    private void createInstancesForReceipt(WmItemRecpt header, List<WmItemRecptLine> lines) {
+        for (WmItemRecptLine line : lines) {
+            if (line.getItemId() == null) continue;
+            MdItemBatchConfig config = mdItemBatchConfigService.selectMdItemBatchConfigByItemId(line.getItemId());
+            if (config == null || !"1".equals(config.getInstanceFlag())) continue;
+
+            WmItemRecptDetail query = new WmItemRecptDetail();
+            query.setRecptId(header.getRecptId());
+            query.setLineId(line.getLineId());
+            List<WmItemRecptDetail> details = wmItemRecptDetailService.selectWmItemRecptDetailList(query);
+            if (details == null || details.isEmpty()) continue;
+
+            WmTransaction txQuery = new WmTransaction();
+            txQuery.setSourceDocType("wm_item_recpt");
+            txQuery.setSourceDocId(header.getRecptId());
+            txQuery.setSourceLineId(line.getLineId());
+            txQuery.setTransactionType("ITEM_RECPT");
+            WmTransaction tx = wmTransactionMapper.selectExistingTransaction(txQuery);
+            if (tx == null || tx.getMaterialStockId() == null) continue;
+
+            int seq = 1;
+            // 实例类型以物料辅助单位为准：单据行未带 unit2 时（移动端到货登记常见）回查主数据兜底
+            String instanceType = line.getUnit2();
+            if ((instanceType == null || instanceType.isEmpty()) && line.getItemId() != null) {
+                MdItem instItem = mdItemMapper.selectMdItemById(line.getItemId());
+                if (instItem != null) instanceType = instItem.getUnit2();
+            }
+            for (WmItemRecptDetail d : details) {
+                BigDecimal qty = d.getInstanceQuantity() != null ? d.getInstanceQuantity() : d.getQuantity();
+                if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) continue;
+                WmStockInstance inst = new WmStockInstance();
+                String code = d.getInstanceCode() == null || d.getInstanceCode().trim().isEmpty()
+                        ? header.getRecptCode() + "-" + line.getLineId() + "-" + seq
+                        : d.getInstanceCode().trim();
+                inst.setInstanceCode(code);
+                inst.setInstanceType(instanceType);
+                inst.setItemId(line.getItemId());
+                inst.setItemCode(line.getItemCode());
+                inst.setItemName(line.getItemName());
+                inst.setSpecification(line.getSpecification());
+                inst.setBatchId(d.getBatchId() != null ? d.getBatchId() : line.getBatchId());
+                inst.setBatchCode(d.getBatchCode() != null ? d.getBatchCode() : line.getBatchCode());
+                inst.setRecptId(header.getRecptId());
+                inst.setRecptDetailId(d.getDetailId());
+                inst.setVendorId(header.getVendorId());
+                inst.setVendorCode(header.getVendorCode());
+                inst.setVendorName(header.getVendorName());
+                inst.setVendorInstanceNo(d.getInstanceCode());
+                inst.setOriginalQuantity(qty);
+                inst.setRemainingQuantity(qty);
+                inst.setQuantityUom(line.getUnitOfMeasure());
+                inst.setWarehouseId(d.getWarehouseId() != null ? d.getWarehouseId() : line.getWarehouseId());
+                inst.setWarehouseCode(d.getWarehouseCode());
+                inst.setWarehouseName(d.getWarehouseName());
+                inst.setLocationId(d.getLocationId());
+                inst.setAreaId(d.getAreaId());
+                inst.setMaterialStockId(tx.getMaterialStockId());
+                inst.setStatus("IN_STOCK");
+                inst.setExtAttrs(d.getExtAttrs());
+                inst.setCreateBy(SecurityUtils.getUsername());
+                wmStockInstanceService.insertWmStockInstance(inst);
+                d.setInstanceId(inst.getInstanceId());
+                d.setMaterialStockId(tx.getMaterialStockId());
+                wmItemRecptDetailService.updateWmItemRecptDetail(d);
+                seq++;
+            }
+            wmTransactionService.refreshInstanceAuxQuantity(tx.getMaterialStockId());
+        }
     }
 
     /** 构造批次匹配参数（供 getOrGenerateBatchCode） */

@@ -10,10 +10,13 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.md.MdItem;
+import com.ruoyi.system.domain.mes.md.MdItemBatchConfig;
 import com.ruoyi.system.mapper.mes.md.MdItemMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.service.mes.common.MesQuantityService;
+import com.ruoyi.system.service.mes.md.IMdItemBatchConfigService;
+import com.ruoyi.system.service.mes.wm.IWmStockInstanceService;
 import com.ruoyi.system.service.mes.wm.IWmTransactionService;
 import com.ruoyi.common.core.redis.RedisLockTemplate;
 import jakarta.annotation.PostConstruct;
@@ -45,6 +48,12 @@ public class WmTransactionServiceImpl implements IWmTransactionService
     private MesQuantityService mesQuantityService;
 
     @Autowired
+    private IMdItemBatchConfigService mdItemBatchConfigService;
+
+    @Autowired
+    private IWmStockInstanceService wmStockInstanceService;
+
+    @Autowired
     private RedisLockTemplate lockTemplate;
 
     @Autowired
@@ -71,18 +80,19 @@ public class WmTransactionServiceImpl implements IWmTransactionService
         validate(transaction);
         MdItem item = transaction.getItemId() != null
                 ? mdItemMapper.selectMdItemById(transaction.getItemId()) : null;
-        // 所有库存变动统一折算到物料主单位（基准单位），并按换算率维护辅助单位数量
-        normalizeUnit(transaction, item);
+        boolean instanceTracked = isInstanceTracked(item);
+        // 所有库存变动统一折算到物料主单位；实例管理物料的辅助数量由实例数决定，不走换算率
+        normalizeUnit(transaction, item, instanceTracked);
         WmMaterialStock stock = initStock(transaction, item);
         return lockTemplate.execute(buildLockKey(stock),
-                () -> txTemplate.execute(status -> doProcessTransaction(transaction, stock, item)));
+                () -> txTemplate.execute(status -> doProcessTransaction(transaction, stock, item, instanceTracked)));
     }
 
     /** 业务单位 → 物料主单位；同时写入辅助单位数量与单位快照 */
-    private void normalizeUnit(WmTransaction tx, MdItem item) {
+    private void normalizeUnit(WmTransaction tx, MdItem item, boolean instanceTracked) {
         if (item == null) return;
         BigDecimal baseQty = mesQuantityService.toBaseQty(tx.getQuantity(), tx.getUnitOfMeasure(), item);
-        if (mesQuantityService.hasAuxUnit(item)) {
+        if (!instanceTracked && mesQuantityService.hasAuxUnit(item)) {
             BigDecimal auxQty = mesQuantityService.toAuxQty(baseQty, item.getUnitOfMeasure(), item);
             tx.setUnit2(item.getUnit2());
             tx.setUnit2Name(item.getUnit2Name());
@@ -91,9 +101,15 @@ public class WmTransactionServiceImpl implements IWmTransactionService
         tx.setQuantity(baseQty);
         tx.setUnitOfMeasure(item.getUnitOfMeasure());
         tx.setUnitName(item.getUnitName());
+        if (instanceTracked) {
+            tx.setUnit2(item.getUnit2());
+            tx.setUnit2Name(item.getUnit2Name());
+            tx.setQuantity2(null);
+        }
     }
 
-    private WmTransaction doProcessTransaction(WmTransaction transaction, WmMaterialStock stock, MdItem item) {
+    private WmTransaction doProcessTransaction(WmTransaction transaction, WmMaterialStock stock,
+                                               MdItem item, boolean instanceTracked) {
         // 幂等检查：同一来源单据行已处理过 → 直接返回已有记录
         WmTransaction existingTx = wmTransactionMapper.selectExistingTransaction(transaction);
         if (existingTx != null) {
@@ -120,8 +136,10 @@ public class WmTransactionServiceImpl implements IWmTransactionService
             } else {
                 stock.setQuantityAvailable(availBase.min(result));
             }
-            applyAuxQuantity(existing, stock, item, delta, onhandBase, availBase, result, transaction.getQuantity2());
+            // 先带出库存行ID：实例数口径要按 materialStockId 统计，放在 applyInstanceAux 之后会查不到而把辅数量清零
             stock.setMaterialStockId(existing.getMaterialStockId());
+            applyAuxQuantity(existing, stock, item, delta, onhandBase, availBase, result, transaction.getQuantity2());
+            applyInstanceAux(stock, instanceTracked);
             stock.setUpdateTime(new Date());
             wmMaterialStockMapper.updateWmMaterialStock(stock);
         } else {
@@ -133,6 +151,7 @@ public class WmTransactionServiceImpl implements IWmTransactionService
             BigDecimal auxQty = transaction.getQuantity2() != null ? transaction.getQuantity2() : BigDecimal.ZERO;
             stock.setQuantityOnhand2(auxQty);
             stock.setQuantityAvailable2(auxQty);
+            applyInstanceAux(stock, instanceTracked);
             stock.setCreateTime(new Date());
             stock.setUpdateTime(new Date());
             wmMaterialStockMapper.insertWmMaterialStock(stock);
@@ -143,6 +162,34 @@ public class WmTransactionServiceImpl implements IWmTransactionService
         transaction.setCreateBy(SecurityUtils.getUsername());
         wmTransactionMapper.insertWmTransaction(transaction);
         return transaction;
+    }
+
+    /** 开启实例管理的物料：辅助数量 = 在库实例数（一卷/一根/一桶），不再由换算率推算 */
+    private void applyInstanceAux(WmMaterialStock stock, boolean instanceTracked) {
+        if (!instanceTracked) return;
+        Long stockId = stock.getMaterialStockId();
+        int count = stockId == null ? 0 : wmStockInstanceService.countActiveByStockId(stockId);
+        stock.setQuantityOnhand2(BigDecimal.valueOf(count));
+        stock.setQuantityAvailable2(BigDecimal.valueOf(count));
+    }
+
+    private boolean isInstanceTracked(MdItem item) {
+        if (item == null || item.getItemId() == null) return false;
+        MdItemBatchConfig config = mdItemBatchConfigService.selectMdItemBatchConfigByItemId(item.getItemId());
+        return config != null && "1".equals(config.getInstanceFlag());
+    }
+
+    @Override
+    @Transactional
+    public void refreshInstanceAuxQuantity(Long materialStockId) {
+        if (materialStockId == null) return;
+        int count = wmStockInstanceService.countActiveByStockId(materialStockId);
+        WmMaterialStock stock = new WmMaterialStock();
+        stock.setMaterialStockId(materialStockId);
+        stock.setQuantityOnhand2(BigDecimal.valueOf(count));
+        stock.setQuantityAvailable2(BigDecimal.valueOf(count));
+        stock.setUpdateTime(new Date());
+        wmMaterialStockMapper.updateWmMaterialStock(stock);
     }
 
     /**

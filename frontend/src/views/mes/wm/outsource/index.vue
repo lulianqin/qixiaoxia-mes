@@ -132,6 +132,7 @@
         <el-table-column label="物料名称" prop="itemName" min-width="120" show-overflow-tooltip />
         <el-table-column label="数量" prop="quantity" width="90"  :show-overflow-tooltip="true" />
         <el-table-column label="单位" prop="unitName" width="60"  :show-overflow-tooltip="true" />
+        <el-table-column label="母卷编号" prop="instanceCode" width="150"  :show-overflow-tooltip="true" />
         <el-table-column label="批次" prop="batchCode" width="120"  :show-overflow-tooltip="true" />
         <el-table-column label="仓库" prop="warehouseName" width="100"  :show-overflow-tooltip="true" />
       </el-table>

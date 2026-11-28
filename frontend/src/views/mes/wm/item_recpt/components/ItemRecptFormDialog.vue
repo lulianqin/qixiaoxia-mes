@@ -80,6 +80,15 @@
           <span v-else>{{ scope.row.quantityRecpt }}</span>
         </template>
       </el-table-column>
+      <!-- 逐件收货：一卷纸 / 一根钢管 / 一桶油墨，各自实际数量 -->
+      <el-table-column label="实物实例" width="130" align="center">
+        <template #default="scope">
+          <el-button v-if="!readonly" link type="primary" size="small" @click="openInstanceEditor(scope.row)">
+            {{ (scope.row.details || []).length ? `${scope.row.details.length} 件` : '逐件录入' }}
+          </el-button>
+          <span v-else>{{ (scope.row.details || []).length || '-' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="70" align="center" v-if="!readonly">
         <template #default="scope">
           <el-button link type="danger" icon="Delete" @click="handleDelLine(scope.$index)" />
@@ -98,17 +107,49 @@
     <WarehouseSelect ref="warehouseSelectRef" @onSelected="onWarehouseSelected" />
     <PurOrderSelect ref="purOrderSelectRef" @onSelected="onPurOrderSelected" />
     <ItemSelect ref="itemSelectRef" @onSelected="onItemSelected" />
+
+    <!-- 逐件收货录入：一件一行，数量填该件实际重量/长度 -->
+    <el-dialog v-model="instEditorVisible" :title="`逐件录入 · ${instLine?.itemName || ''}`" width="780px" append-to-body>
+      <el-alert type="info" :closable="false" class="mb8"
+        title="按实际到货逐件登记：一卷/一根一行，数量填该件实际重量或长度；行的入库总量按各件合计自动回写。" />
+      <el-table :data="instRows" size="small" border max-height="380">
+        <el-table-column label="实例编号 / 供应商卷号" min-width="200">
+          <template #default="scope">
+            <el-input v-model="scope.row.instanceCode" size="small" placeholder="可留空，保存时自动生成" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="`本件数量(${instLine?.unitName || instLine?.unitOfMeasure || ''})`" width="180" align="center">
+          <template #default="scope">
+            <el-input-number v-model="scope.row.instanceQuantity" :min="0" :precision="4" size="small" controls-position="right" style="width:160px" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="70" align="center">
+          <template #default="scope">
+            <el-button link type="danger" icon="Delete" @click="instRows.splice(scope.$index, 1)" />
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="inst-bar">
+        <el-button plain icon="Plus" size="small" @click="addInstanceRow">添加一件</el-button>
+        <span class="inst-total">合计：<b>{{ instTotal }}</b> {{ instLine?.unitName || '' }}</span>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="saveInstances">确 定</el-button>
+        <el-button @click="instEditorVisible = false">取 消</el-button>
+      </template>
+    </el-dialog>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from 'vue'
+import { ref, reactive, computed, getCurrentInstance } from 'vue'
 import type { WmItemRecpt } from '@/types/api/mes/wm/item_recpt'
 import type { WmItemRecptLine } from '@/types/api/mes/wm/item_recpt_line'
 import type { PurOrder } from '@/types/api/mes/pur/order'
 import { addWmItemRecpt, updateWmItemRecpt, getWmItemRecpt } from '@/api/mes/wm/item_recpt'
 import { listWmItemRecptLine } from '@/api/mes/wm/item_recpt_line'
 import { buildFromPurOrder } from '@/api/mes/wm/item_recpt'
+import { getBatchConfigByItemId } from '@/api/mes/md/batchconfig'
 import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import VendorSelect from '@/components/vendorSelect/single.vue'
 import WarehouseSelect from '@/components/warehouseSelect/single.vue'
@@ -248,6 +289,50 @@ function onItemSelected(row: any) {
 }
 function handleDelLine(idx: number) { lineList.value.splice(idx, 1) }
 
+// ==================== 逐件收货（一卷/一根/一桶） ====================
+const instEditorVisible = ref(false)
+const instLine = ref<any>(null)
+const instRows = ref<any[]>([])
+const instTotal = computed(() => Number(instRows.value.reduce((s: number, r: any) => s + (Number(r.instanceQuantity) || 0), 0).toFixed(4)))
+
+/** 打开逐件录入：先确认物料已开启「逐实物管理」，否则后端不会建实例 */
+function openInstanceEditor(row: any) {
+  if (!row?.itemId) { proxy.$modal.msgWarning('请先选择物料'); return }
+  getBatchConfigByItemId(row.itemId).then((r: any) => {
+    const cfg = r.data
+    if (!cfg || cfg.instanceFlag !== '1') {
+      proxy.$modal.msgWarning('该物料未开启「逐实物管理」，请先到 物料管理-批次配置 开启后再逐件录入')
+      return
+    }
+    instLine.value = row
+    instRows.value = (row.details && row.details.length)
+      ? row.details.map((d: any) => ({ ...d }))
+      : [{ instanceCode: '', instanceQuantity: row.quantityRecpt || null, batchId: row.batchId, batchCode: row.batchCode, warehouseId: row.warehouseId }]
+    instEditorVisible.value = true
+  }).catch(() => {
+    proxy.$modal.msgError('读取物料批次配置失败，无法判断是否逐件管理')
+  })
+}
+
+function addInstanceRow() {
+  instRows.value.push({
+    instanceCode: '',
+    instanceQuantity: null,
+    batchId: instLine.value?.batchId,
+    batchCode: instLine.value?.batchCode,
+    warehouseId: instLine.value?.warehouseId
+  })
+}
+
+/** 保存逐件明细：行入库量 = 各件合计 */
+function saveInstances() {
+  const rows = instRows.value.filter((r: any) => Number(r.instanceQuantity) > 0)
+  if (!rows.length) { proxy.$modal.msgWarning('请至少录入一件有效数量'); return }
+  instLine.value.details = rows
+  instLine.value.quantityRecpt = Number(rows.reduce((s: number, r: any) => s + (Number(r.instanceQuantity) || 0), 0).toFixed(4))
+  instEditorVisible.value = false
+}
+
 function submitForm() {
   if (submitting.value) return
   formRef.value?.validate((v: boolean) => {
@@ -255,6 +340,16 @@ function submitForm() {
     if (lineList.value.length === 0) {
       proxy.$modal.msgWarning('请至少添加一行物料')
       return
+    }
+    // 逐件收货的行：入库量必须等于各件合计，避免明细与行数量对不上
+    for (const l of lineList.value) {
+      if (Array.isArray(l.details) && l.details.length) {
+        const sum = Number(l.details.reduce((s: number, d: any) => s + (Number(d.instanceQuantity) || 0), 0).toFixed(4))
+        if (Math.abs(sum - (Number(l.quantityRecpt) || 0)) > 0.0001) {
+          proxy.$modal.msgError(`物料[${l.itemCode}]逐件合计(${sum})与入库量(${l.quantityRecpt})不一致，请重新录入`)
+          return
+        }
+      }
     }
     submitting.value = true
     form.lines = lineList.value
@@ -275,4 +370,11 @@ defineExpose({ openAdd, openEdit, openView })
 <style scoped>
 .mb8 { margin-bottom: 8px; }
 .dialog-footer { text-align: right; }
+.inst-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.inst-total { font-size: 13px; color: var(--el-text-color-regular); }
 </style>

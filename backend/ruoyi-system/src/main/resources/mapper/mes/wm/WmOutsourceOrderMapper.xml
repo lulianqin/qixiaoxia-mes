@@ -207,6 +207,7 @@
     <update id="updateOutsourceOrder" parameterType="com.ruoyi.system.domain.mes.wm.WmOutsourceOrder">
         update qxx_wm_outsource_order
         <trim prefix="SET" suffixOverrides=",">
+            <if test="sourceRefId != null">source_ref_id = #{sourceRefId},</if>
             <if test="docTitle != null">doc_title = #{docTitle},</if>
             <if test="orderDate != null">order_date = #{orderDate},</if>
             <if test="expectedDate != null">expected_date = #{expectedDate},</if>

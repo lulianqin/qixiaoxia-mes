@@ -2,6 +2,7 @@ package com.ruoyi.system.domain.mes.wm;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.Map;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -83,6 +84,18 @@ public class WmItemRecptDetail extends BaseEntity
     @Excel(name = "库存记录ID")
     private Long materialStockId;
 
+    /** 实物实例ID（确认收货后创建实例回填） */
+    private Long instanceId;
+
+    /** 实物实例编号（一卷/一根/一桶） */
+    private String instanceCode;
+
+    /** 本实例入库数量（主单位） */
+    private BigDecimal instanceQuantity;
+
+    /** 实例级动态属性（不落本表，确认收货时写入库存实物实例） */
+    private Map<String, Object> extAttrs;
+
     public Long getDetailId() { return detailId; }
     public void setDetailId(Long v) { this.detailId = v; }
 
@@ -148,6 +161,18 @@ public class WmItemRecptDetail extends BaseEntity
 
     public Long getMaterialStockId() { return materialStockId; }
     public void setMaterialStockId(Long v) { this.materialStockId = v; }
+
+    public Long getInstanceId() { return instanceId; }
+    public void setInstanceId(Long v) { this.instanceId = v; }
+
+    public String getInstanceCode() { return instanceCode; }
+    public void setInstanceCode(String v) { this.instanceCode = v; }
+
+    public BigDecimal getInstanceQuantity() { return instanceQuantity; }
+    public void setInstanceQuantity(BigDecimal v) { this.instanceQuantity = v; }
+
+    public Map<String, Object> getExtAttrs() { return extAttrs; }
+    public void setExtAttrs(Map<String, Object> extAttrs) { this.extAttrs = extAttrs; }
 
     @Override
     public String toString() {

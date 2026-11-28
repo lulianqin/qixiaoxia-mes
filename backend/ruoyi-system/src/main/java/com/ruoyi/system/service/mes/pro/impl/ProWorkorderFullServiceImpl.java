@@ -565,6 +565,8 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         rp.setProcessId(p.getProcessId());
         rp.setProcessCode(p.getProcessCode());
         rp.setProcessName(p.getProcessName());
+        // 工序业务类型透传（分切工序 → 单据配置生成分切单）
+        rp.setBizType(p.getBizType());
         rp.setOrderNum(p.getOrderNum());
         rp.setIsOutsource(p.getIsOutsource());
         rp.setDocType(p.getDocType());
@@ -844,7 +846,13 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
                 ? wo.getClientOrderCode() : doc.getSourceOrderCode());
         req.setDeliveryAddress(doc.getDeliveryAddress());
         req.setRemark(doc.getRemark());
+        // 分切单：显式来源类型 + 母卷发料明细（草稿阶段可空，发料环节补录）
+        req.setSourceType(StringUtils.isEmpty(doc.getSourceType()) ? "GENERIC" : doc.getSourceType());
         req.setProcessLines(buildProcLines(doc.getLines()));
+        if (doc.getIssueLines() != null && !doc.getIssueLines().isEmpty())
+        {
+            req.setIssueLines(doc.getIssueLines());
+        }
         return outsourceService.createOutsource(req);
     }
 
@@ -879,6 +887,11 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         patch.setUpdateTime(new Date());
         outsourceOrderMapper.updateDraftHeaderForWorkorder(patch);
         outsourceService.saveProcessLines(orderId, lines);
+        // 分切单发料明细：仅在本次提交带明细时整体替换，未带则保留原明细（发料环节补录）
+        if (doc.getIssueLines() != null && !doc.getIssueLines().isEmpty())
+        {
+            outsourceService.updateIssueLines(orderId, doc.getIssueLines());
+        }
     }
 
     private void removeUnsubmittedDraftProcess(Long workorderId, Set<Long> submitted)
@@ -950,6 +963,8 @@ public class ProWorkorderFullServiceImpl implements IProWorkorderFullService
         for (WmOutsourceOrder o : orders)
         {
             o.setProcessLines(processLineMapper.selectByOrderId(o.getOrderId()));
+            // 分切单需要展示母卷发料明细；其他单据也一并带出，前端按来源类型决定是否展示
+            o.setIssueLines(outsourceLineMapper.selectIssueLinesByOrderId(o.getOrderId()));
         }
         return orders;
     }

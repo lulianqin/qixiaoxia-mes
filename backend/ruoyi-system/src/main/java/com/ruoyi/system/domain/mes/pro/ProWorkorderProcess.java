@@ -25,8 +25,10 @@ public class ProWorkorderProcess extends BaseEntity
     private String processName;
     private Integer orderNum;
     private String isOutsource;
-    /** 开单类型：PROCESS-加工 / PURCHASE-采购 */
+    /** 开单类型：PROCESS-加工 / PURCHASE-采购 / SLITTING-分切 */
     private String docType;
+    /** 工序业务类型（读库时由 qxx_pro_process.biz_type 带出）：NORMAL-普通 / SLITTING-分切 */
+    private String bizType;
     private Long vendorId;
     private String vendorCode;
     private String vendorName;
@@ -52,6 +54,8 @@ public class ProWorkorderProcess extends BaseEntity
     public void setOrderNum(Integer v) { this.orderNum = v; }
     public String getIsOutsource() { return isOutsource; }
     public void setIsOutsource(String v) { this.isOutsource = v; }
+    public String getBizType() { return bizType; }
+    public void setBizType(String v) { this.bizType = v; }
     public String getDocType() { return docType; }
     public void setDocType(String v) { this.docType = v; }
     public Long getVendorId() { return vendorId; }

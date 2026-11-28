@@ -68,6 +68,7 @@ export * from "./mes/wm/rt_vendor_detail";
 export * from "./mes/wm/rt_vendor_line";
 export * from "./mes/wm/stock_taking";
 export * from "./mes/wm/stock_taking_plan";
+export * from "./mes/wm/stock_instance";
 export * from "./mes/wm/storage_area";
 export * from "./mes/wm/storage_location";
 export * from "./mes/wm/transaction";

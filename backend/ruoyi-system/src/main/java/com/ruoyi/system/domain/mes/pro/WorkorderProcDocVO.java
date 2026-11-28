@@ -1,6 +1,7 @@
 package com.ruoyi.system.domain.mes.pro;
 
 import java.util.List;
+import com.ruoyi.system.domain.mes.wm.WmOutsourceIssueLine;
 
 /**
  * 生产工单开单页 — 一张加工单提交体
@@ -15,6 +16,8 @@ public class WorkorderProcDocVO
     private String docTitle;
     /** INSIDE-厂内 / OUTSIDE-外协 */
     private String supplierType;
+    /** 来源类型：GENERIC-通用外协 / SLITTING-分切单（分切单走分切外协策略，需录母卷发料） */
+    private String sourceType;
     private Long vendorId;
     private String vendorCode;
     private String vendorName;
@@ -25,9 +28,15 @@ public class WorkorderProcDocVO
     private String deliveryAddress;
     private String remark;
     private List<WorkorderProcLineVO> lines;
+    /** 发料明细（仅分切单使用：母卷物料，草稿阶段可为空，发料环节补录） */
+    private List<WmOutsourceIssueLine> issueLines;
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long v) { this.orderId = v; }
+    public String getSourceType() { return sourceType; }
+    public void setSourceType(String v) { this.sourceType = v; }
+    public List<WmOutsourceIssueLine> getIssueLines() { return issueLines; }
+    public void setIssueLines(List<WmOutsourceIssueLine> v) { this.issueLines = v; }
     public String getDocTitle() { return docTitle; }
     public void setDocTitle(String v) { this.docTitle = v; }
     public String getSupplierType() { return supplierType; }

@@ -16,6 +16,7 @@ export const MOBILE_MENU_GROUPS = [
     items: [
       { key: 'issue-list', text: '领料单', icon: 'paperplane-filled', color: '#409eff', perm: 'mes:wm:issue:list', path: '/pages/mes/wm/issue/list' },
       { key: 'issue-scan', text: '扫码发料', icon: 'scan', color: '#67c23a', perm: 'mes:wm:issue:list', path: '/pages/mes/wm/issue/list', query: 'from=scan' },
+      { key: 'stock-list', text: '库存现有量', icon: 'shop', color: '#409eff', perm: ['mes:wm:material_stock:list', 'mes:wm:material_stock:query'], path: '/pages/mes/wm/stock/list' },
       { key: 'stock-query', text: '扫码查库存', icon: 'search', color: '#e6a23c', perm: 'mes:wm:material_stock:query', path: '/pages/mes/wm/issue/scan-query' },
       { key: 'product-recpt', text: '产品入库', icon: 'checkbox-filled', color: '#67c23a', perm: 'mes:wm:product_recpt:list', path: '/pages/mes/wm/productrecpt/list' },
       { key: 'product-recpt-history', text: '入库记录', icon: 'list', color: '#409eff', perm: 'mes:wm:product_recpt:list', path: '/pages/mes/wm/productrecpt/list' },

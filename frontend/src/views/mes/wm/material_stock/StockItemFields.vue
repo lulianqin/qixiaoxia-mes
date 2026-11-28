@@ -71,13 +71,13 @@
         </el-form-item>
       </el-col>
       <el-col :span="8">
-        <el-form-item label="装箱规格">
-          <el-input v-model="form.packageSpec" placeholder="可空" :disabled="isEdit" />
+        <el-form-item label="产品尺寸">
+          <el-input v-model="form.productSize" placeholder="可空" :disabled="isEdit" />
         </el-form-item>
       </el-col>
       <el-col :span="8">
-        <el-form-item label="产品尺寸">
-          <el-input v-model="form.productSize" placeholder="可空" :disabled="isEdit" />
+        <el-form-item label="装箱规格">
+          <el-input v-model="form.packageSpec" placeholder="可空" :disabled="isEdit" />
         </el-form-item>
       </el-col>
     </el-row>

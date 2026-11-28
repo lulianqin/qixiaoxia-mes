@@ -107,6 +107,12 @@ public class WmTransaction extends BaseEntity
     @Excel(name = "关联事务ID")
     private Long relatedTransactionId;
 
+    /** 实物实例ID（一卷/一根/一桶） */
+    private Long instanceId;
+
+    /** 实物实例编号 */
+    private String instanceCode;
+
     @Excel(name = "事务时间")
     private Date transactionTime;
 
@@ -211,6 +217,12 @@ public class WmTransaction extends BaseEntity
 
     public Long getRelatedTransactionId() { return relatedTransactionId; }
     public void setRelatedTransactionId(Long v) { this.relatedTransactionId = v; }
+
+    public Long getInstanceId() { return instanceId; }
+    public void setInstanceId(Long v) { this.instanceId = v; }
+
+    public String getInstanceCode() { return instanceCode; }
+    public void setInstanceCode(String v) { this.instanceCode = v; }
 
     public Date getTransactionTime() { return transactionTime; }
     public void setTransactionTime(Date v) { this.transactionTime = v; }

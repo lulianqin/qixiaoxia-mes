@@ -26,6 +26,10 @@ public class WmOutsourceIssueLine extends BaseEntity
     private Long warehouseId;
     private String warehouseCode;
     private String warehouseName;
+    /** 发料母卷/母件实物实例ID（分切单逐卷发料，实例扣减后剩余量可追溯） */
+    private Long instanceId;
+    /** 实物实例编号快照 */
+    private String instanceCode;
     /** 来源对象类型：ROLL-纸卷, STOCK-库存记录 */
     private String sourceRefType;
     /** 来源对象ID（如 roll_id） */
@@ -67,6 +71,10 @@ public class WmOutsourceIssueLine extends BaseEntity
     public void setWarehouseCode(String v) { this.warehouseCode = v; }
     public String getWarehouseName() { return warehouseName; }
     public void setWarehouseName(String v) { this.warehouseName = v; }
+    public Long getInstanceId() { return instanceId; }
+    public void setInstanceId(Long v) { this.instanceId = v; }
+    public String getInstanceCode() { return instanceCode; }
+    public void setInstanceCode(String v) { this.instanceCode = v; }
     public String getSourceRefType() { return sourceRefType; }
     public void setSourceRefType(String v) { this.sourceRefType = v; }
     public Long getSourceRefId() { return sourceRefId; }

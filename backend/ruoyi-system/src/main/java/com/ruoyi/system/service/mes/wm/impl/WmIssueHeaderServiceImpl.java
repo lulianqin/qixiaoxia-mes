@@ -43,6 +43,9 @@ import com.ruoyi.system.mapper.mes.pro.ProCardMapper;
 import com.ruoyi.system.mapper.mes.pro.ProWorkorderMapper;
 import com.ruoyi.system.service.mes.sys.generator.AutoCodeGenerator;
 import com.ruoyi.system.service.mes.wm.IWmIssueHeaderService;
+import com.ruoyi.system.service.mes.wm.IWmStockInstanceService;
+import com.ruoyi.system.service.mes.wm.IWmTransactionService;
+import com.ruoyi.system.domain.mes.wm.WmStockInstance;
 
 /**
  * WmIssueHeaderService业务层处理
@@ -70,6 +73,12 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     @Autowired
     private WmTransactionMapper wmTransactionMapper;
+
+    @Autowired
+    private IWmStockInstanceService wmStockInstanceService;
+
+    @Autowired
+    private IWmTransactionService wmTransactionService;
 
     @Autowired
     private MesQuantityService mesQuantityService;
@@ -1227,6 +1236,23 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
 
     /** 发料单批次出库：扣单条库存 onhand + 写 detail + 写 ISSUE_OUT 事务 + trace */
     private void issueOutSingleBatch(WmIssueHeader header, WmIssueDetail d, BigDecimal qty, WmMaterialStock stock) {
+        WmStockInstance issueInstance = null;
+        if (d.getInstanceId() != null) {
+            WmStockInstance check = wmStockInstanceService.selectWmStockInstanceById(d.getInstanceId());
+            if (check == null) {
+                throw new ServiceException("实物实例不存在：" + d.getInstanceId());
+            }
+            if (d.getItemId() != null && !d.getItemId().equals(check.getItemId())) {
+                throw new ServiceException("实物实例[" + check.getInstanceCode() + "]与发料物料不符");
+            }
+            if (check.getMaterialStockId() != null && !check.getMaterialStockId().equals(stock.getMaterialStockId())) {
+                throw new ServiceException("实物实例[" + check.getInstanceCode() + "]不属于所选库存批次");
+            }
+            issueInstance = wmStockInstanceService.adjustRemaining(d.getInstanceId(), qty.negate(),
+                    header.getIssueId(), header.getWorkorderId(), header.getWorkorderCode());
+            d.setInstanceCode(issueInstance.getInstanceCode());
+            d.setInstanceQuantity(qty);
+        }
         mesQuantityService.normalizeStockRow(stock);
         BigDecimal newOnhand = (stock.getQuantityOnhand() != null ? stock.getQuantityOnhand() : BigDecimal.ZERO).subtract(qty);
         if (newOnhand.compareTo(BigDecimal.ZERO) < 0) {
@@ -1242,6 +1268,9 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         }
         stock.setUpdateTime(new Date());
         wmMaterialStockMapper.updateWmMaterialStock(stock);
+        if (issueInstance != null) {
+            wmTransactionService.refreshInstanceAuxQuantity(stock.getMaterialStockId());
+        }
 
         // 回写 detail 的实际批次/仓库/库存记录
         d.setIssueId(header.getIssueId());
@@ -1289,6 +1318,8 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         tx.setSourceDocCode(header.getIssueCode());
         tx.setSourceLineId(d.getLineId());
         tx.setMaterialStockId(stock.getMaterialStockId());
+        tx.setInstanceId(d.getInstanceId());
+        tx.setInstanceCode(d.getInstanceCode());
         tx.setItemId(d.getItemId());
         tx.setItemCode(d.getItemCode());
         tx.setItemName(d.getItemName());
@@ -1308,8 +1339,13 @@ public class WmIssueHeaderServiceImpl implements IWmIssueHeaderService
         ProMaterialTrace trace = new ProMaterialTrace();
         Long cardId = resolveCardId(header);
         trace.setTraceType("ISSUE");
-        trace.setParentType("MATERIAL_STOCK");
-        trace.setParentId(stock.getMaterialStockId());
+        if (d.getInstanceId() != null) {
+            trace.setParentType("STOCK_INSTANCE");
+            trace.setParentId(d.getInstanceId());
+        } else {
+            trace.setParentType("MATERIAL_STOCK");
+            trace.setParentId(stock.getMaterialStockId());
+        }
         // 无流转卡的工单（工单级生产），投料去向记为工单本身，避免无效的 CARD:0 断链
         if (cardId != null) {
             trace.setChildType("CARD");

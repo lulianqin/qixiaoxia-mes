@@ -22,6 +22,7 @@
         <result property="qualityStatusFlag" column="quality_status_flag"/>
         <result property="paperRollFlag" column="paper_roll_flag"/>
         <result property="paperWidthFlag" column="paper_width_flag"/>
+        <result property="instanceFlag" column="instance_flag"/>
         <result property="enableFlag" column="enable_flag"/>
         <result property="remark" column="remark"/>
         <result property="createBy" column="create_by"/>
@@ -33,7 +34,7 @@
     <sql id="cols">config_id,factory_id,item_id,produce_date_flag,expire_date_flag,recpt_date_flag,
         vendor_flag,client_flag,co_code_flag,po_code_flag,workorder_flag,task_flag,
         workstation_flag,tool_flag,mold_flag,lot_number_flag,quality_status_flag,
-        paper_roll_flag,paper_width_flag,enable_flag,remark,create_by,create_time,update_by,update_time</sql>
+        paper_roll_flag,paper_width_flag,instance_flag,enable_flag,remark,create_by,create_time,update_by,update_time</sql>
 
     <select id="selectMdItemBatchConfigList" parameterType="com.ruoyi.system.domain.mes.md.MdItemBatchConfig" resultMap="Result">
         select <include refid="cols"/> from qxx_md_item_batch_config
@@ -56,6 +57,7 @@
             produce_date_flag,expire_date_flag,recpt_date_flag,vendor_flag,client_flag,
             co_code_flag,po_code_flag,workorder_flag,task_flag,workstation_flag,tool_flag,
             mold_flag,lot_number_flag,quality_status_flag,paper_roll_flag,paper_width_flag,
+            <if test="instanceFlag != null">instance_flag,</if>
             <if test="enableFlag != null">enable_flag,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
@@ -65,6 +67,7 @@
             #{produceDateFlag},#{expireDateFlag},#{recptDateFlag},#{vendorFlag},#{clientFlag},
             #{coCodeFlag},#{poCodeFlag},#{workorderFlag},#{taskFlag},#{workstationFlag},#{toolFlag},
             #{moldFlag},#{lotNumberFlag},#{qualityStatusFlag},#{paperRollFlag},#{paperWidthFlag},
+            <if test="instanceFlag != null">#{instanceFlag},</if>
             <if test="enableFlag != null">#{enableFlag},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -83,6 +86,7 @@
             tool_flag = #{toolFlag}, mold_flag = #{moldFlag},
             lot_number_flag = #{lotNumberFlag}, quality_status_flag = #{qualityStatusFlag},
             paper_roll_flag = #{paperRollFlag}, paper_width_flag = #{paperWidthFlag},
+            <if test="instanceFlag != null">instance_flag = #{instanceFlag},</if>
             <if test="enableFlag != null">enable_flag = #{enableFlag},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

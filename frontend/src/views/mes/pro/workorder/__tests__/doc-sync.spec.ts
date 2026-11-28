@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDocSyncPlan, applyDocSyncPlan, isDraftDoc, isLockedDoc } from '../docSync'
+import { buildDocSyncPlan, applyDocSyncPlan, isDraftDoc, isLockedDoc, docKindOf } from '../docSync'
 
 const ctx = {
   productName: '牛皮纸袋', unitOfMeasure: 'PCS', unitName: '个',
@@ -224,5 +224,49 @@ describe('docSync', () => {
     const res = applyDocSyncPlan(plan, purchase, [])
     expect(res.purchaseDocs).toHaveLength(0)
     expect(res.removedDocs).toBe(1)
+  })
+  it('分切工序（业务类型=分切）生成分切单，不看工序名称', () => {
+    const plan = buildDocSyncPlan({
+      routeProcesses: [routeRow({
+        processId: 902, processName: '任意叫法', bizType: 'SLITTING',
+        docType: 'PROCESS', isOutsource: '1', vendorId: 208, vendorName: '万隆'
+      })],
+      purchaseDocs: [],
+      processDocs: [],
+      loadedProcessIds: [],
+      ctx
+    })
+    expect(plan.additions).toHaveLength(1)
+    expect(plan.additions[0].kind).toBe('SLITTING')
+    expect(plan.additions[0].docIndex).toBe(-1)
+    expect(plan.additions[0].docHeader.sourceType).toBe('SLITTING')
+    expect(plan.additions[0].docHeader.docTitle).toBe('万隆分切单')
+    const res = applyDocSyncPlan(plan, [], [])
+    expect(res.processDocs).toHaveLength(1)
+    expect(docKindOf(res.processDocs[0])).toBe('SLITTING')
+    expect(res.processDocs[0].issueLines).toEqual([])
+  })
+
+  it('分切单与加工单互不串单：同供应商也各自追加', () => {
+    const slitting = procDoc({
+      orderId: 30, sourceType: 'SLITTING', docTitle: '万隆分切单',
+      lines: [{ processId: 901, processName: '分切' }]
+    })
+    const normal = procDoc({ orderId: 31, docTitle: '万隆加工单', lines: [{ processId: 219, processName: '印刷' }] })
+    const plan = buildDocSyncPlan({
+      routeProcesses: [
+        routeRow({ processId: 903, processName: '分切二号', bizType: 'SLITTING', docType: 'PROCESS', vendorId: 208, vendorName: '万隆' }),
+        routeRow({ processId: 904, processName: '后道', bizType: 'NORMAL', docType: 'PROCESS', vendorId: 208, vendorName: '万隆' })
+      ],
+      purchaseDocs: [],
+      processDocs: [slitting, normal],
+      loadedProcessIds: [],
+      ctx
+    })
+    expect(plan.additions).toHaveLength(2)
+    const slittingAdd = plan.additions.find((g: any) => g.kind === 'SLITTING')!
+    const normalAdd = plan.additions.find((g: any) => g.kind === 'PROCESS')!
+    expect(slittingAdd.docIndex).toBe(0)
+    expect(normalAdd.docIndex).toBe(1)
   })
 })

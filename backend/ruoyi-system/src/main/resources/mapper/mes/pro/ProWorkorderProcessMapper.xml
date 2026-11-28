@@ -12,6 +12,7 @@
         <result property="orderNum" column="order_num" />
         <result property="isOutsource" column="is_outsource" />
         <result property="docType" column="doc_type" />
+        <result property="bizType" column="biz_type" />
         <result property="vendorId" column="vendor_id" />
         <result property="vendorCode" column="vendor_code" />
         <result property="vendorName" column="vendor_name" />
@@ -22,11 +23,13 @@
     </resultMap>
 
     <select id="selectByWorkorderId" resultMap="ProWorkorderProcessResult">
-        select record_id, factory_id, workorder_id, process_id, process_code, process_name, order_num,
-               is_outsource, doc_type, vendor_id, vendor_code, vendor_name, unit_price, plan_qty, expected_date, remark
-        from qxx_pro_workorder_process
-        where workorder_id = #{workorderId} and factory_id = #{factoryId}
-        order by order_num asc, record_id asc
+        select w.record_id, w.factory_id, w.workorder_id, w.process_id, w.process_code, w.process_name, w.order_num,
+               w.is_outsource, w.doc_type, w.vendor_id, w.vendor_code, w.vendor_name, w.unit_price, w.plan_qty,
+               w.expected_date, w.remark, p.biz_type
+        from qxx_pro_workorder_process w
+        left join qxx_pro_process p on p.process_id = w.process_id
+        where w.workorder_id = #{workorderId} and w.factory_id = #{factoryId}
+        order by w.order_num asc, w.record_id asc
     </select>
 
     <delete id="deleteByWorkorderId">

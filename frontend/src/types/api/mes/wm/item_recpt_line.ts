@@ -37,4 +37,6 @@ export interface WmItemRecptLine extends BaseEntity {
   quantityOrdered?: number
   /** 已收数量(展示用,不落库) */
   quantityReceived?: number
+  /** 逐件收货明细（开启实物流管理的物料：行=物料+批次，件=一卷/一根） */
+  details?: any[]
 }

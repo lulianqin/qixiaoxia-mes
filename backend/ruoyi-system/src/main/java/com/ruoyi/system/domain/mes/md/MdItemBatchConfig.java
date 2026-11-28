@@ -34,6 +34,8 @@ public class MdItemBatchConfig extends BaseEntity
     private String qualityStatusFlag;
     private String paperRollFlag;
     private String paperWidthFlag;
+    /** 通用开关：是否逐实物实例管理（一卷/一根/一桶） */
+    private String instanceFlag;
     private String enableFlag;
 
     public Long getConfigId() { return configId; }
@@ -75,6 +77,8 @@ public class MdItemBatchConfig extends BaseEntity
     public void setPaperRollFlag(String s) { this.paperRollFlag = s; }
     public String getPaperWidthFlag() { return paperWidthFlag; }
     public void setPaperWidthFlag(String s) { this.paperWidthFlag = s; }
+    public String getInstanceFlag() { return instanceFlag; }
+    public void setInstanceFlag(String s) { this.instanceFlag = s; }
     public String getEnableFlag() { return enableFlag; }
     public void setEnableFlag(String s) { this.enableFlag = s; }
 

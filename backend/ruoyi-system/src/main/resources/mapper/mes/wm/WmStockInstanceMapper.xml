@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.mes.wm.WmStockInstanceMapper">
+
+    <resultMap type="com.ruoyi.system.domain.mes.wm.WmStockInstance" id="WmStockInstanceResult">
+        <id property="instanceId" column="instance_id" />
+        <result property="factoryId" column="factory_id" />
+        <result property="instanceCode" column="instance_code" />
+        <result property="instanceType" column="instance_type" />
+        <result property="itemId" column="item_id" />
+        <result property="itemCode" column="item_code" />
+        <result property="itemName" column="item_name" />
+        <result property="specification" column="specification" />
+        <result property="batchId" column="batch_id" />
+        <result property="batchCode" column="batch_code" />
+        <result property="recptId" column="recpt_id" />
+        <result property="recptDetailId" column="recpt_detail_id" />
+        <result property="vendorId" column="vendor_id" />
+        <result property="vendorCode" column="vendor_code" />
+        <result property="vendorName" column="vendor_name" />
+        <result property="vendorInstanceNo" column="vendor_instance_no" />
+        <result property="parentInstanceId" column="parent_instance_id" />
+        <result property="originalQuantity" column="original_quantity" />
+        <result property="remainingQuantity" column="remaining_quantity" />
+        <result property="quantityUom" column="quantity_uom" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="locationId" column="location_id" />
+        <result property="areaId" column="area_id" />
+        <result property="materialStockId" column="material_stock_id" />
+        <result property="lastIssueId" column="last_issue_id" />
+        <result property="lastWorkorderId" column="last_workorder_id" />
+        <result property="lastWorkorderCode" column="last_workorder_code" />
+        <result property="status" column="status" />
+        <result property="extAttrs" column="ext_attrs"
+                typeHandler="com.ruoyi.common.core.handler.JsonMapTypeHandler" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectWmStockInstanceVo">
+        select instance_id, factory_id, instance_code, instance_type, item_id, item_code, item_name,
+               specification, batch_id, batch_code, recpt_id, recpt_detail_id, vendor_id, vendor_code,
+               vendor_name, vendor_instance_no, parent_instance_id, original_quantity, remaining_quantity,
+               quantity_uom, warehouse_id, warehouse_code, warehouse_name, location_id, area_id,
+               material_stock_id, last_issue_id, last_workorder_id, last_workorder_code, status,
+               ext_attrs, remark, create_by, create_time, update_by, update_time
+          from qxx_wm_stock_instance
+    </sql>
+
+    <select id="selectWmStockInstanceList" parameterType="com.ruoyi.system.domain.mes.wm.WmStockInstance" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+        <where>
+            <if test="instanceCode != null and instanceCode != ''"> and instance_code like concat('%', #{instanceCode}, '%')</if>
+            <if test="instanceType != null and instanceType != ''"> and instance_type = #{instanceType}</if>
+            <if test="itemId != null"> and item_id = #{itemId}</if>
+            <if test="itemCode != null and itemCode != ''"> and item_code like concat('%', #{itemCode}, '%')</if>
+            <if test="itemName != null and itemName != ''"> and item_name like concat('%', #{itemName}, '%')</if>
+            <if test="specification != null and specification != ''"> and specification like concat('%', #{specification}, '%')</if>
+            <if test="batchId != null"> and batch_id = #{batchId}</if>
+            <if test="batchCode != null and batchCode != ''"> and batch_code like concat('%', #{batchCode}, '%')</if>
+            <if test="recptId != null"> and recpt_id = #{recptId}</if>
+            <if test="vendorId != null"> and vendor_id = #{vendorId}</if>
+            <if test="vendorInstanceNo != null and vendorInstanceNo != ''"> and vendor_instance_no like concat('%', #{vendorInstanceNo}, '%')</if>
+            <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+            <if test="materialStockId != null"> and material_stock_id = #{materialStockId}</if>
+            <if test="lastWorkorderId != null"> and last_workorder_id = #{lastWorkorderId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectWmStockInstanceAll" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+    </select>
+
+    <select id="selectWmStockInstanceById" parameterType="Long" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+        where instance_id = #{instanceId}
+    </select>
+
+    <select id="selectWmStockInstanceByCode" parameterType="String" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+        where instance_code = #{instanceCode}
+    </select>
+
+    <select id="selectActiveByStockId" parameterType="Long" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+        where material_stock_id = #{materialStockId}
+          and remaining_quantity &gt; 0
+          and status not in ('CONSUMED', 'SCRAPPED')
+        order by create_time asc
+    </select>
+
+    <!-- 发料/退料可选实例：有剩余、未报废；可按批次/仓库/库存桶收窄 -->
+    <select id="selectAvailableInstances" parameterType="com.ruoyi.system.domain.mes.wm.WmStockInstance" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+        where item_id = #{itemId}
+          and remaining_quantity &gt; 0
+          and status not in ('CONSUMED', 'SCRAPPED')
+        <if test="batchId != null"> and batch_id = #{batchId}</if>
+        <if test="warehouseId != null"> and warehouse_id = #{warehouseId}</if>
+        <if test="materialStockId != null"> and material_stock_id = #{materialStockId}</if>
+        order by create_time asc
+    </select>
+
+    <select id="selectWmStockInstanceForUpdate" parameterType="Long" resultMap="WmStockInstanceResult">
+        <include refid="selectWmStockInstanceVo"/>
+        where instance_id = #{instanceId} for update
+    </select>
+
+    <select id="countActiveByStockId" parameterType="Long" resultType="int">
+        select count(1) from qxx_wm_stock_instance
+        where material_stock_id = #{materialStockId}
+          and remaining_quantity &gt; 0
+          and status not in ('CONSUMED', 'SCRAPPED')
+    </select>
+
+    <select id="sumRemainingByStockId" parameterType="Long" resultType="java.math.BigDecimal">
+        select coalesce(sum(remaining_quantity), 0) from qxx_wm_stock_instance
+        where material_stock_id = #{materialStockId}
+          and status not in ('SCRAPPED')
+    </select>
+
+    <insert id="insertWmStockInstance" parameterType="com.ruoyi.system.domain.mes.wm.WmStockInstance" useGeneratedKeys="true" keyProperty="instanceId">
+        insert into qxx_wm_stock_instance
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="instanceCode != null">instance_code,</if>
+            <if test="instanceType != null">instance_type,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="itemCode != null">item_code,</if>
+            <if test="itemName != null">item_name,</if>
+            <if test="specification != null">specification,</if>
+            <if test="batchId != null">batch_id,</if>
+            <if test="batchCode != null">batch_code,</if>
+            <if test="recptId != null">recpt_id,</if>
+            <if test="recptDetailId != null">recpt_detail_id,</if>
+            <if test="vendorId != null">vendor_id,</if>
+            <if test="vendorCode != null">vendor_code,</if>
+            <if test="vendorName != null">vendor_name,</if>
+            <if test="vendorInstanceNo != null">vendor_instance_no,</if>
+            <if test="parentInstanceId != null">parent_instance_id,</if>
+            <if test="originalQuantity != null">original_quantity,</if>
+            <if test="remainingQuantity != null">remaining_quantity,</if>
+            <if test="quantityUom != null">quantity_uom,</if>
+            <if test="warehouseId != null">warehouse_id,</if>
+            <if test="warehouseCode != null">warehouse_code,</if>
+            <if test="warehouseName != null">warehouse_name,</if>
+            <if test="locationId != null">location_id,</if>
+            <if test="areaId != null">area_id,</if>
+            <if test="materialStockId != null">material_stock_id,</if>
+            <if test="status != null">status,</if>
+            <if test="extAttrs != null">ext_attrs,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="instanceCode != null">#{instanceCode},</if>
+            <if test="instanceType != null">#{instanceType},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="itemCode != null">#{itemCode},</if>
+            <if test="itemName != null">#{itemName},</if>
+            <if test="specification != null">#{specification},</if>
+            <if test="batchId != null">#{batchId},</if>
+            <if test="batchCode != null">#{batchCode},</if>
+            <if test="recptId != null">#{recptId},</if>
+            <if test="recptDetailId != null">#{recptDetailId},</if>
+            <if test="vendorId != null">#{vendorId},</if>
+            <if test="vendorCode != null">#{vendorCode},</if>
+            <if test="vendorName != null">#{vendorName},</if>
+            <if test="vendorInstanceNo != null">#{vendorInstanceNo},</if>
+            <if test="parentInstanceId != null">#{parentInstanceId},</if>
+            <if test="originalQuantity != null">#{originalQuantity},</if>
+            <if test="remainingQuantity != null">#{remainingQuantity},</if>
+            <if test="quantityUom != null">#{quantityUom},</if>
+            <if test="warehouseId != null">#{warehouseId},</if>
+            <if test="warehouseCode != null">#{warehouseCode},</if>
+            <if test="warehouseName != null">#{warehouseName},</if>
+            <if test="locationId != null">#{locationId},</if>
+            <if test="areaId != null">#{areaId},</if>
+            <if test="materialStockId != null">#{materialStockId},</if>
+            <if test="status != null">#{status},</if>
+            <if test="extAttrs != null">#{extAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateWmStockInstance" parameterType="com.ruoyi.system.domain.mes.wm.WmStockInstance">
+        update qxx_wm_stock_instance
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="instanceCode != null">instance_code = #{instanceCode},</if>
+            <if test="instanceType != null">instance_type = #{instanceType},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="itemCode != null">item_code = #{itemCode},</if>
+            <if test="itemName != null">item_name = #{itemName},</if>
+            <if test="specification != null">specification = #{specification},</if>
+            <if test="batchId != null">batch_id = #{batchId},</if>
+            <if test="batchCode != null">batch_code = #{batchCode},</if>
+            <if test="vendorInstanceNo != null">vendor_instance_no = #{vendorInstanceNo},</if>
+            <if test="originalQuantity != null">original_quantity = #{originalQuantity},</if>
+            <if test="remainingQuantity != null">remaining_quantity = #{remainingQuantity},</if>
+            <if test="quantityUom != null">quantity_uom = #{quantityUom},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="warehouseCode != null">warehouse_code = #{warehouseCode},</if>
+            <if test="warehouseName != null">warehouse_name = #{warehouseName},</if>
+            <if test="materialStockId != null">material_stock_id = #{materialStockId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="extAttrs != null">ext_attrs = #{extAttrs, typeHandler=com.ruoyi.common.core.handler.JsonMapTypeHandler},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where instance_id = #{instanceId}
+    </update>
+
+    <update id="adjustRemaining">
+        update qxx_wm_stock_instance
+        set remaining_quantity = remaining_quantity + #{delta},
+            update_by = #{operator},
+            update_time = #{now}
+            <if test="status != null and status != ''">, status = #{status}</if>
+            <if test="lastIssueId != null">, last_issue_id = #{lastIssueId}</if>
+            <if test="lastWorkorderId != null">, last_workorder_id = #{lastWorkorderId}</if>
+            <if test="lastWorkorderCode != null and lastWorkorderCode != ''">, last_workorder_code = #{lastWorkorderCode}</if>
+        where instance_id = #{instanceId}
+          and remaining_quantity + #{delta} &gt;= 0
+    </update>
+
+    <delete id="deleteWmStockInstanceById" parameterType="Long">
+        delete from qxx_wm_stock_instance where instance_id = #{instanceId}
+    </delete>
+
+    <delete id="deleteWmStockInstanceByIds" parameterType="String">
+        delete from qxx_wm_stock_instance where instance_id in
+        <foreach item="instanceId" collection="array" open="(" separator="," close=")">
+            #{instanceId}
+        </foreach>
+    </delete>
+
+</mapper>

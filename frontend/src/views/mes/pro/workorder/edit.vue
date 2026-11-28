@@ -176,7 +176,7 @@
         </template>
         <div class="doc-toolbar" v-if="!pageReadonly">
           <el-button type="primary" icon="MagicStick" @click="openDocSync">按工序配置同步单据</el-button>
-          <span class="tip">只补新增明细、确认后删除已移除工序的明细；供应商/开单类型变更仅提示人工处理</span>
+          <span class="tip">按工序的开单类型自动补采购单/加工单，「分切」工序自动补分切单；已移除工序的草稿明细可一并删除，供应商变更仅提示</span>
         </div>
         <WorkorderDocPanel v-model:purchase-docs="purchaseDocs" v-model:process-docs="processDocs"
           :process-options="routeProcesses" :product-size="form.productSize" :printing-req="form.printingReq" :readonly="pageReadonly" />
@@ -506,7 +506,8 @@ function loadDetail(id: number) {
     processDocs.value = (d.processDocs || []).map((x: any, i: number) => ({
       ...x,
       __docKey: 'o-' + (x.orderId ?? i),
-      lines: x.processLines || []
+      lines: x.processLines || [],
+      issueLines: x.issueLines || []
     }))
     // 记录加载时的工序快照，供同步时识别“本次删除的工序”
     loadedProcessIds.value = new Set(
@@ -549,7 +550,8 @@ function loadCopyTemplate(sourceId: number) {
     processDocs.value = (d.processDocs || []).map((x: any, i: number) => ({
       ...x,
       __docKey: 'o-' + (x.orderId ?? i),
-      lines: x.processLines || []
+      lines: x.processLines || [],
+      issueLines: x.issueLines || []
     }))
     // 记录加载时的工序快照，供同步时识别“本次删除的工序”
     loadedProcessIds.value = new Set(
@@ -830,10 +832,48 @@ function confirmDocSync() {
   )
 }
 
+/** 单据配置校验：明细数量必填（>0），单据表头必填项齐全 */
+function validateDocs(): boolean {
+  for (const doc of purchaseDocs.value) {
+    const title = doc.docTitle || '采购单'
+    if (!doc.vendorId) { ElMessage.warning(`采购单「${title}」请选择供应商`); activeTab.value = 'docs'; return false }
+    if (!(doc.lines || []).length) { ElMessage.warning(`采购单「${title}」至少需要一行明细`); activeTab.value = 'docs'; return false }
+    const bad = (doc.lines || []).findIndex((l: any) => Number(l.quantity || 0) <= 0)
+    if (bad >= 0) {
+      ElMessage.warning(`采购单「${title}」第 ${bad + 1} 行数量必须大于 0`)
+      activeTab.value = 'docs'
+      return false
+    }
+  }
+  for (const doc of processDocs.value) {
+    const slitting = String(doc.sourceType || '').toUpperCase() === 'SLITTING'
+    const title = doc.docTitle || (slitting ? '分切单' : '加工单')
+    const inside = String(doc.supplierType || '').toUpperCase() === 'INSIDE'
+    if (!inside && !doc.vendorId) {
+      ElMessage.warning(`${slitting ? '分切单' : '加工单'}「${title}」请选择${slitting ? '分切商' : '加工商'}`)
+      activeTab.value = 'docs'
+      return false
+    }
+    if (!(doc.lines || []).length) {
+      ElMessage.warning(`${slitting ? '分切单' : '加工单'}「${title}」至少需要一行工序`)
+      activeTab.value = 'docs'
+      return false
+    }
+    const badLine = (doc.lines || []).findIndex((l: any) => Number(l.planQty || 0) <= 0)
+    if (badLine >= 0) {
+      ElMessage.warning(`${slitting ? '分切单' : '加工单'}「${title}」第 ${badLine + 1} 行数量必须大于 0`)
+      activeTab.value = 'docs'
+      return false
+    }
+  }
+  return true
+}
+
 function submit() {
   formRef.value?.validate((valid: boolean) => {
     if (!valid) return
     if (!routeProcesses.value.length) { ElMessage.warning('请选择工艺路线或添加工序'); return }
+    if (!validateDocs()) return
     const payload = {
       workorder: {
         ...form,
@@ -845,7 +885,12 @@ function submit() {
       paramList: [],
       routeProcesses: routeProcesses.value,
       purchaseDocs: purchaseDocs.value.map((d: any) => ({ ...d, lines: d.lines || [] })),
-      processDocs: processDocs.value.map((d: any) => ({ ...d, lines: d.lines || [] }))
+      processDocs: processDocs.value.map((d: any) => ({
+        ...d,
+        lines: d.lines || [],
+        // 分切单带母卷发料明细；其他单据为空数组，后端按空忽略
+        issueLines: (d.issueLines || []).filter((l: any) => l.itemId)
+      }))
     }
     submitting.value = true
     const call = (mode.value === 'add' || mode.value === 'copy')

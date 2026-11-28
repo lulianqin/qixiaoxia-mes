@@ -312,6 +312,8 @@ public class ProRouteProcess extends BaseEntity
     }
 
     // ---- 开单页工序配置（非路线主数据字段，仅工单开单时携带） ----
+    /** 工序业务类型（来自 qxx_pro_process.biz_type）：NORMAL-普通 / SLITTING-分切 */
+    private String bizType;
     /** 开单类型：PROCESS-加工 / PURCHASE-采购 */
     private String docType;
     /** 计划数量 */
@@ -322,6 +324,8 @@ public class ProRouteProcess extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date expectedDate;
 
+    public String getBizType() { return bizType; }
+    public void setBizType(String v) { this.bizType = v; }
     public String getDocType() { return docType; }
     public void setDocType(String v) { this.docType = v; }
     public BigDecimal getPlanQty() { return planQty; }

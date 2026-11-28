@@ -92,11 +92,20 @@
           <el-input :model-value="brandOf(row)" @update:model-value="(v: string) => setBrand(row, v)" :disabled="readonly" />
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="120">
-        <template #default="{ row }"><el-input-number v-model="row.quantity" :min="0" :precision="4" controls-position="right" style="width:100%" :disabled="readonly" /></template>
+      <el-table-column width="120">
+        <template #header><span class="req">*</span>数量</template>
+        <template #default="{ row }">
+          <el-input-number v-model="row.quantity" :min="0" :precision="4" controls-position="right"
+            :class="['qty-input', { 'qty-invalid': !isQtyValid(row) }]" style="width:100%" :disabled="readonly" />
+        </template>
       </el-table-column>
-      <el-table-column label="单位" width="80">
-        <template #default="{ row }"><el-input v-model="row.unitName" :disabled="readonly" /></template>
+      <el-table-column label="单位" width="110">
+        <template #default="{ row }">
+          <el-select v-model="row.unitName" filterable placeholder="选择单位" style="width:100%" :disabled="readonly"
+            @change="(v: any) => onUnitChange(row, v)">
+            <el-option v-for="u in unitOptions" :key="u.unitCode" :label="u.unitName" :value="u.unitName" />
+          </el-select>
+        </template>
       </el-table-column>
       <el-table-column label="单价" width="110">
         <template #default="{ row }"><el-input-number v-model="row.unitPrice" :min="0" :precision="4" controls-position="right" style="width:100%" :disabled="readonly" /></template>
@@ -130,6 +139,7 @@
 import { ref, getCurrentInstance } from 'vue'
 import VendorSelect from '@/components/vendorSelect/single.vue'
 import ItemSelect from '@/components/itemSelect/single.vue'
+import { listAllUnitmeasure } from '@/api/mes/md/unitmeasure'
 
 const props = defineProps<{ modelValue: any; processOptions: any[]; readonly?: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: any): void; (e: 'remove'): void }>()
@@ -139,6 +149,8 @@ const { mes_purchase_type } = proxy.useDict('mes_purchase_type')
 const purchaseTypes = mes_purchase_type
 
 const form = props.modelValue
+const unitOptions = ref<any[]>([])
+listAllUnitmeasure().then((r: any) => { unitOptions.value = r.data || [] }).catch(() => {})
 const vendorRef = ref()
 const itemRef = ref()
 let currentRow: any = null
@@ -173,7 +185,19 @@ function onProcessChange(row: any) {
 
 function addLine() {
   form.lines = form.lines || []
-  form.lines.push({ quantity: 1, unitPrice: 0, unitName: '个', productName: '', lineAttrs: {} })
+  // 数量默认 0（必填，提交前校验），单位跟随所选物料主单位
+  form.lines.push({ quantity: 0, unitPrice: 0, unitOfMeasure: null, unitName: null, productName: '', lineAttrs: {} })
+}
+
+/** 数量必填且必须大于 0 */
+function isQtyValid(row: any) {
+  return Number(row?.quantity || 0) > 0
+}
+
+/** 单位选项：全部启用单位，不限该物料的主/辅单位 */
+function onUnitChange(row: any, unitName: string) {
+  const u = unitOptions.value.find((x: any) => x.unitName === unitName)
+  row.unitOfMeasure = u?.unitCode || row.unitOfMeasure
 }
 
 function brandOf(row: any) {
@@ -197,5 +221,7 @@ function money(q: any, p: any) {
 .doc-title { display: flex; align-items: center; font-weight: 600; }
 .ml8 { margin-left: 8px; }
 .mt8 { margin-top: 8px; }
+.req { color: #f56c6c; margin-right: 2px; }
+.qty-invalid :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 :deep(.el-form-item__label) { padding-right: 12px !important; }
 </style>

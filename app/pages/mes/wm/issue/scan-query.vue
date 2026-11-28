@@ -29,20 +29,20 @@
       <view v-if="itemInfo.specification" class="sub">规格：{{ itemInfo.specification }}</view>
     </view>
 
-    <!-- 纸卷信息（扫卷料码 ROLL） -->
-    <view v-if="rollInfo" class="info-card">
+    <!-- 实物实例信息（扫实例码 ROLL/根/桶） -->
+    <view v-if="instanceInfo" class="info-card">
       <view class="card-top">
-        <text class="code">{{ rollInfo.rollCode }}</text>
-        <text class="unit">{{ rollInfo.status || '' }}</text>
+        <text class="code">{{ instanceInfo.instanceCode }}</text>
+        <text class="unit">{{ instanceStatusText(instanceInfo.status) }}</text>
       </view>
-      <text class="name">{{ rollInfo.itemName || '-' }}</text>
-      <view class="sub">仓库：{{ rollInfo.warehouseName || '-' }}</view>
-      <view class="sub">实际幅宽：{{ rollInfo.actualWidth || '-' }}</view>
-      <view class="sub">实际克重：{{ rollInfo.actualWeightGsm || '-' }}</view>
-      <view class="sub">实际重量：{{ rollInfo.actualWeight != null ? rollInfo.actualWeight : '-' }}</view>
+      <text class="name">{{ instanceInfo.itemName || '-' }}</text>
+      <view class="sub">仓库：{{ instanceInfo.warehouseName || '-' }}</view>
+      <view class="sub">批次：{{ instanceInfo.batchCode || '无批次' }}</view>
+      <view class="sub">入库数量：{{ fmtQty(instanceInfo.originalQuantity) }} {{ instanceInfo.quantityUom || '' }}</view>
       <view class="sub">
-        剩余数量：<text class="roll-qty">{{ rollInfo.remainingQuantity != null ? rollInfo.remainingQuantity : '-' }}</text>
+        剩余数量：<text class="roll-qty">{{ fmtQty(instanceInfo.remainingQuantity) }} {{ instanceInfo.quantityUom || '' }}</text>
       </view>
+      <view v-for="(v, k) in (instanceInfo.extAttrs || {})" :key="k" class="sub">{{ k }}：{{ v }}</view>
     </view>
 
     <!-- 库存列表 -->
@@ -67,7 +67,8 @@
 <script setup>
 import { ref, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getItemStock, getStockByBatchCode, getRollByRollCode } from '@/api/mes/wm/issue'
+import { getItemStock, getStockByBatchCode } from '@/api/mes/wm/issue'
+import { scanInstance } from '@/api/mes/wm/stock_instance'
 import { parseQrPayload } from '@/utils/qrPayload'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
@@ -76,7 +77,7 @@ import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue
 const { proxy } = getCurrentInstance()
 const itemCode = ref('')
 const itemInfo = ref(null)
-const rollInfo = ref(null)
+const instanceInfo = ref(null)
 const stockList = ref([])
 const queried = ref(false)
 
@@ -85,7 +86,7 @@ onLoad((options) => {
   if (options && options.batchCode) {
     queryByBatch(options.batchCode)
   } else if (options && options.rollCode) {
-    queryRoll(options.rollCode)
+    queryInstance(options.rollCode)
   }
 })
 
@@ -95,7 +96,7 @@ function handleCode(code) {
   if (payload && payload.type === 'MAT') {
     queryByBatch(payload.code)
   } else if (payload && payload.type === 'ROLL') {
-    queryRoll(payload.code)
+    queryInstance(payload.code)
   } else {
     itemCode.value = code
     queryStock()
@@ -129,7 +130,7 @@ function onManualQuery() {
 async function queryStock() {
   if (!itemCode.value) { proxy.$modal.msgError('请输入或扫描物料编码'); return }
   queried.value = true
-  rollInfo.value = null
+  instanceInfo.value = null
   try {
     const res = await getItemStock(itemCode.value)
     const rows = res.rows || []
@@ -151,7 +152,7 @@ async function queryStock() {
 // 按批次码查库存（MAT 码）：返回该批次的库存行
 async function queryByBatch(batchCode) {
   queried.value = true
-  rollInfo.value = null
+  instanceInfo.value = null
   itemInfo.value = null
   stockList.value = []
   try {
@@ -170,17 +171,28 @@ async function queryByBatch(batchCode) {
   } catch (e) {}
 }
 
-// 按纸卷码查卷料详情（ROLL 码）：单卷卡片，不走库存列表
-async function queryRoll(rollCode) {
+// 按实物实例码查实例详情（一卷/一根/一桶）：单件卡片，不走库存列表
+async function queryInstance(instanceCode) {
   queried.value = false
-  rollInfo.value = null
+  instanceInfo.value = null
   itemInfo.value = null
   stockList.value = []
   try {
-    const res = await getRollByRollCode(rollCode)
-    rollInfo.value = res.data || null
-    if (!rollInfo.value) { proxy.$modal.msgError('未查到该卷料信息') }
+    const res = await scanInstance(instanceCode)
+    instanceInfo.value = res.data || null
+    if (!instanceInfo.value) { proxy.$modal.msgError('未查到该实物实例') }
   } catch (e) {}
+}
+
+function instanceStatusText(s) {
+  const map = { IN_STOCK: '在库', PARTIAL: '部分领用', CONSUMED: '已用完', RETURNED: '已退回', SCRAPPED: '已报废', OUTSOURCED: '外协中' }
+  return map[s] || s || ''
+}
+
+function fmtQty(v) {
+  if (v === null || v === undefined || v === '') return '-'
+  const n = Number(v)
+  return Number.isNaN(n) ? String(v) : n.toFixed(2).replace(/\.00$/, '')
 }
 </script>
 

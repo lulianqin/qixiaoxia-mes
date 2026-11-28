@@ -5,9 +5,10 @@ import { nextTick } from 'vue'
 // ═══════════════════════════════════════
 // Hoisted mock functions
 // ═══════════════════════════════════════
-const { mockListItem, mockGetItem } = vi.hoisted(() => ({
+const { mockListItem, mockGetItem, mockSpecVariantItem } = vi.hoisted(() => ({
   mockListItem: vi.fn(),
   mockGetItem: vi.fn(),
+  mockSpecVariantItem: vi.fn(),
 }))
 
 // ═══════════════════════════════════════
@@ -19,6 +20,7 @@ vi.mock('@/api/mes/md/item', () => ({
   addItem: vi.fn().mockResolvedValue({ code: 200 }),
   updateItem: vi.fn().mockResolvedValue({ code: 200 }),
   delItem: vi.fn().mockResolvedValue({}),
+  specVariantItem: mockSpecVariantItem,
 }))
 vi.mock('@/api/mes/md/itemtype', () => ({
   treeselect: vi.fn().mockResolvedValue({ data: [] }),
@@ -218,5 +220,33 @@ describe('物料管理 — 变体功能', () => {
     await nextTick()
 
     expect(vm.parentItemDisplay).toBe('')
+  })
+
+  // ═══════════════════════════════════════
+  // 7. 基于 SPU 新建 SKU — 复用后端 specVariant
+  // ═══════════════════════════════════════
+  it('SPU 行「新建SKU」→ 提交走 specVariant 且携带 parentId/规格', async () => {
+    mockListItem.mockResolvedValue({ rows: [], total: 0 })
+    mockSpecVariantItem.mockResolvedValue({ data: { itemId: 301, itemCode: 'ZD-01-V1' } })
+
+    const wrapper = mountItem()
+    await nextTick(); await nextTick()
+    const vm = wrapper.vm as any
+    vm.$.appContext.config.globalProperties.$modal = { msgSuccess: vi.fn(), msgError: vi.fn() }
+
+    vm.handleAddSku({ itemId: 201, itemCode: 'ZD-01', itemName: '奔趣纸袋', parentId: 0 })
+    await nextTick()
+    expect(vm.skuOpen).toBe(true)
+    expect(vm.skuForm.parentId).toBe(201)
+
+    vm.skuForm.specification = '250*150'
+    await vm.submitSku()
+    await nextTick()
+
+    expect(mockSpecVariantItem).toHaveBeenCalledWith(expect.objectContaining({
+      parentId: 201,
+      specification: '250*150'
+    }))
+    expect(vm.skuOpen).toBe(false)
   })
 })

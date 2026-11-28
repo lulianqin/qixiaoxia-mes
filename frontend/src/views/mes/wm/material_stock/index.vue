@@ -82,9 +82,12 @@
         </template>
       </el-table-column>
       <el-table-column label="单位" align="center" prop="unitName" width="70" :show-overflow-tooltip="true" />
-      <el-table-column label="辅助数量" align="center" width="100">
+      <el-table-column :label="auxUnitLabel" align="center" width="110">
         <template #default="scope">
-          {{ scope.row.quantityOnhand2 ?? '-' }}{{ scope.row.unit2Name ? ' ' + scope.row.unit2Name : '' }}
+          <el-button v-if="Number(scope.row.quantityOnhand2) > 0" link type="primary" size="small" @click="openInstanceDetail(scope.row)">
+            {{ scope.row.quantityOnhand2 }}<span v-if="scope.row.unit2Name"> {{ scope.row.unit2Name }}</span>
+          </el-button>
+          <span v-else>{{ scope.row.quantityOnhand2 ?? '-' }}{{ scope.row.unit2Name ? ' ' + scope.row.unit2Name : '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="客户PO号" align="center" prop="poNo" width="110" :show-overflow-tooltip="true">
@@ -157,15 +160,51 @@
       </el-table>
       <el-empty v-if="!lockLoading && lockRows.length === 0" description="暂无锁定明细" :image-size="60" />
     </el-dialog>
+
+    <!-- 实物实例下钻：一卷纸 / 一根钢管 / 一桶油墨 -->
+    <el-dialog v-model="instVisible" :title="instTitle" width="1020px" append-to-body>
+      <div class="inst-summary">
+        <span>库存账：<b>{{ instStockQty }}</b> {{ instRow?.unitName || '' }}</span>
+        <span>实例剩余合计：<b :class="{ 'inst-diff': hasInstDiff }">{{ instRemainSum }}</b> {{ instRow?.unitName || '' }}</span>
+        <span v-if="instRow?.unit2Name">件数：<b>{{ instRows.length }}</b> {{ instRow.unit2Name }}</span>
+        <span v-if="hasInstDiff" class="inst-diff">账实差异 {{ instDiffQty }}，请核查</span>
+      </div>
+      <el-table v-loading="instLoading" :data="instRows" border size="small" max-height="420">
+        <el-table-column label="实例编号" prop="instanceCode" min-width="150" :show-overflow-tooltip="true" />
+        <el-table-column label="供应商编号" prop="vendorInstanceNo" width="120" :show-overflow-tooltip="true">
+          <template #default="scope">{{ scope.row.vendorInstanceNo || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="原始数量" prop="originalQuantity" width="100" align="right" />
+        <el-table-column label="剩余数量" prop="remainingQuantity" width="100" align="right">
+          <template #default="scope"><b>{{ scope.row.remainingQuantity }}</b></template>
+        </el-table-column>
+        <el-table-column label="单位" prop="quantityUom" width="70" align="center" />
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="scope">
+            <el-tag size="small" :type="instStatusType(scope.row.status)">{{ instStatusText(scope.row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="实例属性" min-width="160">
+          <template #default="scope">{{ attrText(scope.row.extAttrs) }}</template>
+        </el-table-column>
+        <el-table-column label="批次号" prop="batchCode" width="130" :show-overflow-tooltip="true" />
+        <el-table-column label="仓库" prop="warehouseName" width="110" :show-overflow-tooltip="true" />
+        <el-table-column label="最近工单" prop="lastWorkorderCode" width="130" :show-overflow-tooltip="true">
+          <template #default="scope">{{ scope.row.lastWorkorderCode || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!instLoading && instRows.length === 0" description="该库存未按实物实例管理，或实例已全部用完" :image-size="60" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts" name="WmMaterialStock">
-import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue'
+import { ref, reactive, toRefs, getCurrentInstance, onMounted, computed } from 'vue'
 import type { WmMaterialStockQueryParams, WmMaterialStock } from '@/types/api/mes/wm/material_stock'
 import type { WmWarehouse } from '@/types/api/mes/wm/warehouse'
 import type { TreeSelect } from '@/types'
 import { listWmMaterialStock, delWmMaterialStock } from '@/api/mes/wm/material_stock'
+import { listInstancesByStock } from '@/api/mes/wm/stock_instance'
 import { listStockReservation } from '@/api/mes/wm/stockReservation'
 import { listAllWmWarehouse } from '@/api/mes/wm/warehouse'
 import { treeselect } from '@/api/mes/md/itemtype'
@@ -205,13 +244,52 @@ function statusText(status?: string) {
   return status ? (map[status] || status) : '-'
 }
 
-function openLockDetail(row: WmMaterialStock) {
-  lockVisible.value = true
+function openLockDetail(row: WmMaterialStock) {  lockVisible.value = true
   lockLoading.value = true
   lockRows.value = []
   listStockReservation({ materialStockId: row.materialStockId, pageNum: 1, pageSize: 200 })
     .then((r: any) => { lockRows.value = r.rows || [] })
     .finally(() => { lockLoading.value = false })
+}
+
+// ==================== 实物实例下钻 ====================
+const instVisible = ref(false)
+const instLoading = ref(false)
+const instRows = ref<any[]>([])
+const instRow = ref<WmMaterialStock | null>(null)
+
+/** 表头单位随物料辅助单位走：只有一种时显示「辅助数量(卷/根/桶)」 */
+const auxUnitLabel = computed(() => {
+  const names = Array.from(new Set(stockList.value.map((r: any) => r.unit2Name).filter(Boolean)))
+  return names.length === 1 ? `辅助数量(${names[0]})` : '辅助数量'
+})
+const instTitle = computed(() => `${instRow.value?.itemName || ''}${instRow.value?.specification ? ' · ' + instRow.value.specification : ''} · 实物明细`)
+const instStockQty = computed(() => Number(instRow.value?.quantityOnhand) || 0)
+const instRemainSum = computed(() => Number(instRows.value.reduce((s, r) => s + (Number(r.remainingQuantity) || 0), 0).toFixed(4)))
+const instDiffQty = computed(() => Number((instStockQty.value - instRemainSum.value).toFixed(4)))
+const hasInstDiff = computed(() => Math.abs(instDiffQty.value) > 0.005)
+
+const INST_STATUS: Record<string, { text: string; type: string }> = {
+  IN_STOCK: { text: '在库', type: 'success' },
+  PARTIAL: { text: '部分领用', type: 'warning' },
+  CONSUMED: { text: '已用完', type: 'info' },
+  RETURNED: { text: '已退回', type: 'info' },
+  SCRAPPED: { text: '已报废', type: 'danger' },
+  OUTSOURCED: { text: '外协中', type: 'warning' }
+}
+function instStatusText(s?: string) { return s ? (INST_STATUS[s]?.text || s) : '-' }
+function instStatusType(s?: string) { return s ? (INST_STATUS[s]?.type || 'info') : 'info' }
+
+function openInstanceDetail(row: WmMaterialStock) {
+  instRow.value = row
+  instVisible.value = true
+  instLoading.value = true
+  instRows.value = []
+  if (!row.materialStockId) { instLoading.value = false; return }
+  listInstancesByStock(row.materialStockId)
+    .then((r: any) => { instRows.value = r.data || [] })
+    .catch(() => { instRows.value = [] })
+    .finally(() => { instLoading.value = false })
 }
 
 const data = reactive({
@@ -289,6 +367,18 @@ getList()
 <style lang="scss" scoped>
 .occu-pending {
   color: #e6a23c;
+  font-weight: 600;
+}
+.inst-summary {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+.inst-diff {
+  color: var(--el-color-danger);
   font-weight: 600;
 }
 </style>

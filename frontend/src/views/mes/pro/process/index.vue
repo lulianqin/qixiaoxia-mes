@@ -42,6 +42,13 @@
           <el-button link @click="handleView(scope.row)" v-hasPermi="['mes:pro:process:query']">{{ scope.row.processName }}</el-button>
         </template>
       </el-table-column>
+      <el-table-column label="业务类型" align="center" width="100">
+        <template #default="scope">
+          <el-tag :type="scope.row.bizType === 'SLITTING' ? 'warning' : 'info'" size="small">
+            {{ scope.row.bizType === 'SLITTING' ? '分切' : '普通' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180" :show-overflow-tooltip="true">
         <template #default="scope">
@@ -83,6 +90,17 @@
           <el-col :span="12">
             <el-form-item label="工序名称" prop="processName">
               <el-input v-model="form.processName" placeholder="请输入" :disabled="optType === 'view'" maxlength="255" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="业务类型" prop="bizType">
+              <el-select v-model="form.bizType" placeholder="请选择" style="width:100%" :disabled="optType === 'view'">
+                <el-option label="普通工序" value="NORMAL" />
+                <el-option label="分切" value="SLITTING" />
+              </el-select>
+              <div class="form-tip">选「分切」后，工单单据配置可据此开分切单，无需依赖工序名称</div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -411,6 +429,7 @@ export default {
         processId: null,
         processCode: null,
         processName: null,
+        bizType: 'NORMAL',
         attention: null,
         enableFlag: '1',
         remark: null
@@ -618,3 +637,7 @@ export default {
 }
 
 </script>
+
+<style scoped>
+.form-tip { font-size: 12px; color: #909399; line-height: 18px; margin-top: 2px; }
+</style>

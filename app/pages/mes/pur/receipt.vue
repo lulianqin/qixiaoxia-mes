@@ -97,6 +97,16 @@
             <uni-easyinput v-model="line.lotNumber" placeholder="供应商批号" :inputBorder="true" class="extra-field" />
           </view>
         </view>
+        <!-- 逐件收货：一卷纸 / 一根钢管 / 一桶油墨，各自实际数量 -->
+        <view class="line-instance">
+          <text class="label">实物实例</text>
+          <view class="inst-entry" @click="openInstanceEditor(idx)">
+            <text :class="(line.details || []).length ? 'inst-count' : 'inst-ph'">
+              {{ (line.details || []).length ? `已录入 ${line.details.length} 件` : '逐件录入' }}
+            </text>
+            <uni-icons type="right" size="12" color="#999" />
+          </view>
+        </view>
       </view>
     </view>
 
@@ -143,11 +153,48 @@
         {{ submitting ? '提交中...' : '到货登记' }}
       </button>
     </view>
+
+    <!-- 逐件录入：一件一行，数量填该件实际重量/长度 -->
+    <uni-popup ref="instPopup" type="bottom" :is-mask-click="false">
+      <view class="popup-content">
+        <view class="popup-header">
+          <text class="popup-title">逐件录入 · {{ instLine ? instLine.itemName : '' }}</text>
+          <text class="popup-close" @click="instPopup.close()">关闭</text>
+        </view>
+        <view class="popup-tip">按实际到货逐件登记：一卷/一根一行，数量填该件实际重量或长度；行的实收数量会按各件合计自动回写。</view>
+        <scroll-view scroll-y class="popup-scroll">
+          <view v-for="(r, i) in instRows" :key="i" class="inst-row">
+            <view class="inst-row-head">
+              <text class="inst-idx">第 {{ i + 1 }} 件</text>
+              <text class="inst-del" @click="removeInstRow(i)">删除</text>
+            </view>
+            <view class="inst-field">
+              <text class="label">实例编号 / 供应商卷号</text>
+              <uni-easyinput v-model="r.instanceCode" placeholder="可留空，确认入库时自动生成" :inputBorder="true" />
+            </view>
+            <view class="inst-field">
+              <text class="label">本件数量({{ instLine ? (instLine.unitName || instLine.unitOfMeasure || '') : '' }})</text>
+              <uni-easyinput v-model="r.instanceQuantity" type="number" placeholder="0" :inputBorder="true" />
+            </view>
+          </view>
+          <view v-if="!instRows.length" class="empty-hint">
+            <text class="text-grey">还没有录入，点下方「添加一件」</text>
+          </view>
+        </scroll-view>
+        <view class="inst-bar">
+          <button class="cu-btn sm" @click="addInstRow">添加一件</button>
+          <text class="inst-total">合计：<text class="bold">{{ instTotal }}</text> {{ instLine ? (instLine.unitName || '') : '' }}</text>
+        </view>
+        <view class="popup-footer">
+          <button class="cu-btn bg-blue lg" style="flex:1" @click="saveInstances">确 定</button>
+        </view>
+      </view>
+    </uni-popup>
   </view>
 </template>
 
 <script setup>
-import { ref, reactive, getCurrentInstance, onMounted } from 'vue'
+import { ref, reactive, computed, getCurrentInstance, onMounted } from 'vue'
 import { onShow, onLoad } from '@dcloudio/uni-app'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniEasyInput from '@/uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput.vue'
@@ -157,7 +204,9 @@ import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue
 import UniSection from '@/components/uni-section/uni-section.vue'
 import UniTag from '@/uni_modules/uni-tag/components/uni-tag/uni-tag.vue'
 import UniDatetimePicker from '@/uni_modules/uni-datetime-picker/components/uni-datetime-picker/uni-datetime-picker.vue'
+import UniPopup from '@/uni_modules/uni-popup/components/uni-popup/uni-popup.vue'
 import { getOrder, getOrderDetailByCode, receiveItemRecpt, listWarehouseAll } from '@/api/mes/pur/order'
+import { getBatchConfigByItemId } from '@/api/mes/md/batchconfig'
 import { isValidReceiptQty, genRecptCode, purchaseTypeText, orderStatusTagType, orderStatusText, canReceive } from '@/utils/pur.js'
 
 const { proxy } = getCurrentInstance()
@@ -194,6 +243,67 @@ const arrivalInfo = reactive({
   vendorDeliveryNo: ''
 })
 
+// ==================== 逐件收货（一卷 / 一根 / 一桶） ====================
+const instPopup = ref()
+const instLineIdx = ref(-1)
+const instRows = ref([])
+const instLine = computed(() => (instLineIdx.value >= 0 ? lines.value[instLineIdx.value] : null))
+const instTotal = computed(() => Number(instRows.value.reduce((s, r) => s + (Number(r.instanceQuantity) || 0), 0).toFixed(4)))
+
+/** 打开逐件录入：先确认物料已开启「逐实物管理」，否则后端确认入库时不会建实例 */
+function openInstanceEditor(idx) {
+  const line = lines.value[idx]
+  if (!line || !line.itemId) {
+    proxy.$modal.msgWarning('请先选择物料')
+    return
+  }
+  proxy.$modal.loading('读取物料配置...')
+  getBatchConfigByItemId(line.itemId).then(res => {
+    setTimeout(() => proxy.$modal.closeLoading(), 0)
+    const cfg = res.data
+    if (!cfg || cfg.instanceFlag !== '1') {
+      setTimeout(() => proxy.$modal.msgWarning('该物料未开启「逐实物管理」，请先到 物料管理-批次配置 开启后再逐件录入'), 60)
+      return
+    }
+    instLineIdx.value = idx
+    instRows.value = (line.details && line.details.length)
+      ? line.details.map(d => ({ ...d }))
+      : [{ instanceCode: '', instanceQuantity: line.receiptQty || null }]
+    instPopup.value.open()
+  }).catch(() => {
+    setTimeout(() => proxy.$modal.closeLoading(), 0)
+    setTimeout(() => proxy.$modal.msgError('读取物料批次配置失败，无法判断是否逐件管理'), 60)
+  })
+}
+
+function addInstRow() {
+  instRows.value.push({ instanceCode: '', instanceQuantity: null })
+}
+
+function removeInstRow(i) {
+  instRows.value.splice(i, 1)
+}
+
+/** 保存逐件明细：行实收量 = 各件合计 */
+function saveInstances() {
+  const rows = instRows.value
+    .filter(r => Number(r.instanceQuantity) > 0)
+    .map(r => ({
+      instanceCode: (r.instanceCode || '').trim() || null,
+      instanceQuantity: Number(r.instanceQuantity),
+      quantity: Number(r.instanceQuantity)
+    }))
+  if (!rows.length) {
+    proxy.$modal.msgWarning('请至少录入一件有效数量')
+    return
+  }
+  const line = lines.value[instLineIdx.value]
+  line.details = rows
+  line.receiptQty = Number(rows.reduce((s, r) => s + r.instanceQuantity, 0).toFixed(4))
+  instPopup.value.close()
+  setTimeout(() => proxy.$modal.msgSuccess(`已录入 ${rows.length} 件，实收 ${line.receiptQty} ${line.unitName || ''}`), 60)
+}
+
 // 把后端返回的订单详情（PurOrderDetailVO：order + lines）填充到表单
 function applyDetail(detail) {
   if (!detail || !detail.order) {
@@ -216,7 +326,8 @@ function applyDetail(detail) {
     produceDate: '',
     expireDate: '',
     lotNumber: l.lotNumber || '',
-    quantityReceived: l.quantityReceived || 0
+    quantityReceived: l.quantityReceived || 0,
+    details: []
   }))
 }
 
@@ -291,6 +402,16 @@ function submitReceipt() {
     proxy.$modal.msgError('请为每个已填数量的行选择入库仓库')
     return
   }
+  // 逐件收货的行：实收数量必须等于各件合计，避免明细与行数量对不上
+  for (const l of filledLines) {
+    if (Array.isArray(l.details) && l.details.length) {
+      const sum = Number(l.details.reduce((s, d) => s + (Number(d.instanceQuantity) || 0), 0).toFixed(4))
+      if (Math.abs(sum - (Number(l.receiptQty) || 0)) > 0.0001) {
+        proxy.$modal.msgError(`物料[${l.itemCode}]逐件合计(${sum})与实收数量(${l.receiptQty})不一致，请重新逐件录入`)
+        return
+      }
+    }
+  }
 
   proxy.$modal.confirm('确认提交到货登记？登记后仅生成草稿入库单，库存不变；检验合格后由 PC 端确认入库。').then(() => {
     submitting.value = true
@@ -321,7 +442,8 @@ function submitReceipt() {
         warehouseName: warehouseNameOf(l.warehouseId),
         produceDate: l.produceDate || null,
         expireDate: l.expireDate || null,
-        lotNumber: l.lotNumber || null
+        lotNumber: l.lotNumber || null,
+        details: (Array.isArray(l.details) && l.details.length) ? l.details : undefined
       }))
     }
 
@@ -485,4 +607,61 @@ page { background-color: #f5f6f7; min-height: 100%; }
   width: 100%; height: 88rpx; line-height: 88rpx;
   font-size: 32rpx; border-radius: 12rpx;
 }
+
+/* 逐件收货 */
+.line-instance {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 12rpx; padding-top: 12rpx;
+  border-top: 1px dashed #e5e5e5;
+}
+.inst-entry {
+  display: flex; align-items: center; gap: 6rpx;
+  padding: 6rpx 16rpx;
+  border: 1px solid #4a8cf7; border-radius: 8rpx;
+}
+.inst-ph { color: #4a8cf7; font-size: 26rpx; }
+.inst-count { color: #1a9c4a; font-size: 26rpx; font-weight: 600; }
+
+.popup-content {
+  background: #fff;
+  border-radius: 20rpx 20rpx 0 0;
+  padding: 24rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
+  max-height: 82vh;
+  display: flex; flex-direction: column;
+}
+.popup-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 16rpx;
+}
+.popup-title { font-size: 30rpx; font-weight: 600; color: #333; }
+.popup-close { font-size: 26rpx; color: #999; }
+.popup-tip {
+  font-size: 24rpx; color: #999; line-height: 1.5;
+  padding: 12rpx 16rpx; margin-bottom: 12rpx;
+  background: #f6f8fc; border-radius: 8rpx;
+}
+.popup-scroll { flex: 1; max-height: 52vh; }
+.inst-row {
+  padding: 16rpx 0;
+  border-bottom: 1px solid #f2f2f2;
+}
+.inst-row-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 8rpx;
+}
+.inst-idx { font-size: 26rpx; color: #4a8cf7; font-weight: 600; }
+.inst-del { font-size: 24rpx; color: #f56c6c; }
+.inst-field {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16rpx; padding: 6rpx 0;
+}
+.inst-field .label { flex: 0 0 220rpx; }
+.inst-field :deep(.uni-easyinput) { flex: 1; }
+.inst-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16rpx 0;
+}
+.inst-total { font-size: 26rpx; color: #333; }
+.popup-footer { display: flex; padding-top: 8rpx; }
+.empty-hint { padding: 40rpx 0; text-align: center; }
 </style>

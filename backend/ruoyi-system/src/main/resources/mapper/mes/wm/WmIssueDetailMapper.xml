@@ -19,6 +19,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="locationId"    column="location_id"    />
         <result property="areaId"    column="area_id"    />
         <result property="materialStockId"    column="material_stock_id"    />
+        <result property="instanceId"    column="instance_id"    />
+        <result property="instanceCode"    column="instance_code"    />
+        <result property="instanceQuantity"    column="instance_quantity"    />
         <result property="quantity"    column="quantity"    />
         <result property="unitOfMeasure"    column="unit_of_measure"    />
         <result property="unitName"    column="unit_name"    />
@@ -34,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmIssueDetailVo">
-        select detail_id, factory_id, line_id, issue_id, issue_code, item_id, item_code, item_name, batch_id, batch_code, warehouse_id, location_id, area_id, material_stock_id, quantity, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity2, remark, create_by, create_time, update_by, update_time from qxx_wm_issue_detail
+        select detail_id, factory_id, line_id, issue_id, issue_code, item_id, item_code, item_name, batch_id, batch_code, warehouse_id, location_id, area_id, material_stock_id, instance_id, instance_code, instance_quantity, quantity, unit_of_measure, unit_name, unit2, unit2_name, conversion_rate, quantity2, remark, create_by, create_time, update_by, update_time from qxx_wm_issue_detail
     </sql>
 
     <select id="selectWmIssueDetailList" parameterType="WmIssueDetail" resultMap="WmIssueDetailResult">
@@ -74,6 +77,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="locationId != null">location_id,</if>
             <if test="areaId != null">area_id,</if>
             <if test="materialStockId != null">material_stock_id,</if>
+            <if test="instanceId != null">instance_id,</if>
+            <if test="instanceCode != null and instanceCode != ''">instance_code,</if>
+            <if test="instanceQuantity != null">instance_quantity,</if>
             <if test="quantity != null">quantity,</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure,</if>
             <if test="unitName != null and unitName != ''">unit_name,</if>
@@ -98,6 +104,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="locationId != null">#{locationId},</if>
             <if test="areaId != null">#{areaId},</if>
             <if test="materialStockId != null">#{materialStockId},</if>
+            <if test="instanceId != null">#{instanceId},</if>
+            <if test="instanceCode != null and instanceCode != ''">#{instanceCode},</if>
+            <if test="instanceQuantity != null">#{instanceQuantity},</if>
             <if test="quantity != null">#{quantity},</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">#{unitOfMeasure},</if>
             <if test="unitName != null and unitName != ''">#{unitName},</if>
@@ -126,6 +135,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="locationId != null">location_id = #{locationId},</if>
             <if test="areaId != null">area_id = #{areaId},</if>
             <if test="materialStockId != null">material_stock_id = #{materialStockId},</if>
+            <if test="instanceId != null">instance_id = #{instanceId},</if>
+            <if test="instanceCode != null and instanceCode != ''">instance_code = #{instanceCode},</if>
+            <if test="instanceQuantity != null">instance_quantity = #{instanceQuantity},</if>
             <if test="quantity != null">quantity = #{quantity},</if>
             <if test="unitOfMeasure != null and unitOfMeasure != ''">unit_of_measure = #{unitOfMeasure},</if>
             <if test="unitName != null and unitName != ''">unit_name = #{unitName},</if>

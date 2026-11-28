@@ -24,5 +24,7 @@ export interface MdItemBatchConfig extends BaseEntity {
   qualityStatusFlag?: string;
   paperRollFlag?: string;
   paperWidthFlag?: string;
+  /** 是否逐实物实例管理（1-是）：一卷/一根/一桶各自数量可不同 */
+  instanceFlag?: string;
   enableFlag?: string;
 }

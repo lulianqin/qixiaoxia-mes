@@ -38,7 +38,10 @@
         <template #default="{ $index }">{{ $index + 1 }}</template>
       </el-table-column>
       <el-table-column label="工序" min-width="140">
-        <template #default="{ row }">{{ row.processName }}</template>
+        <template #default="{ row }">
+          {{ row.processName }}
+          <el-tag v-if="row.bizType === 'SLITTING'" type="success" size="small" class="ml4">分切</el-tag>
+        </template>
       </el-table-column>
       <el-table-column label="外协" width="70" align="center">
         <template #default="{ row }">
@@ -47,7 +50,10 @@
       </el-table-column>
       <el-table-column label="开单" width="110" align="center">
         <template #default="{ row }">
-          <el-select v-model="row.docType" size="small" :disabled="readonly" style="width:100%">
+          <el-tooltip v-if="row.bizType === 'SLITTING'" content="分切工序在单据配置里生成「分切单」" placement="top">
+            <el-tag type="success" size="small">分切单</el-tag>
+          </el-tooltip>
+          <el-select v-else v-model="row.docType" size="small" :disabled="readonly" style="width:100%">
             <el-option label="加工" value="PROCESS" />
             <el-option label="采购" value="PURCHASE" />
           </el-select>
@@ -131,6 +137,7 @@ function addRow(row: any) {
   if (!row || !row.processId) return
   props.modelValue.push({
     processId: row.processId, processCode: row.processCode, processName: row.processName,
+    bizType: row.bizType === 'SLITTING' ? 'SLITTING' : 'NORMAL',
     isOutsource: row.isOutsource || '0', docType: 'PROCESS', orderNum: props.modelValue.length + 1,
     vendorId: row.vendorId || null, vendorCode: row.vendorCode || null, vendorName: row.vendorName || null,
     planQty: props.defaultQty || 0, unitPrice: 0, expectedDate: props.config?.orderDate || null
@@ -179,6 +186,7 @@ function summary({ columns }: any) {
 
 <style scoped>
 .tip { color: #909399; font-size: 12px; }
+.ml4 { margin-left: 4px; }
 .mb8 { margin-bottom: 8px; }
 :deep(.el-form-item) { margin-bottom: 8px; }
 </style>

@@ -30,6 +30,10 @@ public class ProProcess extends BaseEntity
     @Excel(name = "工序名称")
     private String processName;
 
+    /** 业务类型：NORMAL-普通工序 / SLITTING-分切（决定单据配置生成分切单） */
+    @Excel(name = "业务类型", readConverterExp = "NORMAL=普通工序,SLITTING=分切")
+    private String bizType;
+
     /** 工艺要求/注意事项 */
     @Excel(name = "工艺要求")
     private String attention;
@@ -76,6 +80,16 @@ public class ProProcess extends BaseEntity
     public String getProcessName()
     {
         return processName;
+    }
+
+    public void setBizType(String bizType)
+    {
+        this.bizType = bizType;
+    }
+
+    public String getBizType()
+    {
+        return bizType;
     }
 
     public void setAttention(String attention)

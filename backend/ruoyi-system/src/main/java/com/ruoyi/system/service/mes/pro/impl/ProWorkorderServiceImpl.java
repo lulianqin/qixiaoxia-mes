@@ -2166,6 +2166,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService
             skuConfig.setQualityStatusFlag(parentConfig.getQualityStatusFlag());
             skuConfig.setPaperRollFlag(parentConfig.getPaperRollFlag());
             skuConfig.setPaperWidthFlag(parentConfig.getPaperWidthFlag());
+            skuConfig.setInstanceFlag(parentConfig.getInstanceFlag());
             skuConfig.setEnableFlag(parentConfig.getEnableFlag());
             skuConfig.setRemark("从父产品 " + parentItem.getItemCode() + " 复制");
             mdItemBatchConfigService.insertMdItemBatchConfig(skuConfig);

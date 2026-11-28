@@ -21,14 +21,14 @@
       <span class="ml8" style="color:#909399;font-size:12px">为每个物料指定本次发料数量，可选批次/库位</span>
     </div>
     <el-table :data="details" size="small" border>
-      <el-table-column label="物料" min-width="160">
+      <el-table-column label="物料" min-width="150">
         <template #default="scope">
           <el-select v-model="scope.row.lineId" placeholder="选择领料行" size="small" style="width:100%" @change="(v) => onLineChange(scope.$index, v)">
             <el-option v-for="l in issueableLines" :key="l.lineId" :label="`${l.itemCode} - ${l.itemName}`" :value="l.lineId" />
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="批次" width="240">
+      <el-table-column label="批次" width="200">
         <template #default="scope">
           <el-select v-model="scope.row.materialStockId" placeholder="按预占发料" size="small" clearable filterable style="width:100%" @change="(v) => onBatchChange(scope.$index, v)">
             <el-option v-for="b in (scope.row._batchOptions || [])" :key="b.materialStockId"
@@ -36,9 +36,21 @@
           </el-select>
         </template>
       </el-table-column>
+      <!-- 实物实例：一卷 / 一根 / 一桶，有实例的物料必须逐件发料 -->
+      <el-table-column label="实物实例" width="220">
+        <template #default="scope">
+          <el-select v-if="(scope.row._instanceOptions || []).length" v-model="scope.row.instanceId"
+            placeholder="逐件选择" size="small" clearable filterable style="width:100%"
+            @change="(v) => onInstanceChange(scope.$index, v)">
+            <el-option v-for="i in scope.row._instanceOptions" :key="i.instanceId"
+              :label="`${i.instanceCode} · 剩${i.remainingQuantity}${i.quantityUom || ''}`" :value="i.instanceId" />
+          </el-select>
+          <span v-else style="color:#c0c4cc;font-size:12px">{{ scope.row._instanceLoading ? '加载中…' : '未按实物管理' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="本次发料量" width="120">
         <template #default="scope">
-          <el-input-number v-model="scope.row.quantity" :min="0" :precision="2" size="small" controls-position="right" style="width:110px" />
+          <el-input-number v-model="scope.row.quantity" :min="0" :max="instanceMax(scope.row)" :precision="2" size="small" controls-position="right" style="width:110px" />
         </template>
       </el-table-column>
       <el-table-column label="单位" width="60" align="center">
@@ -73,6 +85,7 @@ import { ref, computed } from 'vue'
 import { issueOut } from '@/api/mes/wm/issueheader'
 import { listIssueDetail } from '@/api/mes/wm/issuedetail'
 import { availableBatches } from '@/api/mes/wm/material_stock'
+import { availableInstances } from '@/api/mes/wm/stock_instance'
 import { getCurrentInstance } from 'vue'
 
 const proxy = getCurrentInstance()?.proxy as any
@@ -120,8 +133,12 @@ function addDetailRow() {
     materialStockId: null,  // 不选 = 按预占发料
     batchId: null,
     batchCode: '',
+    instanceId: null,
+    instanceCode: '',
     quantity: first ? remain(first) : 0,
-    _batchOptions: [] as any[]
+    _batchOptions: [] as any[],
+    _instanceOptions: [] as any[],
+    _instanceLoading: false
   }
   details.value.push(row)
   if (first) loadBatchOptions(details.value.length - 1, first)
@@ -134,7 +151,8 @@ function onLineChange(idx: number, lineId: number) {
       itemId: line.itemId, itemCode: line.itemCode, itemName: line.itemName,
       unitOfMeasure: line.unitOfMeasure, unitName: line.unitName,
       quantity: remain(line),
-      materialStockId: null, batchId: null, batchCode: ''  // 切换物料重置批次
+      materialStockId: null, batchId: null, batchCode: '',
+      instanceId: null, instanceCode: '', _instanceOptions: []
     })
     loadBatchOptions(idx, line)
   }
@@ -146,6 +164,47 @@ function loadBatchOptions(idx: number, line: any) {
   availableBatches(line.itemId).then((r: any) => {
     details.value[idx]._batchOptions = r.data || []
   }).catch(() => { details.value[idx]._batchOptions = [] })
+  loadInstanceOptions(idx, details.value[idx])
+}
+
+/** 加载该行可用实物实例：有剩余、未报废；选定批次后收窄到该库存桶 */
+function loadInstanceOptions(idx: number, row: any) {
+  if (!row?.itemId) return
+  row._instanceLoading = true
+  const params: any = {}
+  if (row.materialStockId) params.materialStockId = row.materialStockId
+  else {
+    if (row.batchId) params.batchId = row.batchId
+    if (row.warehouseId) params.warehouseId = row.warehouseId
+  }
+  availableInstances(row.itemId, params).then((r: any) => {
+    row._instanceOptions = r.data || []
+    // 实例变了之后，已选实例若不在新列表里则清空
+    if (row.instanceId && !row._instanceOptions.some((i: any) => i.instanceId === row.instanceId)) {
+      row.instanceId = null
+      row.instanceCode = ''
+    }
+  }).catch(() => { row._instanceOptions = [] }).finally(() => { row._instanceLoading = false })
+}
+
+/** 选定实例后默认按该件剩余量发货，并回填编码 */
+function onInstanceChange(idx: number, instanceId: any) {
+  const row = details.value[idx]
+  if (!instanceId) { row.instanceCode = ''; return }
+  const inst = (row._instanceOptions || []).find((i: any) => i.instanceId === instanceId)
+  if (!inst) return
+  row.instanceCode = inst.instanceCode
+  if (inst.batchId) { row.batchId = inst.batchId; row.batchCode = inst.batchCode }
+  if (inst.warehouseId) row.warehouseId = inst.warehouseId
+  const remainQty = Number(inst.remainingQuantity) || 0
+  const need = remain(row.lineId ? lines.value.find(l => l.lineId === row.lineId) : null) || remainQty
+  row.quantity = Math.min(remainQty, need)
+}
+
+/** 数量上限：选了实例就是该件剩余量，否则不限 */
+function instanceMax(row: any) {
+  const inst = (row?._instanceOptions || []).find((i: any) => i.instanceId === row.instanceId)
+  return inst ? Number(inst.remainingQuantity) : undefined
 }
 
 /** 选择批次下拉：把 materialStockId 反填 batchId/batchCode */
@@ -153,12 +212,14 @@ function onBatchChange(idx: number, materialStockId: any) {
   const row = details.value[idx]
   if (!materialStockId) {
     row.batchId = null; row.batchCode = ''
+    loadInstanceOptions(idx, row)
     return
   }
   const b = (row._batchOptions || []).find((x: any) => x.materialStockId === materialStockId)
   row.batchId = b?.batchId ?? null
   row.batchCode = b?.batchCode ?? ''
   row.warehouseId = b?.warehouseId ?? row.warehouseId
+  loadInstanceOptions(idx, row)
 }
 
 function handleConfirm() {
@@ -172,6 +233,18 @@ function handleConfirm() {
       proxy.$modal.msgError(`物料[${d.itemCode}]本次发料量(${d.quantity})超过未发料量(${remain(line)})`)
       return
     }
+    // 有实物实例的物料必须逐件发料，且不能超过该件剩余
+    if ((d._instanceOptions || []).length > 0) {
+      if (!d.instanceId) {
+        proxy.$modal.msgError(`物料[${d.itemCode}]需按实物逐件发料，请选择${d.unit2Name || '实物实例'}`)
+        return
+      }
+      const inst = d._instanceOptions.find((i: any) => i.instanceId === d.instanceId)
+      if (inst && d.quantity > Number(inst.remainingQuantity)) {
+        proxy.$modal.msgError(`物料[${d.itemCode}]本次发料量(${d.quantity})超过实例[${inst.instanceCode}]剩余(${inst.remainingQuantity})`)
+        return
+      }
+    }
   }
   submitting.value = true
   // 剥离前端辅助字段 _batchOptions，组装后端需要的字段
@@ -182,7 +255,10 @@ function handleConfirm() {
     batchId: d.batchId ?? null,
     batchCode: d.batchCode || null,
     materialStockId: d.materialStockId ?? null,
-    warehouseId: d.warehouseId ?? null
+    warehouseId: d.warehouseId ?? null,
+    instanceId: d.instanceId ?? null,
+    instanceCode: d.instanceCode || null,
+    instanceQuantity: d.instanceId ? d.quantity : null
   }))
   issueOut(header.value.issueId, payload).then(() => {
     proxy.$modal.msgSuccess('发料成功')

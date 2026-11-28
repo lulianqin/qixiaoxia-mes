@@ -67,6 +67,15 @@
             </template>
           </el-table-column>
           <el-table-column label="规格型号" align="center" prop="specification" width="150" :show-overflow-tooltip="true" />
+          <el-table-column label="产品尺寸" align="center" prop="productSize" width="140" :show-overflow-tooltip="true">
+            <template #default="scope">{{ scope.row.productSize || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="装箱规格" align="center" prop="packageSpec" width="120" :show-overflow-tooltip="true">
+            <template #default="scope">{{ scope.row.packageSpec || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="扩展属性" align="center" min-width="180" :show-overflow-tooltip="true">
+            <template #default="scope">{{ attrText(scope.row.extAttrs) }}</template>
+          </el-table-column>
           <el-table-column label="分类" align="center" prop="itemTypeName" width="100" :show-overflow-tooltip="true">
             <template #default="scope">{{ scope.row.itemTypeName || '未分类' }}</template>
           </el-table-column>
@@ -76,9 +85,10 @@
           <el-switch v-model="scope.row.enableFlag" active-value="1" inactive-value="0" @change="handleEnableChange(scope.row)" />
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="操作" align="center" width="80" class-name="small-padding fixed-width">
+      <el-table-column fixed="right" label="操作" align="center" width="180" class-name="small-padding fixed-width">
             <template #default="scope">
-              <el-tooltip content="修改" placement="top"><el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:item:edit']"></el-button></el-tooltip>
+              <el-button v-if="scope.row.parentId === 0" link type="primary" size="small" @click="handleAddSku(scope.row)" v-hasPermi="['mes:md:item:add']">新建SKU</el-button>
+              <el-button link type="primary" size="small" @click="handleUpdate(scope.row)" v-hasPermi="['mes:md:item:edit']">修改</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -182,7 +192,8 @@
             </el-row>
             <el-row>
               <el-col :span="12"><el-form-item label="启用批次管理"><el-switch v-model="form.batchFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="高价值物资"><el-switch v-model="form.highValue" active-value="1" inactive-value="0" /></el-form-item></el-col>
+              <!-- 高价值物资暂无业务消费，先隐藏（保留字段默认值，启用后改开关即可恢复） -->
+              <el-col v-if="HIGH_VALUE_ENABLED" :span="12"><el-form-item label="高价值物资"><el-switch v-model="form.highValue" active-value="1" inactive-value="0" /></el-form-item></el-col>
             </el-row>
             <el-row>
               <el-col :span="12"><el-form-item label="安全库存"><el-switch v-model="form.safeStockFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
@@ -229,6 +240,51 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 基于 SPU 新建 SKU：复用后端 specVariant（同规格查重、自动生成编码/名称、继承父级属性） -->
+    <el-dialog title="基于SPU新建SKU" v-model="skuOpen" width="680px" append-to-body>
+      <el-form ref="skuFormRef" :model="skuForm" :rules="skuRules" label-width="100px">
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="父产品(SPU)">
+              <el-input :model-value="`${skuForm.parentCode || ''} ${skuForm.parentName || ''}`" disabled />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="规格型号" prop="specification">
+              <el-input v-model="skuForm.specification" placeholder="请输入规格型号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="产品尺寸">
+              <el-input v-model="skuForm.productSize" placeholder="如254*127*330mm" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="装箱规格">
+              <el-input v-model="skuForm.packageSpec" placeholder="如250个/箱" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="印刷要求">
+              <el-input v-model="skuForm.printingReq" placeholder="可空" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-alert type="info" :closable="false" show-icon
+                  title="同规格已存在时直接复用旧SKU；新SKU的编码/名称自动生成，分类、单位和扩展属性继承父产品。" />
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" :loading="skuSaving" @click="submitSku">确 定</el-button>
+          <el-button @click="skuOpen = false">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -239,13 +295,23 @@ import { genSerialCode } from '@/api/mes/sys/autocoderule'
 import type { MdItem, ItemQueryParams } from '@/types/api/mes/md/item'
 import type { MdItemTypeAttr } from '@/types/api/mes/md/attr'
 import type { TreeSelect } from '@/types/api/common'
-import { listItem, getItem, delItem, addItem, updateItem } from '@/api/mes/md/item'
+import { listItem, getItem, delItem, addItem, updateItem, specVariantItem } from '@/api/mes/md/item'
 import { treeselect, getItemtype } from '@/api/mes/md/itemtype'
-import { getEffAttrSchema } from '@/api/mes/md/attr'
+import { getEffAttrSchema, listAttrDef } from '@/api/mes/md/attr'
 import { listAllUnitmeasure } from '@/api/mes/md/unitmeasure'
 import BatchConfig from './components/BatchConfig.vue'
 import ItemBom from './components/ItemBom.vue'
 import ExtAttrForm from '@/components/ExtAttrForm/index.vue'
+
+interface SkuForm {
+  parentId?: number
+  parentCode?: string
+  parentName?: string
+  specification: string
+  productSize: string
+  packageSpec: string
+  printingReq: string
+}
 
 const { proxy } = getCurrentInstance() as any
 const { sys_yes_no } = useDict('sys_yes_no')
@@ -271,8 +337,16 @@ const batchConfigRef = ref<any>(null)
 const itemBomRef = ref<any>(null)
 // 批次配置页签开关：当前批次配置仅存储、无业务消费，先隐藏避免误导
 const BATCH_CONFIG_ENABLED = false
+// 高价值物资暂无业务消费，先隐藏（字段默认值保留，后续启用只需打开开关）
+const HIGH_VALUE_ENABLED = false
 const effAttrSchema = ref<MdItemTypeAttr[]>([])
+const attrMap = ref<Record<string, { attrName: string; attrUnit?: string }>>({})
 const extAttrFormRef = ref<any>(null)
+const skuOpen = ref(false)
+const skuSaving = ref(false)
+const skuFormRef = ref<any>(null)
+const skuForm = ref<SkuForm>({ specification: '', productSize: '', packageSpec: '', printingReq: '' })
+const skuRules = { specification: [{ required: true, message: '请输入规格型号', trigger: 'blur' }] }
 
 const data = reactive({
   form: {
@@ -343,6 +417,28 @@ function loadEffAttrSchema(typeId: number) {
   getEffAttrSchema(typeId).then(res => {
     effAttrSchema.value = res.data || []
   }).catch(() => { effAttrSchema.value = [] })
+}
+
+/** 扩展属性列：中文名+单位:值，属性名取属性字典 */
+function attrText(attrs?: Record<string, any>) {
+  if (!attrs) return '-'
+  const parts = Object.keys(attrs)
+    .filter(k => attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== '')
+    .map(k => {
+      const def = attrMap.value[k]
+      return `${def?.attrName || k}:${attrs[k]}${def?.attrUnit || ''}`
+    })
+  return parts.length ? parts.join(' / ') : '-'
+}
+
+function loadAttrMap() {
+  listAttrDef({ enableFlag: '1' } as any).then((res: any) => {
+    const map: Record<string, { attrName: string; attrUnit?: string }> = {}
+    for (const a of (res.rows || [])) {
+      map[a.attrCode] = { attrName: a.attrName, attrUnit: a.attrUnit }
+    }
+    attrMap.value = map
+  }).catch(() => {})
 }
 
 function handleNodeClick(data: any) {
@@ -455,6 +551,45 @@ function handleUpdate(row?: MdItem) {
   })
 }
 
+/** SPU 行「新建SKU」：只收集规格维度，其余由后端继承父产品 */
+function handleAddSku(row: MdItem) {
+  skuForm.value = {
+    parentId: row.itemId,
+    parentCode: row.itemCode,
+    parentName: row.itemName,
+    specification: '',
+    productSize: '',
+    packageSpec: '',
+    printingReq: ''
+  }
+  skuOpen.value = true
+}
+
+async function submitSku() {
+  if (skuFormRef.value) {
+    const valid = await new Promise<boolean>(resolve =>
+      skuFormRef.value.validate((v: boolean) => resolve(v))
+    )
+    if (!valid) return
+  }
+  const f = skuForm.value
+  skuSaving.value = true
+  try {
+    const r: any = await specVariantItem({
+      parentId: f.parentId,
+      specification: f.specification,
+      productSize: f.productSize,
+      packageSpec: f.packageSpec,
+      printingReq: f.printingReq
+    } as any)
+    const created = r?.data || r
+    proxy.$modal.msgSuccess(created?.itemCode ? `已保存SKU：${created.itemCode}` : '保存成功')
+    skuOpen.value = false
+    getList()
+  } catch { /* 错误提示由 request 拦截器统一处理 */ }
+  finally { skuSaving.value = false }
+}
+
 async function submitForm() {
   const valid = await new Promise<boolean>(resolve =>
     proxy.$refs['formRef'].validate((v: boolean) => resolve(v))
@@ -498,6 +633,7 @@ function handleExport() {
 }
 
 loadTree()
+loadAttrMap()
 getList()
 </script>
 

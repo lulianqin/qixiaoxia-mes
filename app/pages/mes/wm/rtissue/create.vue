@@ -38,6 +38,13 @@
             <input class="qty-input" type="digit" v-model="line.quantityRt" />
             <text class="unit">{{ line.unitName || line.unitOfMeasure || '-' }}</text>
           </view>
+          <!-- 退回实物：默认原卷/原根，可切换 -->
+          <view class="line-row" v-if="(line.instanceOptions || []).length">
+            <text class="line-label">退回实物</text>
+            <view class="inst-pick" @click="pickInstance(idx)">
+              <text class="inst-val">{{ line.instanceCode || '请选择原实物' }}</text>
+            </view>
+          </view>
         </view>
         <view class="tip-card"><text class="text-grey">提交后生成退料草稿，需在「退料单」中执行退库（RQC 检验通过后方可执行）。</text></view>
 
@@ -89,7 +96,15 @@ async function selectIssue(it) {
   try {
     const res = await buildRtIssueFromIssue(it.issueId)
     draft.value = res.data || null
-    lines.value = ((draft.value && draft.value.lines) || []).map(l => ({ ...l, quantityRtMax: Number(l.quantityRt) }))
+    lines.value = ((draft.value && draft.value.lines) || []).map(l => {
+      const row = { ...l, quantityRtMax: Number(l.quantityRt) }
+      // 默认退回原实物实例（该领料单发过的第一件）
+      if (!row.instanceId && Array.isArray(row.instanceOptions) && row.instanceOptions.length) {
+        row.instanceId = row.instanceOptions[0].instanceId
+        row.instanceCode = row.instanceOptions[0].instanceCode
+      }
+      return row
+    })
     if (!workorderCode.value && draft.value) workorderCode.value = draft.value.workorderCode || ''
   } catch (e) {
     selectedIssueId.value = null
@@ -101,8 +116,31 @@ function validLines() {
     .filter(l => Number(l.quantityRt) > 0 && Number(l.quantityRt) <= Number(l.quantityRtMax))
     .map(l => {
       const { quantityRtMax, ...rest } = l
-      return { ...rest, quantityRt: Number(l.quantityRt) }
+      return {
+        ...rest,
+        quantityRt: Number(l.quantityRt),
+        instanceQuantity: l.instanceId ? Number(l.quantityRt) : null
+      }
     })
+}
+
+// 选择退回的实物实例（默认原卷，可改选其它在库件）
+function pickInstance(idx) {
+  const line = lines.value[idx]
+  const opts = line?.instanceOptions || []
+  if (!opts.length) { proxy.$modal.msgError('该物料没有可退回的实物'); return }
+  uni.showActionSheet({
+    itemList: opts.slice(0, 9).map(i => `${i.instanceCode} · 已发${i.remainingQuantity}${i.quantityUom || ''}`),
+    success: (r) => {
+      const inst = opts[r.tapIndex]
+      if (!inst) return
+      const row = lines.value[idx]
+      row.instanceId = inst.instanceId
+      row.instanceCode = inst.instanceCode
+      if (inst.batchId) { row.batchId = inst.batchId; row.batchCode = inst.batchCode || '' }
+      lines.value.splice(idx, 1, { ...row })
+    }
+  })
 }
 
 function submit() {
@@ -175,6 +213,8 @@ page { background-color: #f5f6f7; min-height: 100%; }
 .line-row { display: flex; align-items: center; gap: 16rpx; }
 .line-label { color: #666; font-size: 26rpx; width: 140rpx; }
 .qty-input { flex: 1; font-size: 30rpx; text-align: right; }
+.inst-pick { flex: 1; display: flex; justify-content: flex-end; }
+.inst-val { font-size: 28rpx; color: #007aff; }
 .empty-hint { padding: 40rpx 0; text-align: center; }
 .tip-card { padding: 8rpx 32rpx 16rpx; }
 .footer-submit { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 20rpx 24rpx; border-top: 1rpx solid #eee; }

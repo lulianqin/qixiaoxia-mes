@@ -106,8 +106,12 @@
             type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" placeholder="成品尺寸" :disabled="readonly" />
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="120">
-        <template #default="{ row }"><el-input-number v-model="row.planQty" :min="0" :precision="4" controls-position="right" style="width:100%" :disabled="readonly" /></template>
+      <el-table-column width="120">
+        <template #header><span class="req">*</span>数量</template>
+        <template #default="{ row }">
+          <el-input-number v-model="row.planQty" :min="0" :precision="4" controls-position="right"
+            :class="['qty-input', { 'qty-invalid': Number(row.planQty || 0) <= 0 }]" style="width:100%" :disabled="readonly" />
+        </template>
       </el-table-column>
       <el-table-column label="单价" width="110">
         <template #default="{ row }"><el-input-number v-model="row.unitPrice" :min="0" :precision="4" controls-position="right" style="width:100%" :disabled="readonly" /></template>
@@ -293,5 +297,6 @@ function money(q: any, p: any) {
 .mt8 { margin-top: 8px; }
 .attr-wrap { padding: 8px 16px; background: #fafafa; }
 .req { color: #f56c6c; margin-right: 2px; }
+.qty-invalid :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 :deep(.el-form-item__label) { padding-right: 12px !important; }
 </style>

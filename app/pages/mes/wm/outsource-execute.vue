@@ -60,6 +60,10 @@
                 <uni-icons v-if="isDraft" type="right" size="14" color="#999"></uni-icons>
               </view>
             </view>
+            <view class="line-row" v-if="line.instanceCode">
+              <text class="line-label">母卷</text>
+              <text class="value">{{ line.instanceCode }}</text>
+            </view>
             <view class="line-row" v-if="line.batchCode || line.warehouseName">
               <text class="line-label">批次</text>
               <text class="value">{{ line.batchCode || '-' }}</text>
@@ -139,7 +143,9 @@ function mapIssueLines(rawLines) {
     itemId: l.itemId, itemCode: l.itemCode, itemName: l.itemName, specification: l.specification || '',
     quantity: l.quantity, unitOfMeasure: l.unitOfMeasure || 'TON', unitName: l.unitName || '吨',
     warehouseId: l.warehouseId, warehouseCode: l.warehouseCode || '', warehouseName: l.warehouseName || '',
-    batchId: l.batchId || 0, batchCode: l.batchCode || ''
+    batchId: l.batchId || 0, batchCode: l.batchCode || '',
+    // 母卷实例必须回传，否则草稿行整体替换会丢掉实例绑定（分切单发料强制要求）
+    instanceId: l.instanceId || null, instanceCode: l.instanceCode || null
   }))
 }
 

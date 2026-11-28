@@ -24,6 +24,7 @@ import com.ruoyi.system.mapper.mes.wm.WmRtIssueMapper;
 import com.ruoyi.system.mapper.mes.wm.WmRtIssueLineMapper;
 import com.ruoyi.system.mapper.mes.wm.WmIssueHeaderMapper;
 import com.ruoyi.system.mapper.mes.wm.WmIssueLineMapper;
+import com.ruoyi.system.mapper.mes.wm.WmIssueDetailMapper;
 import com.ruoyi.system.mapper.mes.wm.WmMaterialStockMapper;
 import com.ruoyi.system.mapper.mes.wm.WmTransactionMapper;
 import com.ruoyi.system.mapper.mes.pro.ProMaterialTraceMapper;
@@ -33,6 +34,7 @@ import com.ruoyi.system.domain.mes.wm.WmRtIssue;
 import com.ruoyi.system.domain.mes.wm.WmRtIssueLine;
 import com.ruoyi.system.domain.mes.wm.WmIssueHeader;
 import com.ruoyi.system.domain.mes.wm.WmIssueLine;
+import com.ruoyi.system.domain.mes.wm.WmIssueDetail;
 import com.ruoyi.system.domain.mes.wm.WmMaterialStock;
 import com.ruoyi.system.domain.mes.wm.WmTransaction;
 import com.ruoyi.system.domain.mes.pro.ProMaterialTrace;
@@ -41,6 +43,9 @@ import com.ruoyi.system.domain.mes.pro.ProFeedbackConsume;
 import com.ruoyi.system.service.mes.qc.IQcFactoryService;
 import com.ruoyi.system.service.mes.qc.IQcGateService;
 import com.ruoyi.system.service.mes.wm.IWmRtIssueService;
+import com.ruoyi.system.service.mes.wm.IWmStockInstanceService;
+import com.ruoyi.system.service.mes.wm.IWmTransactionService;
+import com.ruoyi.system.domain.mes.wm.WmStockInstance;
 
 /**
  * WmRtIssueService业务层处理
@@ -64,6 +69,9 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
     private WmIssueLineMapper wmIssueLineMapper;
 
     @Autowired
+    private WmIssueDetailMapper wmIssueDetailMapper;
+
+    @Autowired
     private WmMaterialStockMapper wmMaterialStockMapper;
 
     @Autowired
@@ -71,6 +79,12 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
 
     @Autowired
     private WmTransactionMapper wmTransactionMapper;
+
+    @Autowired
+    private IWmStockInstanceService wmStockInstanceService;
+
+    @Autowired
+    private IWmTransactionService wmTransactionService;
 
     @Autowired
     private ProMaterialTraceMapper proMaterialTraceMapper;
@@ -315,6 +329,30 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             }
         }
 
+        // 3.5 载入该领料单已发的实物实例：退料默认退回原实例（一卷/一根/一桶）
+        Map<Long, List<WmStockInstance>> issuedInstancesByItem = new HashMap<>();
+        WmIssueDetail detailQuery = new WmIssueDetail();
+        detailQuery.setIssueId(issueId);
+        List<WmIssueDetail> issuedDetails = wmIssueDetailMapper.selectWmIssueDetailList(detailQuery);
+        if (issuedDetails != null) {
+            for (WmIssueDetail d : issuedDetails) {
+                if (d.getInstanceId() == null || d.getItemId() == null) continue;
+                WmStockInstance inst = new WmStockInstance();
+                inst.setInstanceId(d.getInstanceId());
+                inst.setInstanceCode(d.getInstanceCode());
+                inst.setItemId(d.getItemId());
+                inst.setItemCode(d.getItemCode());
+                inst.setItemName(d.getItemName());
+                inst.setQuantityUom(d.getUnitOfMeasure());
+                inst.setOriginalQuantity(d.getInstanceQuantity());
+                inst.setRemainingQuantity(d.getInstanceQuantity());
+                inst.setBatchId(d.getBatchId());
+                inst.setBatchCode(d.getBatchCode());
+                inst.setWarehouseId(d.getWarehouseId());
+                issuedInstancesByItem.computeIfAbsent(d.getItemId(), k -> new ArrayList<>()).add(inst);
+            }
+        }
+
         // 4. 遍历领料行，算差额退料量（已发料 - 已消耗），仅 unused > 0 才建退料行
         List<WmRtIssueLine> lines = new ArrayList<>();
         for (WmIssueLine il : issueLines) {
@@ -334,6 +372,7 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
                 rtLine.setQuantityRt(unused);
                 rtLine.setBatchId(il.getBatchId());
                 rtLine.setBatchCode(il.getBatchCode());
+                rtLine.setInstanceOptions(issuedInstancesByItem.get(il.getItemId()));
                 rtLine.setWarehouseId(il.getWarehouseId());
                 rtLine.setLocationId(il.getLocationId());
                 rtLine.setAreaId(il.getAreaId());
@@ -463,11 +502,42 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             stockQuery.setWorkorderId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
             stockQuery.setQualityStatus("NORMAL");
 
-            WmMaterialStock existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
+            WmMaterialStock existing;
+            // 退料必须回到「发出去的那个桶」：优先用实物实例挂的库存桶；
+            // 否则先按工单桶查，再退化为不挂工单的桶（采购入库形成的桶不挂工单）。
+            // 不这样做会把同一物料拆成两行，且辅助件数（=在库实例数）与账面数量对不上。
+            WmStockInstance instanceRef = null;
+            if (line.getInstanceId() != null) {
+                instanceRef = wmStockInstanceService.selectWmStockInstanceById(line.getInstanceId());
+                if (instanceRef == null) {
+                    throw new ServiceException("实物实例不存在：" + line.getInstanceId());
+                }
+                if (line.getItemId() != null && !line.getItemId().equals(instanceRef.getItemId())) {
+                    throw new ServiceException("实物实例[" + instanceRef.getInstanceCode() + "]与退料物料不符");
+                }
+            }
+            existing = (instanceRef != null && instanceRef.getMaterialStockId() != null)
+                    ? wmMaterialStockMapper.loadMaterialStockByIdForUpdate(instanceRef.getMaterialStockId())
+                    : null;
+            if (existing == null) {
+                existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
+            }
+            if (existing == null) {
+                // 退化为不挂工单的桶（采购入库/期初形成的库存行）
+                stockQuery.setWorkorderId(0L);
+                existing = wmMaterialStockMapper.loadMaterialStockForUpdate(stockQuery);
+            }
             com.ruoyi.system.domain.mes.md.MdItem item = items.get(line.getItemId());
             BigDecimal delta = mesQuantityService.toBaseQty(line.getQuantityRt(), line.getUnitOfMeasure(), item);
             BigDecimal auxDelta = (item != null && mesQuantityService.hasAuxUnit(item))
                     ? mesQuantityService.toAuxQty(delta, item.getUnitOfMeasure(), item) : null;
+
+            if (instanceRef != null) {
+                WmStockInstance returned = wmStockInstanceService.adjustRemaining(
+                        line.getInstanceId(), delta, null, header.getWorkorderId(), header.getWorkorderCode());
+                line.setInstanceCode(returned.getInstanceCode());
+                line.setInstanceQuantity(delta);
+            }
 
             if (existing != null) {
                 // 历史库存行可能按辅助单位记录，先归一到主单位再累加
@@ -508,6 +578,10 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
                 existing = stockQuery;
             }
 
+            if (line.getInstanceId() != null) {
+                wmTransactionService.refreshInstanceAuxQuantity(existing.getMaterialStockId());
+            }
+
             // 3. 写库存事务 (RETURN_IN)
             WmTransaction tx = new WmTransaction();
             tx.setTransactionType("RETURN_IN");
@@ -516,6 +590,8 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             tx.setSourceDocCode(header.getRtCode());
             tx.setSourceLineId(line.getLineId());
             tx.setMaterialStockId(existing.getMaterialStockId());
+            tx.setInstanceId(line.getInstanceId());
+            tx.setInstanceCode(line.getInstanceCode());
             tx.setItemId(line.getItemId());
             tx.setItemCode(line.getItemCode());
             tx.setItemName(line.getItemName());
@@ -539,8 +615,13 @@ public class WmRtIssueServiceImpl implements IWmRtIssueService
             trace.setTraceType("RETURN");
             trace.setParentType("WORKORDER");
             trace.setParentId(header.getWorkorderId() != null ? header.getWorkorderId() : 0L);
-            trace.setChildType("MATERIAL_STOCK");
-            trace.setChildId(existing.getMaterialStockId());
+            if (line.getInstanceId() != null) {
+                trace.setChildType("STOCK_INSTANCE");
+                trace.setChildId(line.getInstanceId());
+            } else {
+                trace.setChildType("MATERIAL_STOCK");
+                trace.setChildId(existing.getMaterialStockId());
+            }
             trace.setQuantity(delta);
             trace.setUnitOfMeasure(item != null ? item.getUnitOfMeasure() : line.getUnitOfMeasure());
             trace.setWorkorderId(header.getWorkorderId());

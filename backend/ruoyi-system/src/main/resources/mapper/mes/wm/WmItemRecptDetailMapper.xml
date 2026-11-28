@@ -27,6 +27,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="locationId" column="location_id" />
         <result property="areaId" column="area_id" />
         <result property="materialStockId" column="material_stock_id" />
+        <result property="instanceId" column="instance_id" />
+        <result property="instanceCode" column="instance_code" />
+        <result property="instanceQuantity" column="instance_quantity" />
         <result property="remark" column="remark" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
@@ -35,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectWmItemRecptDetailVo">
-        select detail_id, factory_id, recpt_id, line_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, quantity, quantity2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, material_stock_id, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt_detail
+        select detail_id, factory_id, recpt_id, line_id, item_id, item_code, item_name, specification, unit_of_measure, unit_name, unit2, unit2_name, quantity, quantity2, batch_id, batch_code, warehouse_id, warehouse_code, warehouse_name, location_id, area_id, material_stock_id, instance_id, instance_code, instance_quantity, remark, create_by, create_time, update_by, update_time from qxx_wm_item_recpt_detail
     </sql>
 
     <select id="selectWmItemRecptDetailList" parameterType="WmItemRecptDetail" resultMap="WmItemRecptDetailResult">
@@ -95,6 +98,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="locationId != null">location_id,</if>
             <if test="areaId != null">area_id,</if>
             <if test="materialStockId != null">material_stock_id,</if>
+            <if test="instanceId != null">instance_id,</if>
+            <if test="instanceCode != null">instance_code,</if>
+            <if test="instanceQuantity != null">instance_quantity,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -121,6 +127,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="locationId != null">#{locationId},</if>
             <if test="areaId != null">#{areaId},</if>
             <if test="materialStockId != null">#{materialStockId},</if>
+            <if test="instanceId != null">#{instanceId},</if>
+            <if test="instanceCode != null">#{instanceCode},</if>
+            <if test="instanceQuantity != null">#{instanceQuantity},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -151,6 +160,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="locationId != null">location_id = #{locationId},</if>
             <if test="areaId != null">area_id = #{areaId},</if>
             <if test="materialStockId != null">material_stock_id = #{materialStockId},</if>
+            <if test="instanceId != null">instance_id = #{instanceId},</if>
+            <if test="instanceCode != null">instance_code = #{instanceCode},</if>
+            <if test="instanceQuantity != null">instance_quantity = #{instanceQuantity},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>

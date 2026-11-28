@@ -32,6 +32,12 @@ public class WmIssueDetail extends BaseEntity
     private Long locationId;
     private Long areaId;
     private Long materialStockId;
+    /** 实物实例ID（按卷/根发料时必填） */
+    private Long instanceId;
+    /** 实物实例编号 */
+    private String instanceCode;
+    /** 本次从该实例发出的主单位数量 */
+    private BigDecimal instanceQuantity;
     private BigDecimal quantity;
     private String unitOfMeasure;
     private String unitName;
@@ -68,6 +74,12 @@ public class WmIssueDetail extends BaseEntity
     public void setAreaId(Long v) { this.areaId = v; }
     public Long getMaterialStockId() { return materialStockId; }
     public void setMaterialStockId(Long v) { this.materialStockId = v; }
+    public Long getInstanceId() { return instanceId; }
+    public void setInstanceId(Long v) { this.instanceId = v; }
+    public String getInstanceCode() { return instanceCode; }
+    public void setInstanceCode(String v) { this.instanceCode = v; }
+    public BigDecimal getInstanceQuantity() { return instanceQuantity; }
+    public void setInstanceQuantity(BigDecimal v) { this.instanceQuantity = v; }
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal v) { this.quantity = v; }
     public String getUnitOfMeasure() { return unitOfMeasure; }

@@ -18,6 +18,9 @@ public interface WmMaterialStockMapper
      */
     public WmMaterialStock loadMaterialStockForUpdate(WmMaterialStock stock);
 
+    /** 按库存桶主键查询并锁定行（退料按实物实例回原桶时使用） */
+    public WmMaterialStock loadMaterialStockByIdForUpdate(Long materialStockId);
+
     public List<WmMaterialStock> selectWmMaterialStockList(WmMaterialStock entity);
     public List<WmMaterialStock> selectWmMaterialStockAll();
     public WmMaterialStock selectWmMaterialStockByMaterialStockId(Long materialStockId);

@@ -150,6 +150,12 @@
       "navigationBarTitleText": "入库详情"
     }
   }, {
+    "path": "pages/mes/wm/stock/list",
+    "style": {
+      "navigationBarTitleText": "库存现有量",
+      "enablePullDownRefresh": true
+    }
+  }, {
     "path": "pages/mes/wm/sales/list",
     "style": {
       "navigationBarTitleText": "销售出库",

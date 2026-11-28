@@ -13,6 +13,12 @@
       </el-row>
       <el-row>
         <el-col :span="8"><el-form-item label="质量状态"><el-switch v-model="form.qualityStatusFlag" active-value="1" inactive-value="0" /></el-form-item></el-col>
+        <el-col :span="10">
+          <el-form-item label="逐实物管理">
+            <el-switch v-model="form.instanceFlag" active-value="1" inactive-value="0" />
+            <span class="inst-tip">开启后按辅助单位（卷/根/桶）逐件登记收发，库存辅助数量=在库件数</span>
+          </el-form-item>
+        </el-col>
       </el-row>
       <!-- 仅保留 qxx_wm_batch 有对应列的批次属性，无落库字段的属性已移除 -->
       <!-- 批次配置随物料编辑弹窗的【确认】统一保存，不再单独提供保存按钮 -->
@@ -35,7 +41,7 @@ function emptyForm(itemId: number): MdItemBatchConfig {
     itemId,
     produceDateFlag: '0', expireDateFlag: '0', recptDateFlag: '0',
     vendorFlag: '0', workorderFlag: '0', lotNumberFlag: '0',
-    qualityStatusFlag: '0', enableFlag: '1'
+    qualityStatusFlag: '0', instanceFlag: '0', enableFlag: '1'
   } as MdItemBatchConfig
 }
 
@@ -63,3 +69,12 @@ async function save(silent = true) {
 
 defineExpose({ load, save })
 </script>
+
+<style scoped>
+.inst-tip {
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.4;
+}
+</style>

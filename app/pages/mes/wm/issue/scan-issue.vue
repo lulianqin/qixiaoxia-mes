@@ -42,13 +42,22 @@
       </view>
       <view class="qty-row">
         <text class="qty-label">本次发料：</text>
-        <uni-number-box v-model="d.quantity" :min="0" :max="d.remain" :step="1" />
+        <uni-number-box v-model="d.quantity" :min="0" :max="d.instanceId ? Number(d._instanceRemain) : d.remain" :step="1" />
         <text class="qty-unit">{{ d.unitName }}</text>
       </view>
       <view class="batch-row">
         <text class="batch-label">批次：</text>
         <view class="batch-pick" @click="openBatchPicker(idx)">
           <text :class="d.batchCode ? 'batch-val' : 'batch-ph'">{{ d._batchDisplay || d.batchCode || '按预占发料（点选指定批次）' }}</text>
+        </view>
+      </view>
+      <!-- 实物实例：卷/根/桶，有实例的物料必须逐件发料 -->
+      <view class="batch-row" v-if="(d._instanceOptions || []).length">
+        <text class="batch-label">实物{{ d.unit2Name || '件' }}：</text>
+        <view class="batch-pick" @click="openInstancePicker(idx)">
+          <text :class="d.instanceCode ? 'batch-val' : 'batch-ph'">
+            {{ d.instanceCode ? `${d.instanceCode}（剩 ${d._instanceRemain} ${d.unitName}）` : `请选择${d.unit2Name || '实物'}（必选）` }}
+          </text>
         </view>
       </view>
     </view>
@@ -65,6 +74,7 @@
 import { ref, computed, getCurrentInstance } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getIssueDetail, issueOut, availableBatches, getStockByBatchCode } from '@/api/mes/wm/issue'
+import { availableInstances, scanInstance } from '@/api/mes/wm/stock_instance'
 import { parseQrPayload } from '@/utils/qrPayload'
 // 显式引入 uni-ui 组件（绕过 HBuilderX 发行 H5 时 easycom 失效）
 import UniIcons from '@/uni_modules/uni-icons/components/uni-icons/uni-icons.vue'
@@ -109,7 +119,8 @@ function handleCode(code) {
   if (payload && payload.type === 'MAT') {
     matchByBatchCode(payload.code)
   } else if (payload && payload.type === 'ROLL') {
-    proxy.$modal.msgError('卷料码请在分切投料使用')
+    // 卷料/实物实例码：直接按实例发料（一卷纸 / 一根钢管 / 一桶油墨）
+    matchByInstanceCode(payload.code)
   } else {
     // 裸条码/其他系统码：当作物料编码走原逻辑
     matchItem(code)
@@ -169,19 +180,44 @@ async function matchByBatchCode(batchCode) {
   pushIssueItem(matched, stock)
 }
 
+// 扫实物实例码（ROLL/根/桶）→ 反查实例，匹配领料行并按该件发料
+async function matchByInstanceCode(instanceCode) {
+  let inst = null
+  try {
+    const res = await scanInstance(instanceCode)
+    inst = res.data
+  } catch (e) { return }
+  if (!inst || !inst.instanceId) {
+    proxy.$modal.msgError('未找到实物实例：' + instanceCode)
+    return
+  }
+  const matched = lines.value.find(l => String(l.itemId) === String(inst.itemId))
+  if (!matched) {
+    proxy.$modal.msgError('该实物不属于本领料单物料：' + (inst.itemName || inst.itemCode))
+    return
+  }
+  pushIssueItem(matched, {
+    batchId: inst.batchId,
+    batchCode: inst.batchCode,
+    materialStockId: inst.materialStockId,
+    warehouseId: inst.warehouseId
+  }, inst)
+}
+
 // 校验领料行（未发完、未重复）后加入发料清单；stock 传入则预填批次四件套
-function pushIssueItem(matched, stock) {
+function pushIssueItem(matched, stock, inst) {
   const remain = (matched.quantityIssue || 0) - (matched.quantityIssued || 0)
   if (remain <= 0) {
     proxy.$modal.msgError('该物料已发料完成：' + matched.itemCode)
     return
   }
-  // 已在清单中则提示
-  const exist = issueList.value.find(d => d.lineId === matched.lineId)
+  // 已在清单中则提示（按实例发料时，同一行可来自不同卷，只有同实例才算重复）
+  const exist = issueList.value.find(d => d.lineId === matched.lineId && (!inst || d.instanceId === inst.instanceId))
   if (exist) {
-    proxy.$modal.msgSuccess('已在清单中：' + matched.itemCode)
+    proxy.$modal.msgSuccess('已在清单中：' + matched.itemCode + (inst ? '/' + inst.instanceCode : ''))
     return
   }
+  const instRemain = inst ? Number(inst.remainingQuantity) || 0 : 0
   issueList.value.push({
     lineId: matched.lineId,
     itemId: matched.itemId,
@@ -189,19 +225,25 @@ function pushIssueItem(matched, stock) {
     itemName: matched.itemName,
     unitOfMeasure: matched.unitOfMeasure,
     unitName: matched.unitName,
+    unit2Name: matched.unit2Name || '',
     quantityIssue: matched.quantityIssue,
     remain: remain,
-    quantity: remain,  // 默认发料全部未发量
+    quantity: inst ? Math.min(remain, instRemain) : remain,  // 有实例时不超过该件剩余
     batchId: stock ? stock.batchId : null,
     materialStockId: stock ? stock.materialStockId : null,
     batchCode: stock ? (stock.batchCode || '') : '',
     _batchDisplay: stock ? (stock.batchCode || '无批次') : '',
     warehouseId: (stock && stock.warehouseId) || header.value.warehouseId,
-    _batchOptions: []
+    instanceId: inst ? inst.instanceId : null,
+    instanceCode: inst ? inst.instanceCode : '',
+    _instanceRemain: instRemain,
+    _batchOptions: [],
+    _instanceOptions: inst ? [inst] : []
   })
-  // 加载该物料的可选批次（扫码预选后仍可点选切换）
+  // 加载该物料的可选批次与可用实物
   loadBatchOptions(issueList.value.length - 1)
-  proxy.$modal.msgSuccess('已添加：' + matched.itemName)
+  loadInstanceOptions(issueList.value.length - 1)
+  proxy.$modal.msgSuccess('已添加：' + matched.itemName + (inst ? ' / ' + inst.instanceCode : ''))
 }
 
 // 加载可选批次列表：不传 warehouseId，返回该物料所有仓所有批次
@@ -215,6 +257,61 @@ async function loadBatchOptions(idx) {
   } catch (e) {
     if (issueList.value[idx]) issueList.value[idx]._batchOptions = []
   }
+}
+
+// 加载该物料在库实物实例：选定批次/仓后自动收窄
+async function loadInstanceOptions(idx) {
+  const d = issueList.value[idx]
+  if (!d?.itemId) return
+  try {
+    const params = {}
+    if (d.materialStockId) params.materialStockId = d.materialStockId
+    else {
+      if (d.batchId) params.batchId = d.batchId
+      if (d.warehouseId) params.warehouseId = d.warehouseId
+    }
+    const res = await availableInstances(d.itemId, params)
+    const opts = res.data || []
+    const row = issueList.value[idx]
+    if (!row) return
+    row._instanceOptions = opts
+    if (!row.instanceId && opts.length === 1) {
+      // 只有一件时自动选中，减少现场操作
+      row.instanceId = opts[0].instanceId
+      row.instanceCode = opts[0].instanceCode
+      row._instanceRemain = Number(opts[0].remainingQuantity) || 0
+      if (row.quantity > row._instanceRemain) row.quantity = row._instanceRemain
+    } else if (row.instanceId) {
+      const cur = opts.find(i => i.instanceId === row.instanceId)
+      if (cur) row._instanceRemain = Number(cur.remainingQuantity) || 0
+      else { row.instanceId = null; row.instanceCode = ''; row._instanceRemain = 0 }
+    }
+    issueList.value.splice(idx, 1, { ...row })
+  } catch (e) {}
+}
+
+// 选择实物实例（扫实例码为主，这里作为手选兜底）
+function openInstancePicker(idx) {
+  const d = issueList.value[idx]
+  const opts = d?._instanceOptions || []
+  if (!opts.length) { proxy.$modal.msgError('该物料暂无在库实物，请先入库'); return }
+  const shown = opts.slice(0, 9)
+  uni.showActionSheet({
+    itemList: shown.map(i => `${i.instanceCode} · 剩${i.remainingQuantity}${i.quantityUom || ''}`),
+    success: (r) => {
+      const row = issueList.value[idx]
+      const inst = shown[r.tapIndex]
+      if (!row || !inst) return
+      row.instanceId = inst.instanceId
+      row.instanceCode = inst.instanceCode
+      row._instanceRemain = Number(inst.remainingQuantity) || 0
+      if (inst.batchId) { row.batchId = inst.batchId; row.batchCode = inst.batchCode || '' }
+      if (inst.materialStockId) row.materialStockId = inst.materialStockId
+      if (inst.warehouseId) row.warehouseId = inst.warehouseId
+      if (row.quantity > row._instanceRemain) row.quantity = row._instanceRemain
+      issueList.value.splice(idx, 1, { ...row })
+    }
+  })
 }
 
 // 打开批次选择（action sheet）
@@ -260,6 +357,7 @@ function openBatchPicker(idx) {
       }
       // 强制触发数组更新（uni-app H5 端响应式兜底）
       issueList.value.splice(idx, 1, { ...row })
+      loadInstanceOptions(idx)
     },
     fail: (err) => {
       console.log('[batch picker] cancelled or failed:', err)
@@ -276,6 +374,15 @@ async function handleSubmit() {
       proxy.$modal.msgError(`${d.itemCode} 发料量(${d.quantity})超过未发料量(${d.remain})`)
       return
     }
+    // 有实物实例的物料必须逐件发料
+    if ((d._instanceOptions || []).length && !d.instanceId) {
+      proxy.$modal.msgError(`${d.itemCode} 请先选择${d.unit2Name || '实物实例'}`)
+      return
+    }
+    if (d.instanceId && d.quantity > Number(d._instanceRemain || 0)) {
+      proxy.$modal.msgError(`${d.itemCode} 发料量(${d.quantity})超过该件剩余(${d._instanceRemain})`)
+      return
+    }
   }
   uni.showModal({
     title: '确认发料', content: `共 ${valid.length} 项物料，确认发料出库？`,
@@ -290,7 +397,10 @@ async function handleSubmit() {
           batchId: d.batchId ?? null,           // 选了批次则传真实 batchId（含 0 表示无批次库存），触发精确释放+重占
           batchCode: d.batchCode || null,
           materialStockId: d.materialStockId ?? null,
-          warehouseId: d.warehouseId || header.value.warehouseId
+          warehouseId: d.warehouseId || header.value.warehouseId,
+          instanceId: d.instanceId ?? null,
+          instanceCode: d.instanceCode || null,
+          instanceQuantity: d.instanceId ? d.quantity : null
         }))
         await issueOut(issueId.value, details)
         proxy.$modal.msgSuccess('发料成功')

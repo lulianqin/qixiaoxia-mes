@@ -9,7 +9,7 @@ import com.ruoyi.system.domain.mes.wm.WmOutsourceRecptLine;
  * 外协加工结果策略 —— 各业务（分切/印刷/...）实现自己的"录产出"逻辑。
  *
  * 通用框架在 recordResult/receive 阶段会回调 strategy，
- * 让业务方有机会创建自己的领域对象（如分切建子卷 WmRollDetail）。
+ * 让业务方有机会创建自己的领域对象（如分切建库存实物实例 WmStockInstance）。
  *
  * @author qixiaoxia
  */
